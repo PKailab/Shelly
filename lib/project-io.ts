@@ -1,0 +1,1 @@
+/data/data/com.termux/files/home/ghostty-app/project-io.ts

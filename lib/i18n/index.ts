@@ -1,0 +1,92 @@
+/**
+ * lib/i18n/index.ts — Internationalization engine
+ *
+ * Lightweight i18n using expo-localization for locale detection.
+ * Translation files are plain objects — easy for community PRs.
+ */
+import { getLocales } from 'expo-localization';
+import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import en from './locales/en';
+import ja from './locales/ja';
+
+export type Locale = 'en' | 'ja';
+
+const LOCALES: Record<Locale, Record<string, string>> = { en, ja };
+
+const STORAGE_KEY = '@shelly/locale';
+
+// ── Zustand store ────────────────────────────────────────────────────────────
+
+type I18nState = {
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  loadLocale: () => Promise<void>;
+};
+
+export const useI18n = create<I18nState>((set) => ({
+  locale: detectLocale(),
+  setLocale: (locale) => {
+    set({ locale });
+    AsyncStorage.setItem(STORAGE_KEY, locale);
+  },
+  loadLocale: async () => {
+    const saved = await AsyncStorage.getItem(STORAGE_KEY);
+    if (saved && (saved === 'en' || saved === 'ja')) {
+      set({ locale: saved });
+    }
+  },
+}));
+
+function detectLocale(): Locale {
+  try {
+    const locales = getLocales();
+    const lang = locales[0]?.languageCode ?? 'en';
+    return lang === 'ja' ? 'ja' : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
+// ── Translation function ─────────────────────────────────────────────────────
+
+/**
+ * Get translated string by key.
+ * Supports interpolation: t('hello_name', { name: 'John' }) => "Hello, John!"
+ */
+export function t(key: string, params?: Record<string, string | number>): string {
+  const locale = useI18n.getState().locale;
+  let text = LOCALES[locale]?.[key] ?? LOCALES.en[key] ?? key;
+
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      text = text.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
+    }
+  }
+
+  return text;
+}
+
+/**
+ * React hook version — re-renders on locale change.
+ */
+export function useTranslation() {
+  const locale = useI18n((s) => s.locale);
+
+  const translate = (key: string, params?: Record<string, string | number>): string => {
+    let text = LOCALES[locale]?.[key] ?? LOCALES.en[key] ?? key;
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{\\{${k}\\}\\}`, 'g'), String(v));
+      }
+    }
+    return text;
+  };
+
+  return { t: translate, locale };
+}
+
+export const AVAILABLE_LOCALES: Array<{ code: Locale; label: string; nativeLabel: string }> = [
+  { code: 'en', label: 'English', nativeLabel: 'English' },
+  { code: 'ja', label: 'Japanese', nativeLabel: '日本語' },
+];
