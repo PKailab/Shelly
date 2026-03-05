@@ -451,6 +451,9 @@ export default function TerminalScreen() {
         updateAiBlock(blockId, {
           target: 'local',
           logSummary: `[Local LLM] ${parsed.prompt.slice(0, 60)}${parsed.prompt.length > 60 ? '…' : ''}`,
+          routingDetail: undefined,
+          toolSuggestions: undefined,
+          mentionHint: undefined,
         });
       } else {
         // Local LLM disabled — show brief hint instead of suggestion cards
