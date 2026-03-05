@@ -11,6 +11,8 @@
  */
 
 import { buildSystemPrompt } from './shelly-system-prompt';
+import type { ToolStatus } from './shelly-system-prompt';
+import { routeIntent, formatRoutingMessage, type RoutingDecision } from './intent-router';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,10 +114,16 @@ export interface LocalLlmConfig {
 
 export interface OrchestrationResult {
   category: TaskCategory;
-  handledBy: 'local_llm' | 'claude' | 'gemini' | 'termux';
+  handledBy: 'local_llm' | 'claude' | 'gemini' | 'codex' | 'termux';
   response?: string;         // Local LLMが直接回答した場合
   delegatedCommand?: string; // Claude/Geminiに委譲する場合のコマンド
   reasoning: string;         // 判定理由（デバッグ用）
+  /** ツール未インストール時のセットアップ案内 */
+  setupRequired?: boolean;
+  setupMessage?: string;
+  setupToolId?: string;
+  /** ルーティング判定の詳細 */
+  routingDecision?: RoutingDecision;
 }
 
 // ─── Task Classifier ──────────────────────────────────────────────────────────
@@ -410,16 +418,13 @@ export async function ollamaChatStream(
 // ─── AI Orchestrator ──────────────────────────────────────────────────────────
 
 /**
- * AI Orchestration: タスクを分類し、適切なAIに委譲する。
+ * AI Orchestration: LLMベースでタスクを分類し、適切なAIに委譲する。
  *
  * フロー:
- * 1. Local LLM無効 → Claude Code（デフォルト）
- * 2. Local LLM有効 → タスク分類
- *    - chat → Local LLM（Ollama）で直接回答
- *    - code → Claude Codeに委譲
- *    - research → Gemini CLIに委譲
- *    - file_ops → Termux直接実行
- *    - unknown → Claude Code（安全側）
+ * 1. LLMベースのインテントルーターでユーザー意図を解析
+ * 2. 最適なツールを選択（Claude Code / Gemini CLI / Codex / ローカルLLM / Termux）
+ * 3. ツール未インストールの場合、セットアップを提案
+ * 4. LLM無効時はキーワードベースにフォールバック
  */
 export async function orchestrateTask(
   userInput: string,
@@ -428,23 +433,31 @@ export async function orchestrateTask(
   projectContext?: string,
   userProfileSummary?: string,
   customContext?: string,
+  toolStatuses?: ToolStatus[],
 ): Promise<OrchestrationResult> {
-  // Local LLM無効の場合はClaude Codeに委譲
-  if (!config.enabled) {
+  // LLMベースのインテントルーティング
+  const routing = await routeIntent(userInput, config, toolStatuses ?? []);
+
+  // ツール未インストール → セットアップ案内を返す
+  if (routing.setupRequired) {
     return {
-      category: classifyTask(userInput),
-      handledBy: 'claude',
-      delegatedCommand: buildClaudeCommand(userInput),
-      reasoning: 'Local LLM無効のため、Claude Codeに委譲',
+      category: 'unknown',
+      handledBy: 'local_llm',
+      response: routing.setupMessage,
+      reasoning: `${routing.tool}が未インストール。セットアップを提案。`,
+      setupRequired: true,
+      setupMessage: routing.setupMessage,
+      setupToolId: routing.setupToolId,
+      routingDecision: routing,
     };
   }
 
-  const category = classifyTask(userInput);
-
-  switch (category) {
-    case 'chat': {
+  // ルーティング結果に基づいて処理
+  switch (routing.tool) {
+    case 'local-llm': {
       // Local LLMで直接回答（動的システムプロンプト使用）
       const systemContent = buildSystemPrompt({
+        toolStatuses,
         projectContext,
         userProfileSummary,
         customContext,
@@ -463,43 +476,57 @@ export async function orchestrateTask(
           category: 'chat',
           handledBy: 'local_llm',
           response: result.content,
-          reasoning: `Local LLM (${config.model}) が直接回答`,
+          reasoning: routing.reason,
+          routingDecision: routing,
         };
       } else {
-        // Ollamaエラー時はClaude Codeにフォールバック
         return {
           category: 'chat',
           handledBy: 'claude',
           delegatedCommand: buildClaudeCommand(userInput),
           reasoning: `Local LLMエラー（${result.error}）のため、Claude Codeにフォールバック`,
+          routingDecision: routing,
         };
       }
     }
 
-    case 'code': {
+    case 'claude-code': {
       return {
         category: 'code',
         handledBy: 'claude',
         delegatedCommand: buildClaudeCommand(userInput),
-        reasoning: 'コード生成タスクのため、Claude Codeに委譲',
+        reasoning: routing.reason,
+        routingDecision: routing,
       };
     }
 
-    case 'research': {
+    case 'gemini-cli': {
       return {
         category: 'research',
         handledBy: 'gemini',
         delegatedCommand: buildGeminiCommand(userInput),
-        reasoning: '調査タスクのため、Gemini CLIに委譲',
+        reasoning: routing.reason,
+        routingDecision: routing,
       };
     }
 
-    case 'file_ops': {
+    case 'codex': {
+      return {
+        category: 'code',
+        handledBy: 'codex',
+        delegatedCommand: buildCodexCommand(userInput),
+        reasoning: routing.reason,
+        routingDecision: routing,
+      };
+    }
+
+    case 'termux': {
       return {
         category: 'file_ops',
         handledBy: 'termux',
         delegatedCommand: userInput,
-        reasoning: 'ファイル操作タスクのため、Termuxで直接実行',
+        reasoning: routing.reason,
+        routingDecision: routing,
       };
     }
 
@@ -508,7 +535,8 @@ export async function orchestrateTask(
         category: 'unknown',
         handledBy: 'claude',
         delegatedCommand: buildClaudeCommand(userInput),
-        reasoning: '判定不能のため、Claude Codeに委譲（安全側）',
+        reasoning: routing.reason,
+        routingDecision: routing,
       };
     }
   }
@@ -527,24 +555,18 @@ export async function orchestrateChatStream(
   projectContext?: string,
   userProfileSummary?: string,
   customContext?: string,
+  toolStatuses?: ToolStatus[],
 ): Promise<OrchestrationResult> {
-  if (!config.enabled) {
-    return {
-      category: classifyTask(userInput),
-      handledBy: 'claude',
-      delegatedCommand: buildClaudeCommand(userInput),
-      reasoning: 'Local LLM無効のため、Claude Codeに委譲',
-    };
-  }
+  // LLMベースのインテントルーティング
+  const routing = await routeIntent(userInput, config, toolStatuses ?? []);
 
-  const category = classifyTask(userInput);
-
-  if (category !== 'chat') {
-    // chat以外は通常のorchestrateに委譲
-    return orchestrateTask(userInput, config, conversationHistory, projectContext, userProfileSummary, customContext);
+  // セットアップが必要 or ローカルLLM以外 → 通常フローに委譲
+  if (routing.setupRequired || routing.tool !== 'local-llm') {
+    return orchestrateTask(userInput, config, conversationHistory, projectContext, userProfileSummary, customContext, toolStatuses);
   }
 
   const systemContent = buildSystemPrompt({
+    toolStatuses,
     projectContext,
     userProfileSummary,
     customContext,
@@ -602,6 +624,11 @@ function buildGeminiCommand(userInput: string): string {
   return `gemini --prompt "${escaped}"`;
 }
 
+function buildCodexCommand(userInput: string): string {
+  const escaped = userInput.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+  return `codex "${escaped}"`;
+}
+
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 /**
@@ -626,6 +653,7 @@ export function getHandlerLabel(handler: OrchestrationResult['handledBy']): stri
     local_llm: 'ローカルLLM',
     claude: 'Claude Code',
     gemini: 'Gemini CLI',
+    codex: 'Codex CLI',
     termux: 'Termux',
   };
   return labels[handler];
