@@ -234,6 +234,7 @@ const ja: Record<string, string> = {
   'setup.step4_start': 'はじめる',
   'setup.back': '戻る',
   'setup.next': '次へ',
+  'setup.skip': 'スキップ',
   'settings.rerun_setup': 'セットアップを再実行',
 };
 

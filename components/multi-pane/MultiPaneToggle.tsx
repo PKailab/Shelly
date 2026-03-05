@@ -15,8 +15,8 @@ export function MultiPaneToggle() {
   const layout = useDeviceLayout();
   const { isMultiPane, toggleMultiPane } = useMultiPaneStore();
 
-  // Only show on inner screen
-  if (!layout.isFoldInner || layout.isFoldOuter) return null;
+  // Only show on wide screens (tablet, foldable inner, desktop)
+  if (!layout.isWide) return null;
 
   return (
     <Pressable

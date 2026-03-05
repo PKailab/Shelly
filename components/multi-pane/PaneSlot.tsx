@@ -17,9 +17,11 @@ type Props = {
   index: number;
   onChangeTab: (index: number, tab: PaneTab) => void;
   onRemove: (index: number) => void;
+  canAddPane?: boolean;
+  onAddPane?: () => void;
 };
 
-const PaneSlotInner = ({ tab, index, onChangeTab, onRemove }: Props) => {
+const PaneSlotInner = ({ tab, index, onChangeTab, onRemove, canAddPane, onAddPane }: Props) => {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [paneWidth, setPaneWidth] = useState(0);
   const entry = PANE_REGISTRY[tab];
@@ -42,6 +44,15 @@ const PaneSlotInner = ({ tab, index, onChangeTab, onRemove }: Props) => {
         </Text>
         <MaterialIcons name="arrow-drop-down" size={16} color="#9BA1A6" />
         <View style={styles.headerSpacer} />
+        {canAddPane && (
+          <Pressable
+            style={styles.addBtn}
+            onPress={onAddPane}
+            hitSlop={8}
+          >
+            <MaterialIcons name="add" size={14} color={ACCENT} />
+          </Pressable>
+        )}
         <Pressable
           style={styles.closeBtn}
           onPress={() => onRemove(index)}
@@ -100,6 +111,10 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     flex: 1,
+  },
+  addBtn: {
+    padding: 2,
+    marginRight: 4,
   },
   closeBtn: {
     padding: 2,

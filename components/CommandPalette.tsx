@@ -75,7 +75,7 @@ export function CommandPalette() {
     ];
 
     // Multi-pane actions (inner screen only)
-    if (layout.isFoldInner) {
+    if (layout.isWide) {
       list.push(
         { id: 'pane-toggle', label: isMultiPane ? t('palette.single_pane') : t('palette.multi_pane'),
           hint: isMultiPane ? t('palette.hint_single') : t('palette.hint_multi'),
@@ -113,7 +113,7 @@ export function CommandPalette() {
     });
 
     return list;
-  }, [snippets, isMultiPane, layout.isFoldInner]);
+  }, [snippets, isMultiPane, layout.isWide]);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return actions;

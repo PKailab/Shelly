@@ -234,6 +234,7 @@ const en: Record<string, string> = {
   'setup.step4_start': 'Get Started',
   'setup.back': 'Back',
   'setup.next': 'Next',
+  'setup.skip': 'Skip',
   'settings.rerun_setup': 'Re-run Setup Wizard',
 };
 

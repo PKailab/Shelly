@@ -27,6 +27,8 @@ import { parseInput, buildRoutingDetail } from '@/lib/input-router';
 import { orchestrateTask, orchestrateChatStream } from '@/lib/local-llm';
 import { shouldShowHint } from '@/lib/hint-tracker';
 import { interpretTermuxOutput, explainCommandIntent } from '@/lib/llm-interpreter';
+import { loadProjectContext, generateProjectContext, clearProjectContextCache } from '@/lib/project-context';
+import { loadUserProfile, learnFromCommand, learnFromAgentUse, learnFromUserInput, learnFromProject, formatProfileForPrompt } from '@/lib/user-profile';
 import { requestNotificationPermission } from '@/lib/command-notifier';
 import { detectGitIntent, generateGuide } from '@/lib/git-assistant';
 import type { AiBlock } from '@/store/types';
@@ -79,6 +81,40 @@ export default function TerminalScreen() {
     requestNotificationPermission();
   }, []);
 
+  // ── ユーザープロファイル（自動学習）─────────────────────────────────────────
+  const userProfileRef = useRef<string>('');
+
+  useEffect(() => {
+    loadUserProfile().then((p) => {
+      userProfileRef.current = formatProfileForPrompt(p);
+    });
+  }, []);
+
+  // ── プロジェクトコンテキスト（ローカルLLM強化用）───────────────────────────
+  const projectContextRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!isBridgeConnected || !settings.localLlmEnabled) return;
+    const cwd = activeSession.currentDir;
+    loadProjectContext(cwd, sendCommand).then(async (ctx) => {
+      if (ctx) {
+        projectContextRef.current = ctx;
+      } else {
+        // context.mdがない場合、package.json等があれば自動生成
+        const hasProject = await sendCommand(
+          `test -f "${cwd}/package.json" -o -f "${cwd}/Cargo.toml" -o -f "${cwd}/go.mod" -o -f "${cwd}/pyproject.toml" -o -f "${cwd}/Makefile" && echo "yes" || echo "no"`,
+        );
+        if (hasProject.trim() === 'yes') {
+          const generated = await generateProjectContext(cwd, sendCommand);
+          projectContextRef.current = generated;
+          // プロジェクトアクセスを学習
+          const projName = cwd.split('/').pop() ?? cwd;
+          learnFromProject(cwd, projName).catch(() => {});
+        }
+      }
+    });
+  }, [isBridgeConnected, settings.localLlmEnabled, activeSession.currentDir]);
+
   // ── LLM通訳: Termuxブロック完了時に自動トリガー ──────────────────────────
   const interpretedBlocksRef = useRef<Set<string>>(new Set());
 
@@ -122,7 +158,7 @@ export default function TerminalScreen() {
               llmInterpretationStreaming: (current?.llmInterpretationStreaming ?? '') + chunk,
             });
           },
-          { verbosity },
+          { verbosity, projectContext: projectContextRef.current },
         ).then((result) => {
           if (result.text) {
             updateBlockInterpretation(block.id, {
@@ -204,6 +240,20 @@ export default function TerminalScreen() {
   const handleSend = useCallback(async (input: string, images?: ImageAttachment[]) => {
     const parsed = parseInput(input);
 
+    // ── 自動学習（バックグラウンド、UIブロックしない）──────────────────────
+    if (parsed.layer === 'command') {
+      learnFromCommand(parsed.prompt).catch(() => {});
+    } else {
+      learnFromUserInput(parsed.prompt).catch(() => {});
+      if (parsed.target !== 'termux' && parsed.target !== 'suggest') {
+        learnFromAgentUse(parsed.target).catch(() => {});
+      }
+    }
+    // プロファイルサマリーを非同期更新
+    loadUserProfile().then((p) => {
+      userProfileRef.current = formatProfileForPrompt(p);
+    });
+
     // Set input mode for UI switching
     setLastInputMode(parsed.layer === 'command' ? 'shell' : 'natural');
 
@@ -275,6 +325,42 @@ export default function TerminalScreen() {
           response: `Geminiエラー: ${geminiResult.error ?? '不明なエラー'}`,
           isStreaming: false,
           logSummary: '[Gemini] エラー',
+        });
+      }
+      return;
+    }
+
+    // ── Built-in: shelly context ────────────────────────────────────────────────
+    if (parsed.layer === 'command' && /^shelly\s+context/i.test(parsed.prompt.trim())) {
+      const cwd = activeSession.currentDir;
+      const blockId = `ai-${Date.now()}`;
+      const aiBlock: AiBlock = {
+        id: blockId,
+        sessionId: activeSession.id,
+        blockType: 'ai',
+        input: parsed.raw,
+        target: 'local',
+        layer: 'command',
+        logSummary: '[Shelly] context.md 自動生成中...',
+        showHint: false,
+        timestamp: Date.now(),
+      };
+      addAiBlock(aiBlock);
+      updateAiBlock(blockId, { isStreaming: true, streamingText: '解析中...' });
+
+      try {
+        const ctx = await generateProjectContext(cwd, sendCommand);
+        projectContextRef.current = ctx;
+        updateAiBlock(blockId, {
+          response: `.shelly/context.md を生成しました (${ctx.length}文字)\nLLMが自動でプロジェクト情報を参照します。\n\n---\n${ctx.slice(0, 1500)}${ctx.length > 1500 ? '\n...(省略)' : ''}`,
+          isStreaming: false,
+          logSummary: '[Shelly] context.md 生成完了',
+        });
+      } catch (err) {
+        updateAiBlock(blockId, {
+          response: `context.md の生成に失敗しました: ${err instanceof Error ? err.message : String(err)}`,
+          isStreaming: false,
+          logSummary: '[Shelly] context生成エラー',
         });
       }
       return;
@@ -385,6 +471,9 @@ export default function TerminalScreen() {
             });
           }
         },
+        [],
+        projectContextRef.current,
+        userProfileRef.current,
       );
 
       if (result.handledBy !== 'local_llm') {

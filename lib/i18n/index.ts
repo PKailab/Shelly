@@ -28,23 +28,38 @@ export const useI18n = create<I18nState>((set) => ({
   locale: detectLocale(),
   setLocale: (locale) => {
     set({ locale });
-    AsyncStorage.setItem(STORAGE_KEY, locale);
+    AsyncStorage.setItem(STORAGE_KEY, locale).catch(() => {});
   },
   loadLocale: async () => {
-    const saved = await AsyncStorage.getItem(STORAGE_KEY);
-    if (saved && (saved === 'en' || saved === 'ja')) {
-      set({ locale: saved });
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved && (saved === 'en' || saved === 'ja')) {
+        set({ locale: saved });
+        return;
+      }
+    } catch {
+      // AsyncStorage unavailable (SSR etc.)
     }
+    // 保存値がなければ再検出（SSR→クライアント遷移時に正しい値になる）
+    set({ locale: detectLocale() });
   },
 }));
 
 function detectLocale(): Locale {
   try {
+    // Web: navigator.languages > navigator.language
+    if (typeof navigator !== 'undefined') {
+      const langs = navigator.languages ?? [navigator.language];
+      if (langs.some(l => l?.startsWith('ja'))) return 'ja';
+    }
+    // Native: expo-localization
     const locales = getLocales();
     const lang = locales[0]?.languageCode ?? 'en';
     return lang === 'ja' ? 'ja' : 'en';
   } catch {
-    return 'en';
+    // SSR(Node.js) or detection failure → 日本語デフォルト
+    // ターゲットユーザーが日本語圏のため
+    return 'ja';
   }
 }
 

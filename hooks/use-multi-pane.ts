@@ -82,7 +82,8 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
       const { panes } = get();
       if (index < 0 || index >= panes.length) return;
       const next = panes.filter((_, i) => i !== index);
-      if (next.length === 0) {
+      if (next.length <= 1) {
+        // Auto-exit multi-pane when only 0-1 pane remains
         set({ isMultiPane: false, panes: [] });
       } else {
         set({ panes: next });

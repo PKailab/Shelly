@@ -409,8 +409,13 @@ export function SetupWizard({ visible, onComplete }: Props) {
     }
   };
 
-  // Can advance? Step 2 requires connection test was NOT enforced (just copy),
-  // Step 3 requires successful connection
+  // ── Skip wizard (Web or advanced users) ──────────────────────────────────
+  const handleSkip = useCallback(async () => {
+    await AsyncStorage.setItem(SETUP_WIZARD_KEY, 'true').catch(() => {});
+    onComplete();
+  }, [onComplete]);
+
+  // Can advance? Step 3 requires successful connection (but skip is always available)
   const canAdvance = (): boolean => {
     if (step === 2) return connectionStatus === 'success';
     return true;
@@ -472,6 +477,11 @@ export function SetupWizard({ visible, onComplete }: Props) {
           <ScrollView style={styles.contentArea} contentContainerStyle={styles.contentAreaInner} showsVerticalScrollIndicator={false}>
             {renderCurrentStep()}
           </ScrollView>
+
+          {/* Skip link */}
+          <Pressable style={{ alignSelf: 'flex-end', paddingHorizontal: 16, paddingBottom: 4 }} onPress={handleSkip}>
+            <Text style={{ color: '#6B7280', fontSize: 12 }}>{t('setup.skip') ?? 'スキップ'}</Text>
+          </Pressable>
 
           {/* Navigation */}
           <View style={styles.navRow}>

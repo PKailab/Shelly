@@ -8,7 +8,6 @@ import { useCommandPaletteStore } from "@/hooks/use-command-palette";
 import { useQuickTerminalStore } from "@/hooks/use-quick-terminal";
 import { matchKeybinding, type KeyAction } from "@/lib/keybindings";
 import { MultiPaneContainer } from "@/components/multi-pane/MultiPaneContainer";
-import { MultiPaneToggle } from "@/components/multi-pane/MultiPaneToggle";
 import { CommandPalette } from "@/components/CommandPalette";
 import { QuickTerminal } from "@/components/QuickTerminal";
 import { Onboarding, isOnboardingComplete } from "@/components/Onboarding";
@@ -56,7 +55,7 @@ export default function TabLayout() {
         useQuickTerminalStore.getState().toggle();
         break;
       case 'multi_pane_toggle':
-        if (layout.isFoldInner) toggleMultiPane();
+        if (layout.isWide) toggleMultiPane();
         break;
       case 'new_session':
         useTerminalStore.getState().addSession();
@@ -72,7 +71,7 @@ export default function TabLayout() {
         // Tab navigation handled by expo-router natively
         break;
     }
-  }, [layout.isFoldInner, toggleMultiPane, router]);
+  }, [layout.isWide, toggleMultiPane, router]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' && Platform.OS !== 'android') return;
@@ -91,21 +90,21 @@ export default function TabLayout() {
     }
   }, [handleKeyAction]);
 
-  // Auto-disable multi-pane when folded to outer screen
+  // Auto-disable multi-pane on non-wide screens
   useEffect(() => {
-    if (layout.isFoldOuter) {
+    if (!layout.isWide) {
       disableMultiPane();
     }
-  }, [layout.isFoldOuter]);
+  }, [layout.isWide]);
 
   // Adjust maxPanes on rotation: landscape=3, portrait=2
   useEffect(() => {
-    if (layout.isFoldInner) {
+    if (layout.isWide) {
       setMaxPanes(layout.isLandscape ? 3 : 2);
     }
-  }, [layout.isFoldInner, layout.isLandscape]);
+  }, [layout.isWide, layout.isLandscape]);
 
-  const showMultiPane = isMultiPane && layout.isFoldInner;
+  const showMultiPane = isMultiPane && layout.isWide;
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -205,9 +204,6 @@ export default function TabLayout() {
 
       {/* Multi-pane overlay (covers entire screen when active) */}
       {showMultiPane && <MultiPaneContainer />}
-
-      {/* FAB toggle (inner screen only, hidden when multi-pane is active) */}
-      {!showMultiPane && <MultiPaneToggle />}
 
       {/* Command Palette (Ctrl+Shift+P) */}
       <CommandPalette />

@@ -45,7 +45,7 @@ export async function interpretTermuxOutput(
   exitCode: number | null,
   config: LlmConfig,
   onChunk: StreamingCallback,
-  options?: { verbosity?: 'verbose' | 'minimal' },
+  options?: { verbosity?: 'verbose' | 'minimal'; projectContext?: string },
 ): Promise<InterpretResult> {
   if (!config.enabled || !config.baseUrl) {
     return { type: 'progress', text: '' };
@@ -91,9 +91,14 @@ export async function interpretTermuxOutput(
 コマンドの実行結果を見て、何が起きたかを必ず日本語で1〜3文で簡潔に説明してください。
 専門用語は避け、ユーザーが理解しやすい言葉で。`;
 
-  const systemPrompt = isError
+  let systemPrompt = isError
     ? (verbosity === 'verbose' ? verboseError : minimalError)
     : (verbosity === 'verbose' ? verboseSuccess : minimalSuccess);
+
+  const projectContext = options?.projectContext;
+  if (projectContext) {
+    systemPrompt += `\n\n--- プロジェクトコンテキスト ---\n${projectContext}\n--- ここまで ---\n\nこのプロジェクト固有の情報を踏まえて回答してください。`;
+  }
 
   const userContent = isError
     ? `コマンド: ${command}\n終了コード: ${exitCode}\n\nstdout:\n${stdout || '(なし)'}\n\nstderr:\n${stderr || '(なし)'}`
