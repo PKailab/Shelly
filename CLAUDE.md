@@ -58,13 +58,13 @@ Shelly/
 │   ├── Onboarding.tsx         # 初回起動チュートリアル
 │   └── SetupWizard.tsx        # Termuxセットアップウィザード（スキップ可能）
 ├── lib/
-│   ├── input-router.ts        # 4層入力ルーティング
+│   ├── input-router.ts        # 4層+4.5層入力ルーティング（軽量タスク直送）
 │   ├── local-llm.ts           # ローカルLLMオーケストレーション
 │   ├── llm-interpreter.ts     # コマンド出力のAI解釈
 │   ├── project-context.ts     # プロジェクトコンテキスト自動生成（.shelly/context.md）
 │   ├── user-profile.ts        # ユーザープロファイル自動学習
-│   ├── command-safety.ts      # コマンド安全チェック（5段階）
-│   ├── git-assistant.ts       # @git 自然言語Gitガイド
+│   ├── command-safety.ts      # コマンド安全チェック（5段階）+ リカバリ提案
+│   ├── git-assistant.ts       # @git 自然言語Gitガイド（5コアインテント + LLM委譲）
 │   ├── gemini.ts              # Gemini API統合
 │   ├── perplexity.ts          # Perplexity API統合
 │   ├── team-roundtable.ts     # @team マルチAI並列実行
@@ -148,6 +148,17 @@ Shelly/
 6. **プロジェクトコンテキスト自動生成**（`lib/project-context.ts`）: プロジェクトディレクトリの`.shelly/context.md`を自動生成し、LLMシステムプロンプトに注入
 
 7. **ユーザープロファイル自動学習**（`lib/user-profile.ts`）: コマンド使用頻度、AIエージェント使用傾向、スキル検出、事実抽出を自動で学習
+
+### 2026-03-06 マルチエージェントフィードバック反映
+
+1. **軽量タスクルーティング（Layer 4.5）**: `lib/input-router.ts` に `LIGHTWEIGHT_PATTERNS`（10パターン）追加。「ファイル一覧」「今どこ」等の自然言語をAPI不要でシェルコマンドに直送
+2. **Git Assistant簡略化**: `lib/git-assistant.ts` の16インテント → 5コア（commit/push/status/diff/help）に集約。それ以外はLLM委譲ガイドを表示
+3. **SetupWizard 2択分岐**: `components/SetupWizard.tsx` に「おすすめ構成」vs「カスタム構成」のモード選択画面を追加。おすすめ = Gemini CLIデフォルト + AI選択ステップをスキップ
+4. **Creatorタスクテンプレート**: `components/creator/CommandLane.tsx` に4テンプレート（Node API / 静的サイト / CLIツール / Python Script）のワンタップ生成カード追加
+5. **コマンド安全リカバリ提案**: `lib/command-safety.ts` に `getRecoverySuggestion()` 追加。rm/git reset --hard/force push/chmod 777/DROP TABLE後の復旧手順を提示
+6. **設定画面の上級トグル**: `app/(tabs)/settings.tsx` に「上級設定を表示/閉じる」トグル追加。Termux Bridge / Local LLM / API設定等を折りたたみ
+7. **AIエラーブロック**: `components/terminal/AiBlock.tsx` にリトライ/別AIに聞くアクションボタン追加
+8. **@team UI改善**: `app/(tabs)/index.tsx` でファシリテーターまとめを先頭表示、個別回答を後に配置
 
 ### 未完了・リマインド
 

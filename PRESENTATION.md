@@ -40,7 +40,7 @@ Shelly
 ├── Browser       — In-app web browser
 ├── Obsidian      — Knowledge base / RAG integration
 ├── Search        — Cross-session search
-└── Settings      — 38 configuration sections
+└── Settings      — 38 configuration sections (advanced toggle for power users)
 ```
 
 ### Core Data Flow
@@ -49,12 +49,13 @@ Shelly
 User Input
     │
     ▼
-4-Layer Input Router (lib/input-router.ts)
+5-Layer Input Router (lib/input-router.ts)
     │
-    ├── Layer 1: @mention     → Direct AI routing (@claude, @gemini, @local, @team, @git, etc.)
-    ├── Layer 2: NL + Tool    → Keyword detection ("claudeで", "検索して", "ollamaで")
-    ├── Layer 3: Natural Lang  → Tool suggestions with confidence scores
-    └── Layer 4: Shell Command → Pattern detection (pipes, paths, known CLIs)
+    ├── Layer 1:   @mention        → Direct AI routing (@claude, @gemini, @local, @team, @git, etc.)
+    ├── Layer 2:   NL + Tool       → Keyword detection ("claudeで", "検索して", "ollamaで")
+    ├── Layer 3:   Natural Lang    → Tool suggestions with confidence scores
+    ├── Layer 4:   Shell Command   → Pattern detection (pipes, paths, known CLIs)
+    └── Layer 4.5: Lightweight NL  → Simple NL→shell shortcut ("ファイル一覧"→ls, "今どこ"→pwd) — no API call
     │
     ▼
 Target Execution
@@ -108,7 +109,7 @@ Real bidirectional communication with Termux via WebSocket (ws://127.0.0.1:8765)
 
 ### 3. @team Table — Multi-Agent Consensus
 
-Sends the same prompt to all enabled AI agents in parallel, collects responses, and has a facilitator AI generate a unified summary.
+Sends the same prompt to all enabled AI agents in parallel, collects responses, and has a facilitator AI generate a unified summary. Results display facilitator summary first, followed by individual agent responses.
 
 **Supported Members:**
 - Claude (CLI, yellow), Gemini (CLI, blue), Codex (CLI, optional)
@@ -138,6 +139,13 @@ Pattern-based detection with ~20 regex rules covering:
 - Pipe-to-interpreter attacks
 - Privilege escalation attempts
 
+**Post-Execution Recovery Suggestions:**
+- `rm` → git checkout / git restore guidance
+- `git reset --hard` → reflog recovery steps
+- `git push --force` → force-with-lease recommendation
+- `chmod 777` → correct permission values (755/644)
+- `DROP TABLE / TRUNCATE` → backup restore procedures
+
 ### 5. Creator Engine — AI Project Generation
 
 4-lane workflow for generating complete projects from natural language:
@@ -153,6 +161,7 @@ CommandLane → PlanLane → BuildLane → ResultLane
 - Project types: web (HTML/CSS/JS), script (Node/Python), document (MD/JSON)
 - Project history with clone, improve, delete operations
 - Save as recipe (reusable snippet template)
+- **1-tap Task Templates:** Node API, Static Site, CLI Tool, Python Script — preset prompts for instant project creation
 
 ### 6. LLM Output Interpreter
 
@@ -167,14 +176,14 @@ Translates terminal command outputs to natural language using Local LLM:
 
 Natural language Git tutoring triggered by `@git`:
 
-**Supported Intents (16):**
-commit, push, pull, branch, merge, undo, status, log, diff, stash, clone, init, conflict, tag, remote, help
+**Core Intents (5):** commit, push, status, diff, help — full guided workflow with action buttons
+
+**Advanced Intents (11):** branch, merge, undo, pull, stash, clone, init, conflict, tag, remote, log — delegated to AI agents (@claude, @gemini) with a status-check command as fallback
 
 **Workflow:**
 1. Detect intent from Japanese/English natural language
-2. Run `git status` to understand repository state
-3. Generate beginner-friendly Japanese explanation
-4. Present executable commands as action buttons
+2. Core intents: Run `git status`, generate beginner-friendly guide, present action buttons
+3. Advanced intents: Suggest AI agent delegation with example prompts
 
 ### 8. Snippet Management
 
@@ -351,7 +360,7 @@ The app is self-referential: Shelly is a terminal IDE, built inside a terminal (
 - **Sound Effects:** 14 feedback sounds
 - **Animation Presets:** 9 (4 spring + 5 timing)
 - **Keyboard Shortcuts:** 8+ physical key bindings
-- **Git Intents:** 16 natural language patterns
+- **Git Intents:** 5 core + 11 AI-delegated
 - **Safety Patterns:** ~20 danger detection rules
 - **Supported Languages:** Japanese / English
 
@@ -360,5 +369,16 @@ The app is self-referential: Shelly is a terminal IDE, built inside a terminal (
 ## Summary
 
 Shelly is not just a terminal emulator — it's a mobile-first development environment that combines real shell access, multi-AI orchestration, project scaffolding, command safety, and a polished UI with spring physics animations. Every component uses a centralized theme system, every interaction has haptic and audio feedback, and every animation respects system accessibility settings.
+
+### 11. Setup Wizard — 2-Choice Onboarding
+
+New users are presented with two paths before the 5-step setup wizard:
+
+- **おすすめ構成 (Recommended):** Sets Gemini CLI as default agent, skips AI tool selection step. One-tap to start.
+- **カスタム構成 (Custom):** Full 5-step wizard with manual AI tool selection.
+
+This reduces initial friction for beginners while preserving flexibility for power users.
+
+---
 
 Built entirely on a smartphone, for smartphones.
