@@ -178,6 +178,8 @@ export function LlamaCppSection({
   // ── Render ────────────────────────────────────────────────────────────────
 
   const recommended = getRecommendedModel();
+  const installedModels = MODEL_CATALOG.filter((m) => installedModelIds.has(m.id));
+  const notInstalledModels = MODEL_CATALOG.filter((m) => !installedModelIds.has(m.id));
 
   return (
     <View>
@@ -230,17 +232,57 @@ export function LlamaCppSection({
         </TouchableOpacity>
       )}
 
-      {/* モデルカタログ */}
+      {/* ── インストール済みモデル ──────────────────────────────────────── */}
+      {installedModels.length > 0 && (
+        <>
+          <Text style={styles.catalogLabel}>インストール済み</Text>
+          {installedModels.map((model) => {
+            const isActive = activeModelId === model.id;
+            return (
+              <View key={model.id} style={[styles.modelCard, isActive && styles.modelCardActive]}>
+                <View style={styles.installedRow}>
+                  <View style={styles.installedInfo}>
+                    <View style={styles.modelTitleRow}>
+                      <Text style={styles.modelName}>{model.name}</Text>
+                      {isActive && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>使用中</Text></View>}
+                    </View>
+                    <Text style={styles.modelMeta}>{model.sizeGb}GB · RAM {model.ramRequiredGb}GB</Text>
+                  </View>
+                  <View style={styles.installedActions}>
+                    {!isActive && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.actionBtnPrimary]}
+                        onPress={() => handleStartServer(model)}
+                      >
+                        <Text style={styles.actionBtnPrimaryText}>起動</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.actionBtnDanger]}
+                      onPress={() => handleDeleteModel(model)}
+                    >
+                      <MaterialIcons name="delete-outline" size={14} color="#F87171" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          <Text style={styles.storageSummary}>
+            ストレージ使用量: {installedModels.reduce((sum, m) => sum + m.sizeGb, 0).toFixed(1)}GB
+          </Text>
+        </>
+      )}
+
+      {/* ── モデルカタログ（未インストールのみ） ──────────────────────────── */}
       <Text style={styles.catalogLabel}>モデルカタログ</Text>
-      {MODEL_CATALOG.map((model) => {
-        const isActive = activeModelId === model.id;
-        const isInstalled = installedModelIds.has(model.id);
+      {notInstalledModels.map((model) => {
         const isExpanded = expandedModelId === model.id;
         const isLoading = loadingModelId === model.id;
         const isRec = recommended?.id === model.id;
 
         return (
-          <View key={model.id} style={[styles.modelCard, isActive && styles.modelCardActive]}>
+          <View key={model.id} style={styles.modelCard}>
             <TouchableOpacity
               style={styles.modelHeader}
               onPress={() => setExpandedModelId(isExpanded ? null : model.id)}
@@ -249,7 +291,6 @@ export function LlamaCppSection({
                 <Text style={styles.modelName}>{model.name}</Text>
                 {isRec && <View style={styles.recBadge}><Text style={styles.recBadgeText}>推奨</Text></View>}
                 {model.badge && <View style={styles.badge}><Text style={styles.badgeText}>{model.badge}</Text></View>}
-                {isActive && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>使用中</Text></View>}
               </View>
               <Text style={styles.modelMeta}>{model.sizeGb}GB · RAM {model.ramRequiredGb}GB · {model.quantization}</Text>
             </TouchableOpacity>
@@ -258,34 +299,16 @@ export function LlamaCppSection({
               <View style={styles.modelDetail}>
                 <Text style={styles.modelDesc}>{model.description}</Text>
                 <View style={styles.modelActions}>
-                  {!isInstalled && (
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.actionBtnPrimary]}
-                      onPress={() => handleDownload(model)}
-                      disabled={isLoading}
-                    >
-                      {isLoading
-                        ? <ActivityIndicator size="small" color="#0A0A0A" />
-                        : <Text style={styles.actionBtnPrimaryText}>ダウンロード</Text>
-                      }
-                    </TouchableOpacity>
-                  )}
-                  {isInstalled && (
-                    <>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionBtnPrimary]}
-                        onPress={() => handleStartServer(model)}
-                      >
-                        <Text style={styles.actionBtnPrimaryText}>起動</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, styles.actionBtnDanger]}
-                        onPress={() => handleDeleteModel(model)}
-                      >
-                        <Text style={styles.actionBtnDangerText}>削除</Text>
-                      </TouchableOpacity>
-                    </>
-                  )}
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnPrimary]}
+                    onPress={() => handleDownload(model)}
+                    disabled={isLoading}
+                  >
+                    {isLoading
+                      ? <ActivityIndicator size="small" color="#0A0A0A" />
+                      : <Text style={styles.actionBtnPrimaryText}>ダウンロード ({model.sizeGb}GB)</Text>
+                    }
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -395,4 +418,20 @@ const styles = StyleSheet.create({
   actionBtnPrimaryText: { color: '#0A0A0A', fontSize: 12, fontWeight: '700', fontFamily: 'monospace' },
   actionBtnDanger: { backgroundColor: '#1A0A0A', borderWidth: 1, borderColor: '#F87171' },
   actionBtnDangerText: { color: '#F87171', fontSize: 12, fontFamily: 'monospace' },
+  installedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  installedInfo: { flex: 1 },
+  installedActions: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  storageSummary: {
+    color: '#6B7280',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    textAlign: 'right',
+    marginBottom: 12,
+    marginTop: 2,
+  },
 });
