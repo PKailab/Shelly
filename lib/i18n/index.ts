@@ -57,9 +57,8 @@ function detectLocale(): Locale {
     const lang = locales[0]?.languageCode ?? 'en';
     return lang === 'ja' ? 'ja' : 'en';
   } catch {
-    // SSR(Node.js) or detection failure → 日本語デフォルト
-    // ターゲットユーザーが日本語圏のため
-    return 'ja';
+    // SSR(Node.js) or detection failure → English default for OSS
+    return 'en';
   }
 }
 

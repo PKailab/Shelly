@@ -122,6 +122,22 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
     return !isShellCommand(trimmed);
   }, [inputText]);
 
+  // Detected routing mode for visual indicator
+  const detectedMode = useMemo((): { label: string; color: string } | null => {
+    const trimmed = inputText.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('@claude')) return { label: 'Claude', color: '#00D4AA' };
+    if (trimmed.startsWith('@gemini')) return { label: 'Gemini', color: '#60A5FA' };
+    if (trimmed.startsWith('@local')) return { label: 'Local LLM', color: '#FBBF24' };
+    if (trimmed.startsWith('@perplexity')) return { label: 'Perplexity', color: '#A78BFA' };
+    if (trimmed.startsWith('@team')) return { label: 'Team', color: '#F472B6' };
+    if (trimmed.startsWith('@git')) return { label: 'Git', color: '#F87171' };
+    if (trimmed.startsWith('@open')) return { label: 'Browser', color: '#60A5FA' };
+    if (trimmed.startsWith('@')) return { label: 'AI', color: '#8B5CF6' };
+    if (!isShellCommand(trimmed)) return { label: 'AI', color: '#8B5CF6' };
+    return { label: 'Shell', color: '#93C5FD' };
+  }, [inputText]);
+
   // @mention detection: show dropdown when input starts with @ (no space yet after trigger)
   const mentionState = useMemo(() => {
     const trimmed = inputText.trimStart();
@@ -377,6 +393,16 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
         </ScrollView>
       )}
 
+      {/* Route mode indicator */}
+      {detectedMode && (
+        <View style={styles.modeIndicatorRow}>
+          <View style={[styles.modeBadge, { backgroundColor: withAlpha(detectedMode.color, 0.12), borderColor: withAlpha(detectedMode.color, 0.3) }]}>
+            <View style={[styles.modeDot, { backgroundColor: detectedMode.color }]} />
+            <Text style={[styles.modeLabel, { color: detectedMode.color }]}>{detectedMode.label}</Text>
+          </View>
+        </View>
+      )}
+
       <View style={styles.inputRow}>
         {/* Prompt indicator with mode-switch animation */}
         <Animated.Text style={[
@@ -494,6 +520,31 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
 const styles = StyleSheet.create({
   wrapper: {
     borderTopWidth: 1,
+  },
+  modeIndicatorRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  modeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  modeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  modeLabel: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '700',
   },
   thumbnailStrip: {
     maxHeight: 68,

@@ -180,6 +180,107 @@ export default function SettingsScreen() {
   // Auto-approve level for CLI permission proxy
   const autoApproveLevel = settings.autoApproveLevel ?? 'safe';
 
+  // Diagnostics
+  const [diagResults, setDiagResults] = useState<{
+    bridge: 'checking' | 'ok' | 'fail' | null;
+    latency: number | null;
+    claudeCli: 'checking' | 'ok' | 'fail' | null;
+    geminiCli: 'checking' | 'ok' | 'fail' | null;
+    codexCli: 'checking' | 'ok' | 'fail' | null;
+    ollama: 'checking' | 'ok' | 'fail' | null;
+    storage: 'checking' | 'ok' | 'fail' | null;
+  }>({ bridge: null, latency: null, claudeCli: null, geminiCli: null, codexCli: null, ollama: null, storage: null });
+  const [isDiagRunning, setIsDiagRunning] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const runDiagnostics = useCallback(async () => {
+    setIsDiagRunning(true);
+    setDiagResults({ bridge: 'checking', latency: null, claudeCli: 'checking', geminiCli: 'checking', codexCli: 'checking', ollama: 'checking', storage: 'checking' });
+
+    // 1. Bridge connection + latency
+    const t0 = Date.now();
+    const bridgeOk = await testConnection().catch(() => false);
+    const latencyMs = Date.now() - t0;
+    setDiagResults(prev => ({ ...prev, bridge: bridgeOk ? 'ok' : 'fail', latency: bridgeOk ? latencyMs : null }));
+
+    // If bridge not connected, mark CLI checks as fail
+    if (!bridgeOk) {
+      setDiagResults(prev => ({ ...prev, claudeCli: 'fail', geminiCli: 'fail', codexCli: 'fail', storage: 'fail' }));
+      // Still check ollama directly
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 3000);
+        const res = await fetch(`${settings.localLlmUrl}/api/tags`, { signal: ctrl.signal }).catch(() => null);
+        clearTimeout(timer);
+        setDiagResults(prev => ({ ...prev, ollama: res?.ok ? 'ok' : 'fail' }));
+      } catch {
+        setDiagResults(prev => ({ ...prev, ollama: 'fail' }));
+      }
+      setIsDiagRunning(false);
+      return;
+    }
+
+    // 2. Check CLIs via bridge
+    const checkCli = async (cmd: string): Promise<boolean> => {
+      try {
+        const result = await runRawCommand(`which ${cmd}`, { timeoutMs: 5000 });
+        return result.exitCode === 0;
+      } catch { return false; }
+    };
+
+    const [claude, gemini, codex] = await Promise.all([
+      checkCli('claude'),
+      checkCli('gemini'),
+      checkCli('codex'),
+    ]);
+    setDiagResults(prev => ({
+      ...prev,
+      claudeCli: claude ? 'ok' : 'fail',
+      geminiCli: gemini ? 'ok' : 'fail',
+      codexCli: codex ? 'ok' : 'fail',
+    }));
+
+    // 3. Ollama
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      const res = await fetch(`${settings.localLlmUrl}/api/tags`, { signal: ctrl.signal }).catch(() => null);
+      clearTimeout(timer);
+      setDiagResults(prev => ({ ...prev, ollama: res?.ok ? 'ok' : 'fail' }));
+    } catch {
+      setDiagResults(prev => ({ ...prev, ollama: 'fail' }));
+    }
+
+    // 4. Storage
+    try {
+      const result = await runRawCommand('ls ~/storage/shared 2>/dev/null && echo OK', { timeoutMs: 5000 });
+      setDiagResults(prev => ({ ...prev, storage: (result.stdout || '').includes('OK') ? 'ok' : 'fail' }));
+    } catch {
+      setDiagResults(prev => ({ ...prev, storage: 'fail' }));
+    }
+
+    setIsDiagRunning(false);
+  }, [testConnection, runRawCommand, settings.localLlmUrl]);
+
+  const copyDiagnostics = useCallback(() => {
+    const d = diagResults;
+    const statusLabel = (s: typeof d.bridge) => s === 'ok' ? 'OK' : s === 'fail' ? 'FAIL' : s === 'checking' ? '...' : '-';
+    const report = [
+      '## Shelly Diagnostics',
+      `Date: ${new Date().toISOString()}`,
+      `Bridge: ${statusLabel(d.bridge)}${d.latency ? ` (${d.latency}ms)` : ''}`,
+      `Claude CLI: ${statusLabel(d.claudeCli)}`,
+      `Gemini CLI: ${statusLabel(d.geminiCli)}`,
+      `Codex CLI: ${statusLabel(d.codexCli)}`,
+      `Ollama/llama-server: ${statusLabel(d.ollama)}`,
+      `Storage: ${statusLabel(d.storage)}`,
+      `Connection Mode: ${connectionMode}`,
+      `Bridge URL: ${termuxSettings.wsUrl}`,
+      `LLM URL: ${settings.localLlmUrl}`,
+    ].join('\n');
+    Share.share({ message: report, title: 'Shelly Diagnostics' });
+  }, [diagResults, connectionMode, termuxSettings.wsUrl, settings.localLlmUrl]);
+
   const handleSelectModel = (model: LlamaCppModel) => {
     setActiveModelId(model.id);
     updateSettings({ localLlmModel: model.id });
@@ -705,6 +806,19 @@ export default function SettingsScreen() {
           </View>
         </SettingRow>
 
+        {/* ── Advanced Settings Toggle ────────────────────────────────────── */}
+        <Pressable
+          onPress={() => setShowAdvanced(v => !v)}
+          style={[styles.actionButton, { marginTop: 12, borderColor: '#6B728033' }]}
+        >
+          <MaterialIcons name={showAdvanced ? 'expand-less' : 'expand-more'} size={18} color="#6B7280" />
+          <Text style={[styles.actionButtonText, { color: '#9CA3AF' }]}>
+            {showAdvanced ? '上級設定を閉じる' : '上級設定を表示'}
+          </Text>
+          <MaterialIcons name="settings" size={16} color="#6B7280" />
+        </Pressable>
+
+        {showAdvanced && (<>
         {/* ── Termux Bridge ─────────────────────────────────────────────────── */}
         <SectionHeader
           title="Termux連携"
@@ -908,7 +1022,7 @@ export default function SettingsScreen() {
         {/* ── Local LLM (Ollama) ─────────────────────────────────────────── */}
         <SectionHeader
           title="ローカルLLM (llama-server)"
-          subtitle="Termux上のllama-serverをAIチャットに使用します"
+          subtitle="実験的・上級者向け — RAM 3-4GB消費。Termux上のllama-serverをAIチャットに使用します"
         />
 
         <SettingRow
@@ -1419,6 +1533,8 @@ export default function SettingsScreen() {
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
+        </>)}
+
         {/* ── Data ─────────────────────────────────────────────────────────── */}
         <SectionHeader title="データ" />
 
@@ -1570,6 +1686,57 @@ export default function SettingsScreen() {
           <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>{t('settings.rerun_setup')}</Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
+
+        {/* ── Diagnostics ──────────────────────────────────────────────────── */}
+        <SectionHeader title="環境診断" subtitle="接続状態・インストール済みツールを一括チェック" />
+
+        <Pressable
+          onPress={runDiagnostics}
+          disabled={isDiagRunning}
+          style={[styles.actionButton, { borderColor: '#00D4AA33', marginBottom: 8 }]}
+        >
+          {isDiagRunning ? (
+            <ActivityIndicator size="small" color="#00D4AA" style={{ marginRight: 4 }} />
+          ) : (
+            <MaterialIcons name="health-and-safety" size={18} color="#00D4AA" />
+          )}
+          <Text style={[styles.actionButtonText, { color: '#00D4AA' }]}>
+            {isDiagRunning ? '診断中...' : '診断を実行'}
+          </Text>
+        </Pressable>
+
+        {diagResults.bridge !== null && (
+          <View style={styles.aboutCard}>
+            {([
+              ['Termux Bridge', diagResults.bridge, diagResults.latency ? `${diagResults.latency}ms` : undefined],
+              ['Claude CLI', diagResults.claudeCli],
+              ['Gemini CLI', diagResults.geminiCli],
+              ['Codex CLI', diagResults.codexCli],
+              ['Ollama / llama-server', diagResults.ollama],
+              ['Storage Access', diagResults.storage],
+            ] as [string, typeof diagResults.bridge, string?][]).map(([label, status, extra]) => (
+              <View key={label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
+                <MaterialIcons
+                  name={status === 'ok' ? 'check-circle' : status === 'fail' ? 'cancel' : status === 'checking' ? 'hourglass-top' : 'remove'}
+                  size={16}
+                  color={status === 'ok' ? '#4ADE80' : status === 'fail' ? '#F87171' : status === 'checking' ? '#FBBF24' : '#6B7280'}
+                />
+                <Text style={{ color: '#AAAAAA', fontFamily: 'monospace', fontSize: 13, marginLeft: 8, flex: 1 }}>
+                  {label}
+                </Text>
+                {extra && <Text style={{ color: '#6B7280', fontFamily: 'monospace', fontSize: 12 }}>{extra}</Text>}
+              </View>
+            ))}
+
+            <Pressable
+              onPress={copyDiagnostics}
+              style={[styles.actionButton, { marginTop: 8, borderColor: '#60A5FA33' }]}
+            >
+              <MaterialIcons name="content-copy" size={16} color="#60A5FA" />
+              <Text style={[styles.actionButtonText, { color: '#60A5FA', fontSize: 12 }]}>診断結果をコピー（GitHub Issues用）</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* ── About ────────────────────────────────────────────────────────── */}
         <SectionHeader title="このアプリについて" />

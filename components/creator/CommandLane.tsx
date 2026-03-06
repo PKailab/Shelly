@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 // ─── Example prompts ──────────────────────────────────────────────────────────
 
@@ -25,6 +26,15 @@ const EXAMPLES = [
   'CSVを可視化したい',
   '自己紹介ページ作りたい',
   'Pythonで画像リサイズスクリプト',
+];
+
+// ─── Task templates (1-tap project creation) ──────────────────────────────────
+
+const TEMPLATES = [
+  { label: 'Node API', prompt: 'ExpressでREST APIサーバーを作って。CORS対応、ヘルスチェックエンドポイント付き', icon: 'dns' as const, color: '#4ADE80' },
+  { label: '静的サイト', prompt: 'HTMLとCSSでシンプルなランディングページを作って。レスポンシブ対応', icon: 'web' as const, color: '#60A5FA' },
+  { label: 'CLIツール', prompt: 'Node.jsでCLIツールを作って。引数パース、ヘルプ表示、カラー出力付き', icon: 'terminal' as const, color: '#FBBF24' },
+  { label: 'Python Script', prompt: 'Pythonで便利なファイル操作スクリプトを作って。一括リネーム機能付き', icon: 'code' as const, color: '#8B5CF6' },
 ];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -108,6 +118,32 @@ export function CommandLane({ onSubmit, isDisabled = false }: Props) {
                 ]}
               >
                 <Text style={styles.chipText}>{ex}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Task templates (1-tap) */}
+      {!isDisabled && (
+        <View style={styles.templates}>
+          <Text style={styles.examplesLabel}>テンプレート:</Text>
+          <View style={styles.templateGrid}>
+            {TEMPLATES.map((tmpl) => (
+              <Pressable
+                key={tmpl.label}
+                onPress={() => {
+                  if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onSubmit(tmpl.prompt);
+                }}
+                style={({ pressed }) => [
+                  styles.templateCard,
+                  { borderColor: tmpl.color + '40' },
+                  pressed && { backgroundColor: tmpl.color + '10' },
+                ]}
+              >
+                <MaterialIcons name={tmpl.icon} size={16} color={tmpl.color} />
+                <Text style={[styles.templateLabel, { color: tmpl.color }]}>{tmpl.label}</Text>
               </Pressable>
             ))}
           </View>
@@ -223,5 +259,30 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'monospace',
     color: '#9BA1A6',
+  },
+  templates: {
+    marginTop: 10,
+    gap: 6,
+  },
+  templateGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  templateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  templateLabel: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
 });

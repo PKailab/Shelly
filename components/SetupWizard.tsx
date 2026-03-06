@@ -51,6 +51,7 @@ const STEPS: StepConfig[] = [
   { icon: 'terminal',      color: '#00D4AA' },
   { icon: 'cable',         color: '#FBBF24' },
   { icon: 'wifi',          color: '#60A5FA' },
+  { icon: 'smart-toy',     color: '#8B5CF6' },
   { icon: 'check-circle',  color: '#4ADE80' },
 ];
 
@@ -126,6 +127,8 @@ type Props = {
 export function SetupWizard({ visible, onComplete }: Props) {
   const { t } = useTranslation();
   const [step, setStep] = useState(0);
+  const [quickMode, setQuickMode] = useState(false);
+  const [showModeSelect, setShowModeSelect] = useState(true);
   const [copied, setCopied] = useState(false);
   const [copiedStart, setCopiedStart] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'checking' | 'success' | 'fail'>('idle');
@@ -240,11 +243,16 @@ export function SetupWizard({ visible, onComplete }: Props) {
       setCopied(false);
       setCopiedStart(false);
       setConnectionStatus('idle');
-      setStep((s) => s + 1);
+      // quickModeの場合、Step4（AIツール選択）をスキップ
+      if (quickMode && step === 2) {
+        setStep(4); // 直接Step5（完了）へ
+      } else {
+        setStep((s) => s + 1);
+      }
     } else {
       handleDone();
     }
-  }, [step, handleDone]);
+  }, [step, handleDone, quickMode]);
 
   const handleBack = useCallback(() => {
     if (step > 0) {
@@ -254,6 +262,52 @@ export function SetupWizard({ visible, onComplete }: Props) {
       setStep((s) => s - 1);
     }
   }, [step]);
+
+  // ── Quick start (skip to minimal setup) ─────────────────────────────────
+
+  const handleQuickStart = useCallback(async () => {
+    // おすすめ構成: Gemini CLIをデフォルトに設定して即完了
+    useTerminalStore.getState().updateSettings({ defaultAgent: 'gemini-cli' });
+    // Step 1（Termux確認）へジャンプ、AIツール選択はスキップ
+    setStep(0);
+    setQuickMode(true);
+  }, []);
+
+  const renderModeSelect = () => (
+    <Animated.View entering={FadeInDown.duration(400)} key="mode-select">
+      <Text style={styles.description}>
+        {'Shellyのセットアップを始めましょう。\nどちらのモードで進めますか？'}
+      </Text>
+
+      <Pressable
+        style={[styles.actionBtn, { backgroundColor: '#00D4AA', marginBottom: 12 }]}
+        onPress={() => {
+          handleQuickStart();
+          setShowModeSelect(false);
+        }}
+      >
+        <MaterialIcons name="rocket-launch" size={18} color="#000" />
+        <Text style={styles.actionBtnText}>おすすめ構成で始める</Text>
+      </Pressable>
+      <Text style={[styles.hint, { marginBottom: 16 }]}>
+        {'Gemini CLI（無料）で最速セットアップ。\n後から設定で変更できます。'}
+      </Text>
+
+      <Pressable
+        style={styles.secondaryBtn}
+        onPress={() => {
+          setShowModeSelect(false);
+          setQuickMode(false);
+        }}
+      >
+        <MaterialIcons name="tune" size={16} color="#9CA3AF" />
+        <Text style={styles.secondaryBtnText}>カスタム構成</Text>
+      </Pressable>
+      <Text style={styles.hint}>
+        {'AIツール選択・詳細設定を自分で選びたい方向け'}
+      </Text>
+    </Animated.View>
+  );
 
   // ── Step content renderers ───────────────────────────────────────────────
 
@@ -383,9 +437,60 @@ export function SetupWizard({ visible, onComplete }: Props) {
     </Animated.View>
   );
 
+  // ── AI Tool Selection (Step 4) ──────────────────────────────────────────
+
+  const AI_TOOLS = [
+    { id: 'gemini-cli' as const, label: 'Gemini CLI', desc: 'Google AI. \u7121\u6599\u679A\u3042\u308A\u3001\u521D\u5FC3\u8005\u5411\u3051', color: '#60A5FA', icon: 'auto-awesome' as const },
+    { id: 'claude-code' as const, label: 'Claude Code', desc: '\u6700\u3082\u8ce2\u3044AI\u30B3\u30FC\u30C9\u30A8\u30FC\u30B8\u30A7\u30F3\u30C8', color: '#00D4AA', icon: 'code' as const },
+    { id: 'codex' as const, label: 'Codex CLI', desc: '\u8EFD\u91CF\u30FB\u9AD8\u901F\u306A\u30B3\u30FC\u30C9\u4FEE\u6B63', color: '#FBBF24', icon: 'bolt' as const },
+  ] as const;
+
+  const [selectedAgent, setSelectedAgent] = useState<'gemini-cli' | 'claude-code' | 'codex'>(
+    useTerminalStore.getState().settings.defaultAgent
+  );
+
+  const handleSelectAgent = useCallback((id: 'gemini-cli' | 'claude-code' | 'codex') => {
+    setSelectedAgent(id);
+    useTerminalStore.getState().updateSettings({ defaultAgent: id });
+  }, []);
+
   const renderStep4 = () => (
     <Animated.View entering={FadeInDown.duration(400)} key="step4">
-      <Text style={styles.description}>{t('setup.step4_desc')}</Text>
+      <Text style={styles.description}>
+        {'\u4F7F\u3044\u305F\u3044AI\u30C4\u30FC\u30EB\u3092\u9078\u3093\u3067\u304F\u3060\u3055\u3044\u3002\u5F8C\u304B\u3089\u8A2D\u5B9A\u3067\u5909\u66F4\u3067\u304D\u307E\u3059\u3002'}
+      </Text>
+
+      {AI_TOOLS.map((tool) => (
+        <Pressable
+          key={tool.id}
+          style={[
+            styles.aiToolCard,
+            selectedAgent === tool.id && { borderColor: tool.color, backgroundColor: tool.color + '12' },
+          ]}
+          onPress={() => handleSelectAgent(tool.id)}
+        >
+          <View style={styles.aiToolRow}>
+            <MaterialIcons name={tool.icon} size={22} color={selectedAgent === tool.id ? tool.color : '#6B7280'} />
+            <View style={styles.aiToolInfo}>
+              <Text style={[styles.aiToolLabel, selectedAgent === tool.id && { color: tool.color }]}>{tool.label}</Text>
+              <Text style={styles.aiToolDesc}>{tool.desc}</Text>
+            </View>
+            {selectedAgent === tool.id && (
+              <MaterialIcons name="check-circle" size={20} color={tool.color} />
+            )}
+          </View>
+        </Pressable>
+      ))}
+
+      <Text style={styles.hint}>
+        {'\u203B \u30ED\u30FC\u30AB\u30EBLLM\u3092\u8A2D\u5B9A\u3059\u308B\u3068\u3001AI\u304C\u81EA\u52D5\u3067\u6700\u9069\u306A\u30C4\u30FC\u30EB\u3092\u9078\u3073\u307E\u3059'}
+      </Text>
+    </Animated.View>
+  );
+
+  const renderStep5 = () => (
+    <Animated.View entering={FadeInDown.duration(400)} key="step5">
+      <Text style={styles.description}>{t('setup.step5_desc')}</Text>
 
       <Text style={styles.tryLabel}>{t('setup.step4_try_commands')}</Text>
       <View style={styles.codeBlock}>
@@ -394,17 +499,19 @@ export function SetupWizard({ visible, onComplete }: Props) {
 
       <Text style={styles.tryLabel}>{t('setup.step4_try_ai')}</Text>
       <View style={styles.codeBlock}>
-        <Text style={styles.codeText}>@local こんにちは</Text>
+        <Text style={styles.codeText}>@local {'\u3053\u3093\u306B\u3061\u306F'}</Text>
       </View>
     </Animated.View>
   );
 
   const renderCurrentStep = () => {
+    if (showModeSelect) return renderModeSelect();
     switch (step) {
       case 0: return renderStep1();
       case 1: return renderStep2();
       case 2: return renderStep3();
       case 3: return renderStep4();
+      case 4: return renderStep5();
       default: return null;
     }
   };
@@ -432,45 +539,49 @@ export function SetupWizard({ visible, onComplete }: Props) {
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          {/* Progress bar */}
-          <View style={styles.progressRow}>
-            {STEPS.map((s, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.progressSegment,
-                  {
-                    backgroundColor: i <= step ? current.color : '#333',
-                    flex: 1,
-                  },
-                ]}
-              />
-            ))}
-          </View>
+          {/* Progress bar (hide during mode select) */}
+          {!showModeSelect && (
+            <View style={styles.progressRow}>
+              {STEPS.map((s, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.progressSegment,
+                    {
+                      backgroundColor: i <= step ? current.color : '#333',
+                      flex: 1,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
 
           {/* Step indicator */}
-          <Text style={styles.stepIndicator}>
-            {step + 1} / {STEPS.length}
-          </Text>
+          {!showModeSelect && (
+            <Text style={styles.stepIndicator}>
+              {step + 1} / {STEPS.length}
+            </Text>
+          )}
 
           {/* Icon */}
           <Animated.View
             style={[
               styles.iconCircle,
-              { backgroundColor: current.color + '20' },
+              { backgroundColor: showModeSelect ? '#00D4AA20' : current.color + '20' },
               iconAnimStyle,
             ]}
           >
             <MaterialIcons
-              name={current.icon as any}
+              name={showModeSelect ? 'waving-hand' as any : current.icon as any}
               size={48}
-              color={current.color}
+              color={showModeSelect ? '#00D4AA' : current.color}
             />
           </Animated.View>
 
           {/* Title */}
-          <Text style={[styles.title, { color: current.color }]}>
-            {t(`setup.step${step + 1}_title`)}
+          <Text style={[styles.title, { color: showModeSelect ? '#00D4AA' : current.color }]}>
+            {showModeSelect ? 'Shellyへようこそ' : t(`setup.step${step + 1}_title`)}
           </Text>
 
           {/* Step content */}
@@ -483,8 +594,8 @@ export function SetupWizard({ visible, onComplete }: Props) {
             <Text style={{ color: '#6B7280', fontSize: 12 }}>{t('setup.skip') ?? 'スキップ'}</Text>
           </Pressable>
 
-          {/* Navigation */}
-          <View style={styles.navRow}>
+          {/* Navigation (hide during mode select) */}
+          {!showModeSelect && <View style={styles.navRow}>
             {step > 0 ? (
               <Pressable style={styles.navBtnSecondary} onPress={handleBack}>
                 <MaterialIcons name="arrow-back" size={16} color="#6B7280" />
@@ -499,17 +610,17 @@ export function SetupWizard({ visible, onComplete }: Props) {
                 styles.navBtnPrimary,
                 { backgroundColor: canAdvance() ? current.color : '#333' },
               ]}
-              onPress={step === 3 ? handleDone : handleNext}
+              onPress={step === STEPS.length - 1 ? handleDone : handleNext}
               disabled={!canAdvance()}
             >
               <Text style={[styles.navBtnTextPrimary, { color: canAdvance() ? '#000' : '#666' }]}>
                 {step === 0
                   ? t('setup.step1_have_it')
-                  : step === 3
+                  : step === STEPS.length - 1
                     ? t('setup.step4_start')
                     : t('setup.next')}
               </Text>
-              {step < 3 && step !== 0 && (
+              {step < STEPS.length - 1 && step !== 0 && (
                 <MaterialIcons
                   name="arrow-forward"
                   size={16}
@@ -517,7 +628,7 @@ export function SetupWizard({ visible, onComplete }: Props) {
                 />
               )}
             </Pressable>
-          </View>
+          </View>}
         </View>
       </View>
     </Modal>
@@ -744,5 +855,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'monospace',
     fontWeight: '800',
+  },
+  aiToolCard: {
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+    backgroundColor: '#1A1A1A',
+  },
+  aiToolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  aiToolInfo: {
+    flex: 1,
+  },
+  aiToolLabel: {
+    color: '#E8E8E8',
+    fontSize: 14,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+  },
+  aiToolDesc: {
+    color: '#6B7280',
+    fontSize: 11,
+    fontFamily: 'monospace',
+    marginTop: 2,
   },
 });

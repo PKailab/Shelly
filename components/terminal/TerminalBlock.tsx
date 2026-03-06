@@ -437,58 +437,47 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* User command bubble (right-aligned) */}
       <Animated.View
-        entering={FadeInDown.duration(250).springify().damping(18)}
+        entering={FadeInDown.duration(200).springify().damping(18)}
       >
         <Pressable
           onLongPress={handleLongPress}
           delayLongPress={350}
-          style={[
-            styles.container,
-            { backgroundColor: colors.surface, borderColor: colors.borderLight },
-            isTermuxBlock && {
-              borderColor: withAlpha(colors.command, 0.2),
-              backgroundColor: '#181C24',
-            },
-          ]}
+          style={styles.userBubbleRow}
         >
-          {/* Block header */}
-          <View style={styles.blockHeader}>
-            <View style={styles.headerLeft}>
-              <Text style={[styles.timestamp, { color: colors.inactive }]}>{formatTimestamp(block.timestamp)}</Text>
+          <View style={[
+            styles.userBubble,
+            { backgroundColor: withAlpha(colors.accent, 0.12), borderColor: withAlpha(colors.accent, 0.25) },
+          ]}>
+            {/* Command with prompt symbol */}
+            <View style={styles.commandLine}>
+              <Text style={[styles.prompt, { fontSize, lineHeight: lineHeightPx, color: colors.accent }]}>
+                {'$ '}
+              </Text>
+              <Text
+                style={[styles.command, { fontSize, lineHeight: lineHeightPx, color: colors.foreground }]}
+                selectable
+              >
+                {block.command}
+              </Text>
+            </View>
+            {/* Meta row: time + badges */}
+            <View style={styles.userMetaRow}>
+              <Text style={[styles.userTimestamp, { color: colors.hint }]}>{formatTimestamp(block.timestamp)}</Text>
               {isTermuxBlock && (
-                <View style={[styles.termuxBadge, { backgroundColor: withAlpha(colors.command, 0.09), borderColor: withAlpha(colors.command, 0.2) }]}>
+                <View style={[styles.termuxBadge, { backgroundColor: withAlpha(colors.command, 0.12), borderColor: withAlpha(colors.command, 0.25) }]}>
                   <Text style={[styles.termuxBadgeText, { color: colors.command }]}>TERMUX</Text>
                 </View>
               )}
-            </View>
-            <View style={styles.headerRight}>
-              {!block.isRunning && block.output.length > 0 && (
-                <Animated.View style={copyAnimStyle}>
-                  <Pressable
-                    style={[styles.quickCopyBtn, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
-                    hitSlop={6}
-                    onPress={handleQuickCopy}
-                  >
-                    <MaterialIcons name="content-copy" size={13} color={colors.inactive} />
-                  </Pressable>
-                </Animated.View>
-              )}
-              {block.isRunning && (
-                <View style={[styles.runningBadge, { backgroundColor: withAlpha(colors.warning, 0.09) }]}>
-                  <RunningDots color={colors.warning} />
-                  <Text style={[styles.runningBadgeText, { color: colors.warning }]}>{'\u5B9F\u884C\u4E2D'}</Text>
-                </View>
-              )}
               {block.isSavedSnippet && (
-                <View style={[styles.snippetBadge, { backgroundColor: withAlpha(colors.warning, 0.13) }]}>
-                  <Text style={[styles.snippetText, { color: colors.warning }]}>{'\u2605'}</Text>
-                </View>
+                <Text style={[styles.snippetStar, { color: colors.warning }]}>{'\u2605'}</Text>
               )}
+              {block.isRunning && <RunningDots color={colors.warning} />}
               {!block.isRunning && block.exitCode !== null && (
                 <Animated.View style={[
                   styles.exitBadge,
-                  { backgroundColor: withAlpha(block.exitCode === 0 ? colors.success : colors.error, 0.09) },
+                  { backgroundColor: withAlpha(block.exitCode === 0 ? colors.success : colors.error, 0.12) },
                   exitAnimStyle,
                 ]}>
                   <Text style={[
@@ -501,177 +490,216 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
               )}
             </View>
           </View>
-
-          {/* Command line */}
-          <View style={styles.commandLine}>
-            <Text style={[styles.prompt, { fontSize, lineHeight: lineHeightPx, color: colors.accent }]}>
-              {'$ '}
-            </Text>
-            <Text
-              style={[styles.command, { fontSize, lineHeight: lineHeightPx, color: colors.command }]}
-              selectable
-            >
-              {block.command}
-            </Text>
-          </View>
-
-          {/* Cancelled state banner */}
-          {isCancelled && (
-            <View style={[styles.cancelledBanner, { backgroundColor: withAlpha(colors.error, 0.07), borderColor: withAlpha(colors.error, 0.19) }]}>
-              <Text style={[styles.cancelledBannerText, { color: colors.error }]}>{'\u2298 Cancelled (exit 130)'}</Text>
-            </View>
-          )}
-
-          {/* Output area */}
-          {block.isRunning ? (
-            <View style={[styles.streamingContainer, { borderTopColor: colors.surface2 }]}>
-              {block.output.length > 0 && (
-                <View style={[styles.outputContainer, { borderTopColor: colors.surface2 }]}>
-                  {block.output.map((line, i) => (
-                    <Text
-                      key={i}
-                      style={[
-                        styles.outputLine,
-                        {
-                          fontSize,
-                          lineHeight: lineHeightPx,
-                          color: getOutputColor(line.type, useHighContrast),
-                        },
-                      ]}
-                      selectable
-                    >
-                      {line.text}
-                    </Text>
-                  ))}
-                </View>
-              )}
-              <View style={styles.runningFooter}>
-                <View style={styles.runningIndicator}>
-                  {isCancelling ? (
-                    <>
-                      <RunningDots color={colors.error} />
-                      <Text style={[styles.runningLabel, { color: colors.error }]}>Cancelling...</Text>
-                    </>
-                  ) : (
-                    <>
-                      <RunningDots color={colors.warning} />
-                      <Text style={[styles.runningLabel, { color: colors.muted }]}>
-                        {isTermuxBlock ? 'Termux\u5B9F\u884C\u4E2D' : '\u5B9F\u884C\u4E2D...'}
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <Pressable
-                  onPress={canCancel ? handleCancel : undefined}
-                  style={[
-                    styles.cancelButton,
-                    { borderColor: withAlpha(colors.error, 0.27), backgroundColor: withAlpha(colors.error, 0.06) },
-                    !canCancel && { borderColor: colors.border, backgroundColor: 'transparent', opacity: 0.4 },
-                    isCancelling && { borderColor: withAlpha(colors.error, 0.53), backgroundColor: withAlpha(colors.error, 0.13) },
-                  ]}
-                >
-                  <Text style={[
-                    styles.cancelButtonText,
-                    { color: colors.error },
-                    !canCancel && { color: colors.inactive },
-                  ]}>
-                    {isCancelling ? 'Cancelling...' : 'Cancel'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <View style={[styles.outputContainer, { borderTopColor: colors.surface2 }]}>
-              {block.output.length === 0 ? (
-                <Text style={[styles.noOutputText, { color: colors.hint }]}>(no output)</Text>
-              ) : isDiff ? (
-                <DiffViewer output={outputText} />
-              ) : (
-                visibleOutput.map((line, i) => {
-                  const segments = segmentText(line.text);
-                  const baseColor = getOutputColor(line.type, useHighContrast);
-                  const hasLinks = segments.some((s) => s.link);
-                  return (
-                    <Text
-                      key={i}
-                      style={[
-                        styles.outputLine,
-                        { fontSize, lineHeight: lineHeightPx, color: baseColor },
-                      ]}
-                      selectable
-                    >
-                      {hasLinks
-                        ? segments.map((seg, j) =>
-                            seg.link ? (
-                              <Text
-                                key={j}
-                                style={[styles.linkText, { color: colors.link }]}
-                                onPress={() => handleLinkPress(seg.link!.text, seg.link!.type)}
-                              >
-                                {seg.text}
-                              </Text>
-                            ) : (
-                              <Text key={j}>{seg.text}</Text>
-                            ),
-                          )
-                        : line.text}
-                    </Text>
-                  );
-                })
-              )}
-
-              {shouldCollapse && block.output.length > 0 && (
-                <Pressable
-                  onPress={handleCollapseToggle}
-                  style={[styles.collapseToggle, { backgroundColor: colors.surface2 }]}
-                >
-                  <Text style={[styles.collapseText, { color: colors.accent }]}>
-                    {isCollapsed
-                      ? `\u25BC ${block.output.length - COLLAPSE_THRESHOLD} \u884C\u3092\u5C55\u958B...`
-                      : '\u25B2 \u6298\u308A\u305F\u305F\u3080'}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          )}
-
-          {/* LLM interpret area */}
-          {isTermuxBlock && (block.isInterpreting || block.llmInterpretation || block.llmInterpretationStreaming) && (
-            <View style={[styles.interpretContainer, { borderColor: withAlpha(colors.interpretPurple, 0.2), backgroundColor: '#1A1A2E' }]}>
-              <View style={[styles.interpretHeader, { borderBottomColor: withAlpha(colors.interpretPurple, 0.13), backgroundColor: withAlpha(colors.interpretPurple, 0.06) }]}>
-                <Text style={[styles.interpretLabel, { color: colors.interpretPurple }]}>
-                  {block.isInterpreting ? '\u25CE AI\u901A\u8A33\u4E2D...' : (block.interpretType === 'error' ? '\u2717 \u30A8\u30E9\u30FC\u89E3\u6790' : '\u2713 \u89E3\u8AAC')}
-                </Text>
-              </View>
-              <Text style={[styles.interpretText, { color: colors.interpretText }]} selectable>
-                {block.isInterpreting
-                  ? (block.llmInterpretationStreaming || '')
-                  : (block.llmInterpretation || '')}
-                {block.isInterpreting && <Text style={[styles.interpretCursor, { color: colors.interpretPurple }]}>{'\u258B'}</Text>}
-              </Text>
-              {!block.isInterpreting && block.llmSuggestedCommand && (
-                <View style={[styles.suggestBox, { borderColor: withAlpha(colors.success, 0.2), backgroundColor: withAlpha(colors.success, 0.06) }]}>
-                  <Text style={[styles.suggestLabel, { color: colors.success }]}>{'\u63D0\u6848\u30B3\u30DE\u30F3\u30C9'}</Text>
-                  <Text style={styles.suggestCommand} selectable>
-                    {'$ '}{block.llmSuggestedCommand}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Inline feedback toast */}
-          {feedbackMsg && (
-            <Animated.View style={[
-              styles.feedbackToast,
-              { backgroundColor: withAlpha(colors.accent, 0.13), borderColor: withAlpha(colors.accent, 0.27) },
-              feedbackAnimStyle,
-            ]}>
-              <Text style={[styles.feedbackText, { color: colors.accent }]}>{feedbackMsg}</Text>
-            </Animated.View>
-          )}
         </Pressable>
       </Animated.View>
+
+      {/* Cancelled state banner */}
+      {isCancelled && (
+        <View style={styles.cancelledRow}>
+          <View style={[styles.cancelledBanner, { backgroundColor: withAlpha(colors.error, 0.07), borderColor: withAlpha(colors.error, 0.19) }]}>
+            <Text style={[styles.cancelledBannerText, { color: colors.error }]}>{'\u2298 Cancelled (exit 130)'}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Output block (left-aligned, terminal style) */}
+      {(block.isRunning || block.output.length > 0) && (
+        <Animated.View
+          entering={FadeInDown.duration(200).delay(50).springify().damping(18)}
+          style={styles.outputBubbleRow}
+        >
+          {/* Terminal icon */}
+          <View style={[styles.terminalIcon, { backgroundColor: withAlpha(colors.command, 0.1), borderColor: withAlpha(colors.command, 0.2) }]}>
+            <Text style={[styles.terminalIconText, { color: colors.command }]}>{'>_'}</Text>
+          </View>
+
+          <View style={[
+            styles.outputBubble,
+            { backgroundColor: '#0F1318', borderColor: withAlpha(colors.command, 0.12) },
+          ]}>
+            {/* Output header bar */}
+            <View style={[styles.outputHeader, { borderBottomColor: withAlpha(colors.command, 0.08) }]}>
+              <Text style={[styles.outputHeaderLabel, { color: colors.inactive }]}>output</Text>
+              <View style={styles.outputHeaderRight}>
+                {!block.isRunning && block.output.length > 0 && (
+                  <Animated.View style={copyAnimStyle}>
+                    <Pressable
+                      style={[styles.quickCopyBtn, { backgroundColor: withAlpha(colors.command, 0.08) }]}
+                      hitSlop={6}
+                      onPress={handleQuickCopy}
+                    >
+                      <MaterialIcons name="content-copy" size={12} color={colors.inactive} />
+                    </Pressable>
+                  </Animated.View>
+                )}
+              </View>
+            </View>
+
+            {block.isRunning ? (
+              <View style={styles.outputBody}>
+                {block.output.length > 0 && (
+                  <View style={styles.outputLines}>
+                    {block.output.map((line, i) => (
+                      <Text
+                        key={i}
+                        style={[
+                          styles.outputLine,
+                          {
+                            fontSize: fontSize - 1,
+                            lineHeight: lineHeightPx,
+                            color: getOutputColor(line.type, useHighContrast),
+                          },
+                        ]}
+                        selectable
+                      >
+                        {line.text}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+                <View style={styles.runningFooter}>
+                  <View style={styles.runningIndicator}>
+                    {isCancelling ? (
+                      <>
+                        <RunningDots color={colors.error} />
+                        <Text style={[styles.runningLabel, { color: colors.error }]}>Cancelling...</Text>
+                      </>
+                    ) : (
+                      <>
+                        <RunningDots color={colors.warning} />
+                        <Text style={[styles.runningLabel, { color: colors.muted }]}>
+                          {isTermuxBlock ? 'Termux\u5B9F\u884C\u4E2D' : '\u5B9F\u884C\u4E2D...'}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                  <Pressable
+                    onPress={canCancel ? handleCancel : undefined}
+                    style={[
+                      styles.cancelButton,
+                      { borderColor: withAlpha(colors.error, 0.27), backgroundColor: withAlpha(colors.error, 0.06) },
+                      !canCancel && { borderColor: colors.border, backgroundColor: 'transparent', opacity: 0.4 },
+                      isCancelling && { borderColor: withAlpha(colors.error, 0.53), backgroundColor: withAlpha(colors.error, 0.13) },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.cancelButtonText,
+                      { color: colors.error },
+                      !canCancel && { color: colors.inactive },
+                    ]}>
+                      {isCancelling ? 'Cancelling...' : 'Cancel'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.outputBody}>
+                {isDiff ? (
+                  <DiffViewer output={outputText} />
+                ) : (
+                  <View style={styles.outputLines}>
+                    {visibleOutput.map((line, i) => {
+                      const segments = segmentText(line.text);
+                      const baseColor = getOutputColor(line.type, useHighContrast);
+                      const hasLinks = segments.some((s) => s.link);
+                      return (
+                        <Text
+                          key={i}
+                          style={[
+                            styles.outputLine,
+                            { fontSize: fontSize - 1, lineHeight: lineHeightPx, color: baseColor },
+                          ]}
+                          selectable
+                        >
+                          {hasLinks
+                            ? segments.map((seg, j) =>
+                                seg.link ? (
+                                  <Text
+                                    key={j}
+                                    style={[styles.linkText, { color: colors.link }]}
+                                    onPress={() => handleLinkPress(seg.link!.text, seg.link!.type)}
+                                  >
+                                    {seg.text}
+                                  </Text>
+                                ) : (
+                                  <Text key={j}>{seg.text}</Text>
+                                ),
+                              )
+                            : line.text}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {shouldCollapse && block.output.length > 0 && (
+                  <Pressable
+                    onPress={handleCollapseToggle}
+                    style={[styles.collapseToggle, { backgroundColor: withAlpha(colors.command, 0.08) }]}
+                  >
+                    <Text style={[styles.collapseText, { color: colors.accent }]}>
+                      {isCollapsed
+                        ? `\u25BC ${block.output.length - COLLAPSE_THRESHOLD} \u884C\u3092\u5C55\u958B...`
+                        : '\u25B2 \u6298\u308A\u305F\u305F\u3080'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      )}
+
+      {/* No output indicator */}
+      {!block.isRunning && block.output.length === 0 && (
+        <View style={styles.noOutputRow}>
+          <Text style={[styles.noOutputText, { color: colors.hint }]}>(no output)</Text>
+        </View>
+      )}
+
+      {/* LLM interpret area */}
+      {isTermuxBlock && (block.isInterpreting || block.llmInterpretation || block.llmInterpretationStreaming) && (
+        <Animated.View
+          entering={FadeInDown.duration(200).delay(100).springify().damping(18)}
+          style={styles.interpretRow}
+        >
+          <View style={[styles.interpretAvatar, { backgroundColor: withAlpha(colors.interpretPurple, 0.12), borderColor: withAlpha(colors.interpretPurple, 0.25) }]}>
+            <Text style={[styles.interpretAvatarText, { color: colors.interpretPurple }]}>AI</Text>
+          </View>
+          <View style={[styles.interpretContainer, { borderColor: withAlpha(colors.interpretPurple, 0.2), backgroundColor: '#1A1A2E' }]}>
+            <View style={[styles.interpretHeader, { borderBottomColor: withAlpha(colors.interpretPurple, 0.13), backgroundColor: withAlpha(colors.interpretPurple, 0.06) }]}>
+              <Text style={[styles.interpretLabel, { color: colors.interpretPurple }]}>
+                {block.isInterpreting ? '\u25CE AI\u901A\u8A33\u4E2D...' : (block.interpretType === 'error' ? '\u2717 \u30A8\u30E9\u30FC\u89E3\u6790' : '\u2713 \u89E3\u8AAC')}
+              </Text>
+            </View>
+            <Text style={[styles.interpretText, { color: colors.interpretText }]} selectable>
+              {block.isInterpreting
+                ? (block.llmInterpretationStreaming || '')
+                : (block.llmInterpretation || '')}
+              {block.isInterpreting && <Text style={[styles.interpretCursor, { color: colors.interpretPurple }]}>{'\u258B'}</Text>}
+            </Text>
+            {!block.isInterpreting && block.llmSuggestedCommand && (
+              <View style={[styles.suggestBox, { borderColor: withAlpha(colors.success, 0.2), backgroundColor: withAlpha(colors.success, 0.06) }]}>
+                <Text style={[styles.suggestLabel, { color: colors.success }]}>{'\u63D0\u6848\u30B3\u30DE\u30F3\u30C9'}</Text>
+                <Text style={styles.suggestCommand} selectable>
+                  {'$ '}{block.llmSuggestedCommand}
+                </Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Inline feedback toast */}
+      {feedbackMsg && (
+        <Animated.View style={[
+          styles.feedbackToast,
+          { backgroundColor: withAlpha(colors.accent, 0.13), borderColor: withAlpha(colors.accent, 0.27) },
+          feedbackAnimStyle,
+        ]}>
+          <Text style={[styles.feedbackText, { color: colors.accent }]}>{feedbackMsg}</Text>
+        </Animated.View>
+      )}
     </>
   );
 }
@@ -681,86 +709,26 @@ export const TerminalBlock = memo(TerminalBlockComponent);
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: 8,
-    marginHorizontal: 8,
-    marginVertical: 3,
+  // ─── User command bubble (right-aligned) ───────────────────────────────────
+  userBubbleRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingLeft: 48,
+    paddingRight: 8,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  userBubble: {
+    borderRadius: 16,
+    borderTopRightRadius: 4,
     borderWidth: 1,
-  },
-  blockHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingTop: 6,
-    paddingBottom: 2,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timestamp: {
-    fontSize: 10,
-    fontFamily: 'monospace',
-  },
-  termuxBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 3,
-    borderWidth: 1,
-  },
-  termuxBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    letterSpacing: 0.5,
-  },
-  runningBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
-  runningBadgeText: {
-    fontSize: 9,
-    fontFamily: 'monospace',
-  },
-  snippetBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
-  snippetText: {
-    fontSize: 10,
-  },
-  quickCopyBtn: {
-    padding: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  exitBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  exitText: {
-    fontSize: 10,
-    fontWeight: '600',
-    fontFamily: 'monospace',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    maxWidth: '100%',
   },
   commandLine: {
     flexDirection: 'row',
-    paddingHorizontal: 10,
-    paddingBottom: 4,
     flexWrap: 'wrap',
     alignItems: 'flex-start',
   },
@@ -773,11 +741,120 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap',
   },
-  outputContainer: {
+  userMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+    marginTop: 4,
+  },
+  userTimestamp: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+  },
+  termuxBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  termuxBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    letterSpacing: 0.5,
+  },
+  snippetStar: {
+    fontSize: 10,
+  },
+  exitBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  exitText: {
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+  },
+
+  // ─── Cancelled row ─────────────────────────────────────────────────────────
+  cancelledRow: {
+    paddingHorizontal: 12,
+    marginBottom: 2,
+  },
+  cancelledBanner: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  cancelledBannerText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+  },
+
+  // ─── Output bubble (left-aligned, terminal style) ─────────────────────────
+  outputBubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingLeft: 8,
+    paddingRight: 32,
+    marginBottom: 4,
+    gap: 8,
+  },
+  terminalIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  terminalIconText: {
+    fontSize: 9,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  outputBubble: {
+    flex: 1,
+    borderRadius: 12,
+    borderTopLeftRadius: 4,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  outputHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 10,
-    paddingBottom: 10,
-    borderTopWidth: 1,
-    paddingTop: 6,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+  },
+  outputHeaderLabel: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  outputHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  quickCopyBtn: {
+    padding: 4,
+    borderRadius: 4,
+  },
+  outputBody: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  outputLines: {
+    gap: 0,
   },
   outputLine: {
     fontFamily: 'monospace',
@@ -787,9 +864,13 @@ const styles = StyleSheet.create({
   linkText: {
     textDecorationLine: 'underline',
   },
+  noOutputRow: {
+    paddingLeft: 44,
+    marginBottom: 4,
+  },
   noOutputText: {
     fontFamily: 'monospace',
-    fontSize: 12,
+    fontSize: 11,
     fontStyle: 'italic',
     paddingVertical: 2,
   },
@@ -797,22 +878,20 @@ const styles = StyleSheet.create({
     marginTop: 6,
     paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 4,
+    borderRadius: 6,
     alignSelf: 'flex-start',
   },
   collapseText: {
     fontSize: 11,
     fontFamily: 'monospace',
   },
-  streamingContainer: {
-    borderTopWidth: 1,
-  },
+
+  // ─── Running / Cancel ──────────────────────────────────────────────────────
   runningFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingTop: 6,
   },
   runningIndicator: {
     flexDirection: 'row',
@@ -826,7 +905,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 1,
   },
   cancelButtonText: {
@@ -834,36 +913,48 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontWeight: '600',
   },
-  cancelledBanner: {
-    marginHorizontal: 10,
-    marginBottom: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
-  },
-  cancelledBannerText: {
-    fontSize: 11,
-    fontFamily: 'monospace',
-  },
+
+  // ─── Feedback ──────────────────────────────────────────────────────────────
   feedbackToast: {
-    position: 'absolute',
-    bottom: 8,
-    right: 10,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    alignSelf: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderWidth: 1,
+    marginBottom: 4,
   },
   feedbackText: {
     fontSize: 10,
     fontFamily: 'monospace',
   },
+
+  // ─── LLM Interpret (left-aligned bubble) ──────────────────────────────────
+  interpretRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingLeft: 8,
+    paddingRight: 48,
+    marginBottom: 4,
+    gap: 8,
+  },
+  interpretAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  interpretAvatarText: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
   interpretContainer: {
-    marginHorizontal: 8,
-    marginBottom: 8,
-    borderRadius: 6,
+    flex: 1,
+    borderRadius: 12,
+    borderTopLeftRadius: 4,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -894,7 +985,7 @@ const styles = StyleSheet.create({
   suggestBox: {
     marginHorizontal: 8,
     marginBottom: 8,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 1,
     padding: 8,
   },

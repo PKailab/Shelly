@@ -74,6 +74,8 @@ const ja: Record<string, string> = {
   'ai.stop': '停止',
   'ai.tokens': '{{count}} tokens | {{tps}} tok/s',
   'ai.sources': 'ソース:',
+  'ai.retry': 'リトライ',
+  'ai.ask_other': '別のAIに聞く',
 
   // ── Input Router ──────────────────────────────────────────────────
   'router.suggest': 'AI提案',
@@ -227,8 +229,9 @@ const ja: Record<string, string> = {
   'setup.step3_fail': '接続に失敗しました',
   'setup.step3_retry': 'もう一度確認',
   'setup.step3_hint_not_running': 'Termuxでブリッジサーバーが実行中か確認してください。',
-  'setup.step4_title': '準備完了！',
-  'setup.step4_desc': 'Shellyが使える状態になりました！',
+  'setup.step4_title': 'AIツールを選ぶ',
+  'setup.step5_title': '準備完了！',
+  'setup.step5_desc': 'Shellyが使える状態になりました！',
   'setup.step4_try_commands': 'コマンドを入力してみよう:',
   'setup.step4_try_ai': 'AIに聞いてみよう:',
   'setup.step4_start': 'はじめる',

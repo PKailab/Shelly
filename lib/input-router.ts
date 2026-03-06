@@ -159,6 +159,33 @@ export function isShellCommand(input: string): boolean {
   return false;
 }
 
+// ─── 軽量タスク判定（API不要、シェル直送） ───────────────────────────────────
+
+type LightweightMatch = { command: string; label: string };
+
+const LIGHTWEIGHT_PATTERNS: Array<{ pattern: RegExp; command: string; label: string }> = [
+  { pattern: /^(?:ファイル一覧|ファイルを?見せて|ファイルを?表示|フォルダの中身|list files)/i, command: 'ls -la', label: 'ls -la' },
+  { pattern: /^(?:今どこ|現在の?ディレクトリ|カレントディレクトリ|current dir|where am i)/i, command: 'pwd', label: 'pwd' },
+  { pattern: /^(?:ディスク容量|ディスク使用|空き容量|disk space|storage)/i, command: 'df -h', label: 'df -h' },
+  { pattern: /^(?:メモリ|RAM|memory usage)/i, command: 'free -h 2>/dev/null || cat /proc/meminfo | head -5', label: 'memory check' },
+  { pattern: /^(?:日時|今何時|日付|date|time now)/i, command: 'date', label: 'date' },
+  { pattern: /^(?:自分は?誰|ユーザー名|whoami|who am i)/i, command: 'whoami', label: 'whoami' },
+  { pattern: /^(?:OS情報|システム情報|uname|system info)/i, command: 'uname -a', label: 'uname -a' },
+  { pattern: /^(?:プロセス一覧|実行中|running processes)/i, command: 'ps aux 2>/dev/null || ps', label: 'ps' },
+  { pattern: /^(?:環境変数|env vars|printenv)/i, command: 'printenv | head -30', label: 'printenv' },
+  { pattern: /^(?:IP.*アドレス|ipアドレス|ip address|my ip)/i, command: 'ip addr show 2>/dev/null || ifconfig 2>/dev/null || echo "ip command not found"', label: 'ip addr' },
+];
+
+function matchLightweightTask(input: string): LightweightMatch | null {
+  const trimmed = input.trim();
+  for (const { pattern, command, label } of LIGHTWEIGHT_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return { command, label };
+    }
+  }
+  return null;
+}
+
 // ─── 自然言語タスク分類（ツール提案用） ──────────────────────────────────────
 
 /**
@@ -300,6 +327,18 @@ export function parseInput(input: string): ParsedInput {
       prompt: trimmed,
       raw: trimmed,
       logSummary: `[Termux] ${trimmed}`,
+    };
+  }
+
+  // ── 4.5 軽量タスク → API不要、シェルコマンドに変換して直送 ─────────────────
+  const shellShortcut = matchLightweightTask(trimmed);
+  if (shellShortcut) {
+    return {
+      layer: 'command',
+      target: 'termux',
+      prompt: shellShortcut.command,
+      raw: trimmed,
+      logSummary: `[Termux] ${shellShortcut.label}`,
     };
   }
 

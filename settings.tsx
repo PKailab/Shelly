@@ -28,6 +28,7 @@ import { useCreatorStore } from '@/store/creator-store';
 import { BRIDGE_SERVER_JS, BRIDGE_SERVER_VERSION } from '@/lib/bridge-bundle';
 import { CursorShape, ThemeVariant, BridgeStatus } from '@/store/types';
 import { LlamaCppSection } from '@/components/settings/LlamaCppSection';
+import { McpSection } from '@/components/settings/McpSection';
 import { LlamaCppModel, buildStartAllScript, getRecommendedModel } from '@/lib/llamacpp-setup';
 import { useTranslation } from '@/lib/i18n';
 import { useI18n, AVAILABLE_LOCALES, type Locale } from '@/lib/i18n';
@@ -36,6 +37,7 @@ import { useDotfilesStore } from '@/lib/dotfiles-sync';
 import { resetOnboarding } from '@/components/Onboarding';
 import { resetSetupWizard } from '@/components/SetupWizard';
 import { PackageManager as PackageManagerModal } from '@/components/PackageManager';
+import { saveCustomContext, loadCustomContext, DEFAULT_CUSTOM_CONTEXT } from '@/lib/shelly-system-prompt';
 
 const THEME_OPTIONS: { value: ThemeVariant; label: string; bg: string }[] = [
   { value: 'black', label: '漆黒', bg: '#0D0D0D' },
@@ -162,6 +164,122 @@ export default function SettingsScreen() {
   // llama.cpp model management state
   const [activeModelId, setActiveModelId] = useState<string | null>(settings.localLlmModel ?? null);
   const [installedModelIds, setInstalledModelIds] = useState<Set<string>>(new Set());
+
+  // Custom context for LLM system prompt
+  const [customContextText, setCustomContextText] = useState('');
+  const [customContextSaved, setCustomContextSaved] = useState(false);
+  React.useEffect(() => {
+    loadCustomContext().then((text) => setCustomContextText(text || DEFAULT_CUSTOM_CONTEXT));
+  }, []);
+  const handleSaveCustomContext = useCallback(async () => {
+    await saveCustomContext(customContextText);
+    setCustomContextSaved(true);
+    setTimeout(() => setCustomContextSaved(false), 2000);
+  }, [customContextText]);
+
+  // Auto-approve level for CLI permission proxy
+  const autoApproveLevel = settings.autoApproveLevel ?? 'safe';
+
+  // Diagnostics
+  const [diagResults, setDiagResults] = useState<{
+    bridge: 'checking' | 'ok' | 'fail' | null;
+    latency: number | null;
+    claudeCli: 'checking' | 'ok' | 'fail' | null;
+    geminiCli: 'checking' | 'ok' | 'fail' | null;
+    codexCli: 'checking' | 'ok' | 'fail' | null;
+    ollama: 'checking' | 'ok' | 'fail' | null;
+    storage: 'checking' | 'ok' | 'fail' | null;
+  }>({ bridge: null, latency: null, claudeCli: null, geminiCli: null, codexCli: null, ollama: null, storage: null });
+  const [isDiagRunning, setIsDiagRunning] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const runDiagnostics = useCallback(async () => {
+    setIsDiagRunning(true);
+    setDiagResults({ bridge: 'checking', latency: null, claudeCli: 'checking', geminiCli: 'checking', codexCli: 'checking', ollama: 'checking', storage: 'checking' });
+
+    // 1. Bridge connection + latency
+    const t0 = Date.now();
+    const bridgeOk = await testConnection().catch(() => false);
+    const latencyMs = Date.now() - t0;
+    setDiagResults(prev => ({ ...prev, bridge: bridgeOk ? 'ok' : 'fail', latency: bridgeOk ? latencyMs : null }));
+
+    // If bridge not connected, mark CLI checks as fail
+    if (!bridgeOk) {
+      setDiagResults(prev => ({ ...prev, claudeCli: 'fail', geminiCli: 'fail', codexCli: 'fail', storage: 'fail' }));
+      // Still check ollama directly
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 3000);
+        const res = await fetch(`${settings.localLlmUrl}/api/tags`, { signal: ctrl.signal }).catch(() => null);
+        clearTimeout(timer);
+        setDiagResults(prev => ({ ...prev, ollama: res?.ok ? 'ok' : 'fail' }));
+      } catch {
+        setDiagResults(prev => ({ ...prev, ollama: 'fail' }));
+      }
+      setIsDiagRunning(false);
+      return;
+    }
+
+    // 2. Check CLIs via bridge
+    const checkCli = async (cmd: string): Promise<boolean> => {
+      try {
+        const result = await runRawCommand(`which ${cmd}`, { timeoutMs: 5000 });
+        return result.exitCode === 0;
+      } catch { return false; }
+    };
+
+    const [claude, gemini, codex] = await Promise.all([
+      checkCli('claude'),
+      checkCli('gemini'),
+      checkCli('codex'),
+    ]);
+    setDiagResults(prev => ({
+      ...prev,
+      claudeCli: claude ? 'ok' : 'fail',
+      geminiCli: gemini ? 'ok' : 'fail',
+      codexCli: codex ? 'ok' : 'fail',
+    }));
+
+    // 3. Ollama
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3000);
+      const res = await fetch(`${settings.localLlmUrl}/api/tags`, { signal: ctrl.signal }).catch(() => null);
+      clearTimeout(timer);
+      setDiagResults(prev => ({ ...prev, ollama: res?.ok ? 'ok' : 'fail' }));
+    } catch {
+      setDiagResults(prev => ({ ...prev, ollama: 'fail' }));
+    }
+
+    // 4. Storage
+    try {
+      const result = await runRawCommand('ls ~/storage/shared 2>/dev/null && echo OK', { timeoutMs: 5000 });
+      setDiagResults(prev => ({ ...prev, storage: (result.stdout || '').includes('OK') ? 'ok' : 'fail' }));
+    } catch {
+      setDiagResults(prev => ({ ...prev, storage: 'fail' }));
+    }
+
+    setIsDiagRunning(false);
+  }, [testConnection, runRawCommand, settings.localLlmUrl]);
+
+  const copyDiagnostics = useCallback(() => {
+    const d = diagResults;
+    const statusLabel = (s: typeof d.bridge) => s === 'ok' ? 'OK' : s === 'fail' ? 'FAIL' : s === 'checking' ? '...' : '-';
+    const report = [
+      '## Shelly Diagnostics',
+      `Date: ${new Date().toISOString()}`,
+      `Bridge: ${statusLabel(d.bridge)}${d.latency ? ` (${d.latency}ms)` : ''}`,
+      `Claude CLI: ${statusLabel(d.claudeCli)}`,
+      `Gemini CLI: ${statusLabel(d.geminiCli)}`,
+      `Codex CLI: ${statusLabel(d.codexCli)}`,
+      `Ollama/llama-server: ${statusLabel(d.ollama)}`,
+      `Storage: ${statusLabel(d.storage)}`,
+      `Connection Mode: ${connectionMode}`,
+      `Bridge URL: ${termuxSettings.wsUrl}`,
+      `LLM URL: ${settings.localLlmUrl}`,
+    ].join('\n');
+    Share.share({ message: report, title: 'Shelly Diagnostics' });
+  }, [diagResults, connectionMode, termuxSettings.wsUrl, settings.localLlmUrl]);
 
   const handleSelectModel = (model: LlamaCppModel) => {
     setActiveModelId(model.id);
@@ -688,6 +806,19 @@ export default function SettingsScreen() {
           </View>
         </SettingRow>
 
+        {/* ── Advanced Settings Toggle ────────────────────────────────────── */}
+        <Pressable
+          onPress={() => setShowAdvanced(v => !v)}
+          style={[styles.actionButton, { marginTop: 12, borderColor: '#6B728033' }]}
+        >
+          <MaterialIcons name={showAdvanced ? 'expand-less' : 'expand-more'} size={18} color="#6B7280" />
+          <Text style={[styles.actionButtonText, { color: '#9CA3AF' }]}>
+            {showAdvanced ? '上級設定を閉じる' : '上級設定を表示'}
+          </Text>
+          <MaterialIcons name="settings" size={16} color="#6B7280" />
+        </Pressable>
+
+        {showAdvanced && (<>
         {/* ── Termux Bridge ─────────────────────────────────────────────────── */}
         <SectionHeader
           title="Termux連携"
@@ -891,7 +1022,7 @@ export default function SettingsScreen() {
         {/* ── Local LLM (Ollama) ─────────────────────────────────────────── */}
         <SectionHeader
           title="ローカルLLM (llama-server)"
-          subtitle="Termux上のllama-serverをAIチャットに使用します"
+          subtitle="実験的・上級者向け — RAM 3-4GB消費。Termux上のllama-serverをAIチャットに使用します"
         />
 
         <SettingRow
@@ -997,6 +1128,128 @@ export default function SettingsScreen() {
           onRunCommand={handleRunCommandForSetup}
           onUpdateLocalLlmUrl={handleUpdateLocalLlmUrl}
         />
+
+        {/* ── MCP Servers ─────────────────────────────────────────────────── */}
+        <SectionHeader
+          title="MCP Servers"
+          subtitle="Claude Codeのコンテキストを強化するサーバー群"
+        />
+        <McpSection
+          isConnected={bridgeStatus === 'connected'}
+          onRunCommand={handleRunCommandForSetup}
+        />
+
+        {/* ── Custom Context ────────────────────────────────────────────── */}
+        <SectionHeader
+          title="カスタムコンテキスト"
+          subtitle="ローカルLLMに自動注入されるMD。設計思想やルールを記述"
+        />
+        <View style={styles.wsUrlRow}>
+          <TextInput
+            style={[styles.wsUrlInput, {
+              color: '#E5E7EB',
+              minHeight: 120,
+              textAlignVertical: 'top',
+              fontFamily: 'monospace',
+              fontSize: 12,
+            }]}
+            value={customContextText}
+            onChangeText={setCustomContextText}
+            placeholder={DEFAULT_CUSTOM_CONTEXT}
+            placeholderTextColor="#4B5563"
+            multiline
+            numberOfLines={8}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Pressable
+            style={[styles.segmentBtn, { backgroundColor: customContextSaved ? '#065F46' : '#1F2937', marginTop: 8 }]}
+            onPress={handleSaveCustomContext}
+          >
+            <Text style={styles.segmentBtnText}>
+              {customContextSaved ? '保存済み' : '保存する'}
+            </Text>
+          </Pressable>
+          <Text style={[styles.wsUrlHint, { marginTop: 4 }]}>
+            LLMをONにした時、ここの内容がシステムプロンプトに自動追加されます
+          </Text>
+        </View>
+
+        {/* ── CLI Auto-Approve ──────────────────────────────────────────── */}
+        <SectionHeader
+          title="CLI自動承認"
+          subtitle="Chatタブ経由でClaude Code/Geminiを使う時の権限承認"
+        />
+        <View style={styles.wsUrlRow}>
+          {(['none', 'safe', 'all'] as const).map((level) => {
+            const labels: Record<string, { title: string; desc: string }> = {
+              none: { title: '全て手動', desc: '毎回確認する（安全）' },
+              safe: { title: '読み取りのみ自動', desc: 'ファイル読み取りは自動承認' },
+              all: { title: '全自動', desc: '全て自動承認（上級者向け）' },
+            };
+            const isActive = autoApproveLevel === level;
+            return (
+              <Pressable
+                key={level}
+                style={[styles.segmentBtn, {
+                  backgroundColor: isActive ? '#1E3A5F' : '#111827',
+                  borderColor: isActive ? '#3B82F6' : '#374151',
+                  marginBottom: 6,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }]}
+                onPress={() => updateSettings({ autoApproveLevel: level })}
+              >
+                <View>
+                  <Text style={[styles.segmentBtnText, { fontWeight: isActive ? '700' : '400' }]}>
+                    {labels[level].title}
+                  </Text>
+                  <Text style={[styles.wsUrlHint, { marginTop: 2 }]}>{labels[level].desc}</Text>
+                </View>
+                {isActive && <MaterialIcons name="check-circle" size={20} color="#3B82F6" />}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* ── Default Agent ──────────────────────────────────────────────── */}
+        <SectionHeader
+          title="デフォルトエージェント"
+          subtitle="ローカルLLM未使用時に優先するCLI"
+        />
+        <View style={styles.wsUrlRow}>
+          {(['gemini-cli', 'claude-code', 'codex'] as const).map((agent) => {
+            const labels: Record<string, { title: string; desc: string }> = {
+              'gemini-cli': { title: 'Gemini CLI', desc: '無料枠あり。Googleアカウントだけで使える。初心者におすすめ' },
+              'claude-code': { title: 'Claude Code', desc: '最も賢い。複雑な開発タスクに最強。有料' },
+              'codex': { title: 'Codex CLI', desc: '高速で軽量。簡単な修正向き' },
+            };
+            const isActive = (settings.defaultAgent ?? 'gemini-cli') === agent;
+            return (
+              <Pressable
+                key={agent}
+                style={[styles.segmentBtn, {
+                  backgroundColor: isActive ? '#1E3A5F' : '#111827',
+                  borderColor: isActive ? '#3B82F6' : '#374151',
+                  marginBottom: 6,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }]}
+                onPress={() => updateSettings({ defaultAgent: agent })}
+              >
+                <View>
+                  <Text style={[styles.segmentBtnText, { fontWeight: isActive ? '700' : '400' }]}>
+                    {labels[agent].title}
+                  </Text>
+                  <Text style={[styles.wsUrlHint, { marginTop: 2 }]}>{labels[agent].desc}</Text>
+                </View>
+                {isActive && <MaterialIcons name="check-circle" size={20} color="#3B82F6" />}
+              </Pressable>
+            );
+          })}
+        </View>
 
             {/* ── Perplexity API ─────────────────────────────────────────────── */}
         <SectionHeader
@@ -1280,6 +1533,8 @@ export default function SettingsScreen() {
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
+        </>)}
+
         {/* ── Data ─────────────────────────────────────────────────────────── */}
         <SectionHeader title="データ" />
 
@@ -1431,6 +1686,57 @@ export default function SettingsScreen() {
           <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>{t('settings.rerun_setup')}</Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
+
+        {/* ── Diagnostics ──────────────────────────────────────────────────── */}
+        <SectionHeader title="環境診断" subtitle="接続状態・インストール済みツールを一括チェック" />
+
+        <Pressable
+          onPress={runDiagnostics}
+          disabled={isDiagRunning}
+          style={[styles.actionButton, { borderColor: '#00D4AA33', marginBottom: 8 }]}
+        >
+          {isDiagRunning ? (
+            <ActivityIndicator size="small" color="#00D4AA" style={{ marginRight: 4 }} />
+          ) : (
+            <MaterialIcons name="health-and-safety" size={18} color="#00D4AA" />
+          )}
+          <Text style={[styles.actionButtonText, { color: '#00D4AA' }]}>
+            {isDiagRunning ? '診断中...' : '診断を実行'}
+          </Text>
+        </Pressable>
+
+        {diagResults.bridge !== null && (
+          <View style={styles.aboutCard}>
+            {([
+              ['Termux Bridge', diagResults.bridge, diagResults.latency ? `${diagResults.latency}ms` : undefined],
+              ['Claude CLI', diagResults.claudeCli],
+              ['Gemini CLI', diagResults.geminiCli],
+              ['Codex CLI', diagResults.codexCli],
+              ['Ollama / llama-server', diagResults.ollama],
+              ['Storage Access', diagResults.storage],
+            ] as [string, typeof diagResults.bridge, string?][]).map(([label, status, extra]) => (
+              <View key={label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
+                <MaterialIcons
+                  name={status === 'ok' ? 'check-circle' : status === 'fail' ? 'cancel' : status === 'checking' ? 'hourglass-top' : 'remove'}
+                  size={16}
+                  color={status === 'ok' ? '#4ADE80' : status === 'fail' ? '#F87171' : status === 'checking' ? '#FBBF24' : '#6B7280'}
+                />
+                <Text style={{ color: '#AAAAAA', fontFamily: 'monospace', fontSize: 13, marginLeft: 8, flex: 1 }}>
+                  {label}
+                </Text>
+                {extra && <Text style={{ color: '#6B7280', fontFamily: 'monospace', fontSize: 12 }}>{extra}</Text>}
+              </View>
+            ))}
+
+            <Pressable
+              onPress={copyDiagnostics}
+              style={[styles.actionButton, { marginTop: 8, borderColor: '#60A5FA33' }]}
+            >
+              <MaterialIcons name="content-copy" size={16} color="#60A5FA" />
+              <Text style={[styles.actionButtonText, { color: '#60A5FA', fontSize: 12 }]}>診断結果をコピー（GitHub Issues用）</Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* ── About ────────────────────────────────────────────────────────── */}
         <SectionHeader title="このアプリについて" />

@@ -32,6 +32,9 @@ export type GitIntent =
   | 'help'         // 一般的なヘルプ
   | 'unknown';
 
+/** コアインテント: アプリ側でガイドUIを出す対象（5つに厳選） */
+const CORE_INTENTS: Set<GitIntent> = new Set(['commit', 'push', 'status', 'diff', 'help']);
+
 type IntentPattern = {
   intent: GitIntent;
   patterns: RegExp[];
@@ -184,6 +187,31 @@ export type GitGuide = {
  * prereqCommand は自動実行され、結果に基づいて追加のガイドが出る。
  */
 export function generateGuide(intent: GitIntent, userInput: string): GitGuide {
+  // コアインテント以外はLLMに委譲する案内を返す
+  if (!CORE_INTENTS.has(intent) && intent !== 'unknown') {
+    return {
+      title: `Git: ${intent}`,
+      overview:
+        `「${userInput}」は高度なGit操作です。\n` +
+        `AIエージェントに任せるとより正確にガイドできます。`,
+      steps: [
+        {
+          type: 'tip',
+          explanation:
+            '以下のように聞いてみてください:\n' +
+            `  @claude ${userInput}\n` +
+            `  @gemini ${userInput}\n\n` +
+            'AIがGitの状態を確認しながら最適な手順を教えてくれます。',
+        },
+        {
+          type: 'command',
+          explanation: 'まずは現在の状態を確認:',
+          command: 'git status',
+        },
+      ],
+    };
+  }
+
   switch (intent) {
     case 'commit':
       return {
@@ -648,18 +676,19 @@ export function generateGuide(intent: GitIntent, userInput: string): GitGuide {
       return {
         title: 'Gitアシスタント',
         overview:
-          'すみません、ご質問の意図が分かりませんでした。\n' +
-          '以下のように聞いてみてください:',
+          '基本操作は @git で、複雑な操作はAIエージェントに聞くのがおすすめです。',
         steps: [
           {
             type: 'info',
             explanation:
-              '例:\n' +
+              '@git で対応できる操作:\n' +
               '  @git コミットしたい\n' +
-              '  @git 変更を戻したい\n' +
-              '  @git ブランチを作りたい\n' +
               '  @git プッシュしたい\n' +
-              '  @git ヘルプ',
+              '  @git 状況を確認\n' +
+              '  @git 差分を見たい\n\n' +
+              '複雑な操作はAIに任せましょう:\n' +
+              '  @claude ブランチ戦略を教えて\n' +
+              '  @gemini rebaseのやり方',
           },
         ],
       };

@@ -128,15 +128,7 @@ export default function TabLayout() {
           },
         }}
       >
-        <Tabs.Screen
-          name="projects"
-          options={{
-            title: "Projects",
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="folder" size={22} color={color} />
-            ),
-          }}
-        />
+        {/* ── Core 4 tabs ─────────────────────────────────────────── */}
         <Tabs.Screen
           name="index"
           options={{
@@ -147,11 +139,11 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="terminal"
+          name="creator"
           options={{
-            title: "Terminal",
+            title: "Creator",
             tabBarIcon: ({ color }) => (
-              <MaterialIcons name="terminal" size={22} color={color} />
+              <MaterialIcons name="auto-awesome" size={22} color={color} />
             ),
           }}
         />
@@ -165,39 +157,6 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="creator"
-          options={{
-            href: null,
-          }}
-        />
-        <Tabs.Screen
-          name="browser"
-          options={{
-            title: "Browser",
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="public" size={22} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="obsidian"
-          options={{
-            title: "Obsidian",
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="psychology" size={22} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="search"
-          options={{
-            title: "Search",
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="search" size={22} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="settings"
           options={{
             title: "Settings",
@@ -205,6 +164,27 @@ export default function TabLayout() {
               <MaterialIcons name="settings" size={22} color={color} />
             ),
           }}
+        />
+        {/* ── Hidden tabs (accessible via navigation, not tab bar) ── */}
+        <Tabs.Screen
+          name="projects"
+          options={{ href: null }}
+        />
+        <Tabs.Screen
+          name="terminal"
+          options={{ href: null }}
+        />
+        <Tabs.Screen
+          name="browser"
+          options={{ href: null }}
+        />
+        <Tabs.Screen
+          name="obsidian"
+          options={{ href: null }}
+        />
+        <Tabs.Screen
+          name="search"
+          options={{ href: null }}
         />
       </Tabs>
 

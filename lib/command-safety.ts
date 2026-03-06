@@ -21,6 +21,8 @@ export interface SafetyResult {
   matchedPattern?: string;
   /** 危険なコマンドの具体的な理由 */
   reason: string;
+  /** リカバリ提案（実行後に表示） */
+  recovery?: string;
 }
 
 // ─── 危険パターン定義 ─────────────────────────────────────────────────────────
@@ -191,6 +193,11 @@ export function checkCommandSafety(command: string): SafetyResult {
     }
   }
 
+  // リカバリ提案を付与
+  if (worst.level !== 'SAFE' && worst.level !== 'LOW') {
+    worst.recovery = getRecoverySuggestion(command);
+  }
+
   return worst;
 }
 
@@ -229,6 +236,70 @@ export function dangerLevelColor(level: DangerLevel): string {
     case 'MEDIUM':   return '#3B82F6'; // blue
     default:         return '#22C55E'; // green
   }
+}
+
+/**
+ * 危険コマンド実行後のリカバリ提案を生成する。
+ * command-safetyで検知されたコマンドが実際に実行された後に、
+ * ユーザーに復旧手順を提案する。
+ */
+export function getRecoverySuggestion(command: string): string | undefined {
+  const cmd = command.trim().toLowerCase();
+
+  // rm系 → gitで復旧可能か確認
+  if (/rm\s/.test(cmd)) {
+    return [
+      'ファイルを削除してしまった場合の復旧方法:',
+      '  1. gitリポジトリ内なら: git checkout -- <ファイル名>',
+      '  2. git管理外なら: 復元は困難です',
+      '  3. コミット済みなら: git log で確認 → git restore --source=<コミットID> <ファイル>',
+      '',
+      'ヒント: こまめに git commit しておくと安心です。',
+    ].join('\n');
+  }
+
+  // git reset --hard
+  if (/git\s+reset\s+--hard/.test(cmd)) {
+    return [
+      'git reset --hard の復旧:',
+      '  1. git reflog で直前の状態を確認',
+      '  2. git reset --hard <reflog-ID> で戻せます',
+      '',
+      '※ reflogは通常30日間保持されます。',
+    ].join('\n');
+  }
+
+  // git push --force
+  if (/git\s+push.*(-f|--force)/.test(cmd)) {
+    return [
+      'force pushの復旧:',
+      '  1. チームメンバーのローカルに元のコミットが残っている場合あり',
+      '  2. git reflog (リモートサーバー側) で元のHEADを探す',
+      '  3. 今後は git push --force-with-lease を使うと安全です',
+    ].join('\n');
+  }
+
+  // chmod 777
+  if (/chmod\s+777/.test(cmd)) {
+    return [
+      'パーミッション修正:',
+      '  ディレクトリ: chmod 755 <パス>',
+      '  ファイル: chmod 644 <パス>',
+      '  実行ファイル: chmod 755 <パス>',
+    ].join('\n');
+  }
+
+  // DROP TABLE / TRUNCATE
+  if (/drop\s+table|truncate\s+table/i.test(cmd)) {
+    return [
+      'データベース復旧:',
+      '  1. バックアップがあれば復元可能',
+      '  2. PostgreSQL: pg_restore / MySQL: mysql < backup.sql',
+      '  3. バックアップがない場合は復元困難です',
+    ].join('\n');
+  }
+
+  return undefined;
 }
 
 /**

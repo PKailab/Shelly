@@ -451,6 +451,18 @@ export default function TerminalScreen() {
 
     addAiBlock(aiBlock);
 
+    // ── Creator detection: project creation keywords → offer Creator shortcut ─
+    const creatorKeywords = /(?:プロジェクト|アプリ|ウェブサイト|サイト|ポートフォリオ|ランディングページ|LP).*(?:作|つく|生成|ビルド|build|create)/i;
+    const creatorKeywordsEn = /(?:create|build|make|generate|scaffold)\s+(?:a\s+)?(?:project|app|website|portfolio|landing\s*page)/i;
+    if (parsed.layer === 'natural' && (creatorKeywords.test(parsed.raw) || creatorKeywordsEn.test(parsed.raw))) {
+      updateAiBlock(blockId, {
+        response: `プロジェクト作成を検知しました。\n\nCreatorタブで自動生成できます。Creatorタブに移動して「${parsed.prompt}」を入力すると、ファイル構成・コード・設定を自動で生成します。\n\n※ このままチャットで続けることもできます。`,
+        isStreaming: false,
+        logSummary: `[Creator提案] ${parsed.prompt.slice(0, 40)}`,
+      });
+      // Don't return — let AI also process the request if LLM is available
+    }
+
     // ── Layer 3: Natural language → route directly to Local LLM (if enabled) ─
     // No more suggestion cards — just send it straight to the LLM
     let target = parsed.target;
@@ -708,7 +720,12 @@ export default function TerminalScreen() {
           },
         );
         const facilitatorLabel = result.facilitator?.label ?? 'ファシリ';
-        const finalText = teamAccumulated + `\n\n=== ファシリサマリー (${facilitatorLabel}) ===\n${result.facilitatorSummary}`;
+        // ファシリサマリーを先頭に、個別回答を後ろに配置
+        const memberDetails = result.members
+          .filter(m => !m.isFacilitator)
+          .map(m => `\n--- ${m.label} ---\n${m.response}`)
+          .join('\n');
+        const finalText = `=== まとめ (${facilitatorLabel}) ===\n${result.facilitatorSummary}\n\n──── 各エージェントの回答 ────${memberDetails}`;
         updateAiBlock(blockId, {
           response: finalText,
           streamingText: undefined,
@@ -724,25 +741,50 @@ export default function TerminalScreen() {
         });
       }
     } else if (target === 'claude') {
-      // Claude CLI — build command and send to Termux
-      const config = {
-        baseUrl: settings.localLlmUrl,
-        model: settings.localLlmModel,
-        enabled: settings.localLlmEnabled,
-      };
-      const result = await orchestrateTask(parsed.prompt, {
-        ...config,
-        enabled: false, // Force delegation to CLI
+      // Claude CLI — execute via bridge and stream output into AiBlock
+      if (connectionMode !== 'termux') {
+        updateAiBlock(blockId, {
+          response: 'Termuxに接続してください。Claude Codeの実行にはTermuxブリッジが必要です。',
+          isStreaming: false,
+        });
+        return;
+      }
+
+      const { buildChatModeClaudeCommand } = await import('@/lib/cli-permission-proxy');
+      const autoApprove = settings.autoApproveLevel ?? 'safe';
+      const cliCommand = buildChatModeClaudeCommand(parsed.prompt, autoApprove);
+
+      let cliAccumulated = '';
+      let cliTokenCount = 0;
+      updateAiBlock(blockId, {
+        isStreaming: true,
+        streamingText: `$ ${cliCommand}\n\n`,
+        tokenCount: 0,
+        streamingStartTime: Date.now(),
+        logSummary: `[Claude Code] ${parsed.prompt.slice(0, 50)}${parsed.prompt.length > 50 ? '...' : ''}`,
       });
-      if (result.delegatedCommand) {
-        if (connectionMode === 'termux') {
-          sendCommand(result.delegatedCommand);
-        } else {
-          updateAiBlock(blockId, {
-            response: `Termuxに接続してください。実行コマンド:\n${result.delegatedCommand}`,
-            isStreaming: false,
-          });
+
+      try {
+        const result = await bridgeRunCommand(cliCommand);
+        cliAccumulated = result.stdout || '';
+        if (result.stderr) {
+          cliAccumulated += `\n--- stderr ---\n${result.stderr}`;
         }
+        cliTokenCount = Math.round(cliAccumulated.length / 4);
+        const exitLabel = result.exitCode === 0 ? 'completed' : `exit ${result.exitCode}`;
+        updateAiBlock(blockId, {
+          response: cliAccumulated,
+          streamingText: undefined,
+          isStreaming: false,
+          tokenCount: cliTokenCount,
+          logSummary: `[Claude Code] ${exitLabel} - ${parsed.prompt.slice(0, 40)}`,
+        });
+      } catch (err) {
+        updateAiBlock(blockId, {
+          response: `Claude Code実行エラー: ${err instanceof Error ? err.message : String(err)}`,
+          isStreaming: false,
+          logSummary: '[Claude Code] エラー',
+        });
       }
     } else if (target === 'git') {
       // @git — 自然言語Gitアシスタント

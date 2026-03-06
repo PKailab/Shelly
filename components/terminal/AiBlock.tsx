@@ -27,6 +27,8 @@ type Props = {
   block: AiBlockType;
   onSelectTool?: (mentionExample: string) => void;
   onRunCommand?: (command: string) => void;
+  onRetry?: (input: string) => void;
+  onAskOther?: (input: string) => void;
   fontSize?: number;
 };
 
@@ -55,7 +57,7 @@ function StreamingCursor({ color }: { color: string }) {
   );
 }
 
-export const AiBlock = memo(function AiBlock({ block, onSelectTool, onRunCommand, fontSize = 14 }: Props) {
+export const AiBlock = memo(function AiBlock({ block, onSelectTool, onRunCommand, onRetry, onAskOther, fontSize = 14 }: Props) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -123,177 +125,250 @@ export const AiBlock = memo(function AiBlock({ block, onSelectTool, onRunCommand
   return (
     <Animated.View
       entering={FadeInDown.duration(250).springify().damping(16)}
-      style={[styles.container, { backgroundColor: colors.surfaceHigh, borderColor: colors.surface }]}
+      style={styles.bubbleRow}
     >
-      {/* Log summary line */}
-      <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7} style={styles.summaryRow}>
-        <View style={[styles.targetDot, { backgroundColor: targetColor }]} />
-        <Text style={[styles.summaryText, { color: colors.muted, fontSize: fontSize - 2 }]} numberOfLines={1}>
-          {block.logSummary}
-        </Text>
-        {block.isStreaming && (
-          <ActivityIndicator size="small" color={targetColor} style={styles.spinner} />
+      {/* Avatar */}
+      <View style={[styles.avatar, { backgroundColor: withAlpha(targetColor, 0.15), borderColor: withAlpha(targetColor, 0.3) }]}>
+        <Text style={[styles.avatarText, { color: targetColor }]}>AI</Text>
+      </View>
+
+      <View style={[styles.container, { backgroundColor: colors.surfaceHigh, borderColor: withAlpha(targetColor, 0.15) }]}>
+        {/* Accent bar */}
+        <View style={[styles.accentBar, { backgroundColor: targetColor }]} />
+
+        {/* Log summary line */}
+        <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7} style={styles.summaryRow}>
+          <View style={[styles.targetDot, { backgroundColor: targetColor }]} />
+          <Text style={[styles.summaryText, { color: colors.muted, fontSize: fontSize - 2 }]} numberOfLines={1}>
+            {block.logSummary}
+          </Text>
+          {block.isStreaming && (
+            <ActivityIndicator size="small" color={targetColor} style={styles.spinner} />
+          )}
+          <MaterialIcons
+            name={expanded ? 'expand-less' : 'expand-more'}
+            size={16}
+            color={colors.muted}
+          />
+        </TouchableOpacity>
+
+        {/* Routing detail */}
+        {expanded && block.routingDetail && (
+          <View style={[styles.detailBox, { borderTopColor: colors.surface }]}>
+            <Text style={[styles.detailText, { color: colors.inactive, fontSize: fontSize - 2 }]}>
+              {block.routingDetail}
+            </Text>
+          </View>
         )}
-        <MaterialIcons
-          name={expanded ? 'expand-less' : 'expand-more'}
-          size={16}
-          color={colors.muted}
-        />
-      </TouchableOpacity>
 
-      {/* Routing detail */}
-      {expanded && block.routingDetail && (
-        <View style={[styles.detailBox, { borderTopColor: colors.surface }]}>
-          <Text style={[styles.detailText, { color: colors.inactive, fontSize: fontSize - 2 }]}>
-            {block.routingDetail}
-          </Text>
-        </View>
-      )}
+        {/* Mention hint */}
+        {block.showHint && block.mentionHint && (
+          <View style={[styles.hintBox, { backgroundColor: withAlpha(colors.accent, 0.04) }]}>
+            <Text style={[styles.hintText, { color: colors.muted }]}>
+              {block.mentionHint.text}
+            </Text>
+            <Text style={[styles.hintExample, { color: colors.accent }]}>{block.mentionHint.example}</Text>
+          </View>
+        )}
 
-      {/* Mention hint */}
-      {block.showHint && block.mentionHint && (
-        <View style={[styles.hintBox, { backgroundColor: withAlpha(colors.accent, 0.04) }]}>
-          <Text style={[styles.hintText, { color: colors.muted }]}>
-            {block.mentionHint.text}
-          </Text>
-          <Text style={[styles.hintExample, { color: colors.accent }]}>{block.mentionHint.example}</Text>
-        </View>
-      )}
+        {/* Tool suggestion cards */}
+        {block.toolSuggestions && block.toolSuggestions.length > 0 && !block.response && !block.isStreaming && (
+          <View style={styles.suggestionsContainer}>
+            {block.toolSuggestions.map((s) => {
+              const sColor = getTargetColor(s.target);
+              return (
+                <TouchableOpacity
+                  key={s.target}
+                  style={[styles.suggestionCard, { borderColor: sColor, backgroundColor: colors.background }]}
+                  onPress={() => onSelectTool?.(s.mentionExample)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.suggestionHeader}>
+                    <View style={[styles.targetDot, { backgroundColor: sColor }]} />
+                    <Text style={[styles.suggestionLabel, { color: sColor }]}>{s.label}</Text>
+                    <Text style={[styles.suggestionConf, { color: colors.inactive }]}>{Math.round(s.confidence * 100)}%</Text>
+                  </View>
+                  <Text style={[styles.suggestionReason, { color: colors.muted }]}>{s.reason}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
-      {/* Tool suggestion cards */}
-      {block.toolSuggestions && block.toolSuggestions.length > 0 && !block.response && !block.isStreaming && (
-        <View style={styles.suggestionsContainer}>
-          {block.toolSuggestions.map((s) => {
-            const sColor = getTargetColor(s.target);
+        {/* Git Guide */}
+        {block.target === 'git' && block.response && (() => {
+          try {
+            const guide: GitGuide = JSON.parse(block.response);
             return (
+              <GitGuideBlock
+                guide={guide}
+                onRunCommand={onRunCommand ?? (() => {})}
+              />
+            );
+          } catch {
+            return null;
+          }
+        })()}
+
+        {/* AI response text / streaming */}
+        {block.target !== 'git' && displayText ? (
+          <View style={[styles.responseBox, { borderTopColor: colors.surface }]}>
+            <Text style={[styles.responseText, { color: colors.foregroundDim, fontSize }]} selectable>
+              {displayText}
+              {block.isStreaming && <StreamingCursor color={targetColor} />}
+            </Text>
+            {block.isStreaming && tps && (
+              <Text style={[styles.statsText, { color: colors.hint }]}>
+                {block.tokenCount} tokens | {tps} tok/s
+              </Text>
+            )}
+          </View>
+        ) : null}
+
+        {/* Citations */}
+        {block.citations && block.citations.length > 0 && (
+          <View style={[styles.citationsBox, { borderTopColor: colors.surface }]}>
+            <Text style={[styles.citationsTitle, { color: colors.inactive }]}>Sources:</Text>
+            {block.citations.map((c, i) => (
+              <Text key={i} style={[styles.citationItem, { color: colors.link }]} numberOfLines={1}>
+                {i + 1}. {c.title || c.url}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        {/* Action buttons */}
+        {(isComplete || displayText) && (
+          <View style={styles.actionRow}>
+            <Animated.View style={copyAnimStyle}>
               <TouchableOpacity
-                key={s.target}
-                style={[styles.suggestionCard, { borderColor: sColor, backgroundColor: colors.background }]}
-                onPress={() => onSelectTool?.(s.mentionExample)}
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  copied && { borderColor: colors.accent, backgroundColor: withAlpha(colors.accent, 0.04) },
+                ]}
+                onPress={handleCopy}
                 activeOpacity={0.7}
               >
-                <View style={styles.suggestionHeader}>
-                  <View style={[styles.targetDot, { backgroundColor: sColor }]} />
-                  <Text style={[styles.suggestionLabel, { color: sColor }]}>{s.label}</Text>
-                  <Text style={[styles.suggestionConf, { color: colors.inactive }]}>{Math.round(s.confidence * 100)}%</Text>
-                </View>
-                <Text style={[styles.suggestionReason, { color: colors.muted }]}>{s.reason}</Text>
+                <MaterialIcons
+                  name={copied ? 'check' : 'content-copy'}
+                  size={14}
+                  color={copied ? colors.accent : colors.muted}
+                />
+                <Text style={[styles.actionBtnText, { color: colors.muted }, copied && { color: colors.accent }]}>
+                  {copied ? t('ai.copied') : t('ai.copy')}
+                </Text>
               </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
+            </Animated.View>
 
-      {/* Git Guide */}
-      {block.target === 'git' && block.response && (() => {
-        try {
-          const guide: GitGuide = JSON.parse(block.response);
-          return (
-            <GitGuideBlock
-              guide={guide}
-              onRunCommand={onRunCommand ?? (() => {})}
-            />
-          );
-        } catch {
-          return null;
-        }
-      })()}
+            {isComplete && (
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  isSpeaking && { borderColor: '#FF6B6B', backgroundColor: withAlpha(colors.error, 0.1) },
+                ]}
+                onPress={handleSpeak}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons
+                  name={isSpeaking ? 'stop' : 'volume-up'}
+                  size={14}
+                  color={isSpeaking ? '#FF6B6B' : colors.muted}
+                />
+                <Text style={[styles.actionBtnText, { color: colors.muted }, isSpeaking && { color: '#FF6B6B' }]}>
+                  {isSpeaking ? t('ai.stop') : t('ai.speak')}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
-      {/* AI response text / streaming */}
-      {block.target !== 'git' && displayText ? (
-        <View style={[styles.responseBox, { borderTopColor: colors.surface }]}>
-          <Text style={[styles.responseText, { color: colors.foregroundDim, fontSize }]} selectable>
-            {displayText}
-            {block.isStreaming && <StreamingCursor color={targetColor} />}
-          </Text>
-          {block.isStreaming && tps && (
-            <Text style={[styles.statsText, { color: colors.hint }]}>
-              {block.tokenCount} tokens | {tps} tok/s
-            </Text>
-          )}
-        </View>
-      ) : null}
+        {/* Error action buttons */}
+        {block.error && !block.isStreaming && (
+          <View style={[styles.errorBox, { borderTopColor: colors.surface }]}>
+            <View style={styles.errorRow}>
+              <MaterialIcons name="error-outline" size={14} color="#F87171" />
+              <Text style={styles.errorText} numberOfLines={2}>{block.error}</Text>
+            </View>
+            <View style={styles.errorActions}>
+              {onRetry && (
+                <TouchableOpacity
+                  style={[styles.errorBtn, { borderColor: '#FBBF2440' }]}
+                  onPress={() => onRetry(block.input)}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="refresh" size={14} color="#FBBF24" />
+                  <Text style={[styles.errorBtnText, { color: '#FBBF24' }]}>{t('ai.retry') || 'Retry'}</Text>
+                </TouchableOpacity>
+              )}
+              {onAskOther && (
+                <TouchableOpacity
+                  style={[styles.errorBtn, { borderColor: '#60A5FA40' }]}
+                  onPress={() => onAskOther(block.input)}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="swap-horiz" size={14} color="#60A5FA" />
+                  <Text style={[styles.errorBtnText, { color: '#60A5FA' }]}>{t('ai.ask_other') || 'Ask another AI'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
-      {/* Citations */}
-      {block.citations && block.citations.length > 0 && (
-        <View style={[styles.citationsBox, { borderTopColor: colors.surface }]}>
-          <Text style={[styles.citationsTitle, { color: colors.inactive }]}>Sources:</Text>
-          {block.citations.map((c, i) => (
-            <Text key={i} style={[styles.citationItem, { color: colors.link }]} numberOfLines={1}>
-              {i + 1}. {c.title || c.url}
-            </Text>
-          ))}
-        </View>
-      )}
-
-      {/* Action buttons */}
-      {(isComplete || displayText) && (
-        <View style={styles.actionRow}>
-          <Animated.View style={copyAnimStyle}>
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                copied && { borderColor: colors.accent, backgroundColor: withAlpha(colors.accent, 0.04) },
-              ]}
-              onPress={handleCopy}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons
-                name={copied ? 'check' : 'content-copy'}
-                size={14}
-                color={copied ? colors.accent : colors.muted}
-              />
-              <Text style={[styles.actionBtnText, { color: colors.muted }, copied && { color: colors.accent }]}>
-                {copied ? t('ai.copied') : t('ai.copy')}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {isComplete && (
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                isSpeaking && { borderColor: '#FF6B6B', backgroundColor: withAlpha(colors.error, 0.1) },
-              ]}
-              onPress={handleSpeak}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons
-                name={isSpeaking ? 'stop' : 'volume-up'}
-                size={14}
-                color={isSpeaking ? '#FF6B6B' : colors.muted}
-              />
-              <Text style={[styles.actionBtnText, { color: colors.muted }, isSpeaking && { color: '#FF6B6B' }]}>
-                {isSpeaking ? t('ai.stop') : t('ai.speak')}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+        {/* Timestamp */}
+        <Text style={[styles.bubbleTime, { color: colors.hint }]}>
+          {new Date(block.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
     </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingLeft: 8,
+    paddingRight: 48,
+    marginVertical: 4,
+    gap: 8,
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  avatarText: {
+    fontSize: 10,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
   container: {
-    marginHorizontal: 8,
-    marginVertical: 3,
-    borderRadius: 8,
+    flex: 1,
+    borderRadius: 16,
+    borderTopLeftRadius: 4,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  accentBar: {
+    height: 2,
+    width: '100%',
   },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 6,
   },
   targetDot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 4,
   },
   summaryText: {
@@ -336,7 +411,7 @@ const styles = StyleSheet.create({
   },
   suggestionCard: {
     borderWidth: 1,
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
@@ -363,12 +438,12 @@ const styles = StyleSheet.create({
   },
   responseBox: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderTopWidth: 1,
   },
   responseText: {
     fontFamily: 'monospace',
-    lineHeight: 20,
+    lineHeight: 21,
   },
   statsText: {
     fontFamily: 'monospace',
@@ -405,11 +480,53 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1,
   },
   actionBtnText: {
     fontFamily: 'monospace',
     fontSize: 11,
+  },
+  errorBox: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  errorText: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+    color: '#F87171',
+    flex: 1,
+  },
+  errorActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  errorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  errorBtnText: {
+    fontFamily: 'monospace',
+    fontSize: 11,
+  },
+  bubbleTime: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    textAlign: 'right',
+    paddingHorizontal: 12,
+    paddingBottom: 6,
+    paddingTop: 2,
   },
 });

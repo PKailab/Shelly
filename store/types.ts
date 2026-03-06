@@ -124,6 +124,8 @@ export type AiBlock = {
   streamingStartTime?: number;
   /** Perplexity引用リスト */
   citations?: Array<{ url: string; title?: string }>;
+  /** エラー時のメッセージ */
+  error?: string;
 };
 
 /** ターミナルに表示するブロックの共用型 */

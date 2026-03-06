@@ -140,7 +140,7 @@ export const TOOL_CATALOG: ToolDefinition[] = [
     checkCommand: 'which gemini',
     versionCommand: 'gemini --version 2>/dev/null | head -1',
     installCommands: [
-      'npm install -g @anthropic-ai/claude-code',  // Gemini CLIはClaude Code同梱のgeminiコマンド、または将来の独立パッケージ
+      'npm install -g @anthropic-ai/claude-code',  // TODO: Gemini CLI正式パッケージ名が確定したら修正
     ],
     estimatedInstallSeconds: 60,
     dependencies: ['node'],

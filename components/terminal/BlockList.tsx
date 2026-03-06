@@ -22,6 +22,7 @@ import { AiBlock } from '@/components/terminal/AiBlock';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useTranslation } from '@/lib/i18n';
 import { useTheme } from '@/hooks/use-theme';
+import { withAlpha } from '@/lib/theme-utils';
 import { SPRING_CONFIGS, TIMING_CONFIGS } from '@/hooks/use-motion';
 
 type Props = {
@@ -176,6 +177,8 @@ export function BlockList({ blocks, entries, currentDir, onRerun, onCancel, onSe
             block={item}
             onSelectTool={onSelectTool}
             onRunCommand={onRerun}
+            onRetry={onRerun}
+            onAskOther={onSelectTool}
             fontSize={fontSize}
           />
         );
@@ -201,33 +204,37 @@ export function BlockList({ blocks, entries, currentDir, onRerun, onCancel, onSe
     () => {
       if (lastInputMode === 'natural') {
         return (
-          <View style={styles.promptLine}>
-            <Text style={[styles.promptAi, { color: colors.aiPurple, fontSize: fontSize - 1 }]}>
-              AI
-            </Text>
-            <Text
-              style={[styles.promptNatural, { color: colors.muted, fontSize: fontSize - 1 }]}
-              numberOfLines={1}
-            >
-              {'\u4F55\u3067\u3082\u805E\u3044\u3066\u304F\u3060\u3055\u3044'}
-            </Text>
-            <BlinkingCursor color={colors.accent} size={fontSize} />
+          <View style={styles.promptFooterRow}>
+            <View style={[styles.promptBubble, { backgroundColor: withAlpha(colors.aiPurple, 0.08), borderColor: withAlpha(colors.aiPurple, 0.2) }]}>
+              <Text style={[styles.promptAi, { color: colors.aiPurple, fontSize: fontSize - 1 }]}>
+                AI
+              </Text>
+              <Text
+                style={[styles.promptNatural, { color: colors.muted, fontSize: fontSize - 1 }]}
+                numberOfLines={1}
+              >
+                {'\u4F55\u3067\u3082\u805E\u3044\u3066\u304F\u3060\u3055\u3044'}
+              </Text>
+              <BlinkingCursor color={colors.aiPurple} size={fontSize} />
+            </View>
           </View>
         );
       }
       return (
-        <View style={styles.promptLine}>
-          <Text
-            style={[styles.promptDir, { color: colors.success, fontSize: fontSize - 1 }]}
-            numberOfLines={1}
-            ellipsizeMode="middle"
-          >
-            {`user@shelly:${currentDir}`}
-          </Text>
-          <Text style={[styles.promptSymbol, { color: colors.accent, fontSize }]}>
-            {' $ '}
-          </Text>
-          <BlinkingCursor color={colors.accent} size={fontSize} />
+        <View style={styles.promptFooterRow}>
+          <View style={[styles.promptBubble, { backgroundColor: withAlpha(colors.accent, 0.06), borderColor: withAlpha(colors.accent, 0.15) }]}>
+            <Text
+              style={[styles.promptDir, { color: colors.success, fontSize: fontSize - 1 }]}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {`user@shelly:${currentDir}`}
+            </Text>
+            <Text style={[styles.promptSymbol, { color: colors.accent, fontSize }]}>
+              {' $ '}
+            </Text>
+            <BlinkingCursor color={colors.accent} size={fontSize} />
+          </View>
         </View>
       );
     },
@@ -270,14 +277,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   listContent: {
-    paddingBottom: 8,
+    paddingBottom: 12,
     flexGrow: 1,
   },
   welcome: {
-    paddingHorizontal: 12,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   welcomeAscii: {
     fontFamily: 'monospace',
@@ -294,12 +301,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
-  promptLine: {
+  promptFooterRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
+  promptBubble: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 4,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
     flexWrap: 'nowrap',
   },
   promptDir: {
@@ -329,9 +342,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'monospace',
     fontWeight: '700',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
     overflow: 'hidden',
   },
 });

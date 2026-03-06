@@ -74,6 +74,8 @@ const en: Record<string, string> = {
   'ai.stop': 'Stop',
   'ai.tokens': '{{count}} tokens | {{tps}} tok/s',
   'ai.sources': 'Sources:',
+  'ai.retry': 'Retry',
+  'ai.ask_other': 'Ask another AI',
 
   // ── Input Router ──────────────────────────────────────────────────
   'router.suggest': 'AI Suggestion',
@@ -227,8 +229,9 @@ const en: Record<string, string> = {
   'setup.step3_fail': 'Connection failed',
   'setup.step3_retry': 'Try Again',
   'setup.step3_hint_not_running': 'Make sure the bridge server is running in Termux.',
-  'setup.step4_title': 'All Set!',
-  'setup.step4_desc': 'Shelly is ready to use!',
+  'setup.step4_title': 'Choose AI Tool',
+  'setup.step5_title': 'All Set!',
+  'setup.step5_desc': 'Shelly is ready to use!',
   'setup.step4_try_commands': 'Try some commands:',
   'setup.step4_try_ai': 'Or ask AI:',
   'setup.step4_start': 'Get Started',
