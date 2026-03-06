@@ -1085,7 +1085,7 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
           <Text style={styles.wsUrlHint}>
-            使用するGGUFモデル名。例: qwen2.5-3b-instruct-q4_k_m, qwen2.5-7b-instruct-q3_k_m{`\n`}
+            使用するGGUFモデル名。例: gemma-3-4b-it-Q4_K_M, Qwen3-4B-Instruct-2507-Q4_K_M{`\n`}
             ※ 下のモデルカタログからファイル名をコピーして使用してください。
           </Text>
         </View>

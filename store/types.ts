@@ -295,7 +295,7 @@ export type AppSettings = {
   localLlmEnabled: boolean;
   /** Ollama API base URL (default: http://127.0.0.1:11434) */
   localLlmUrl: string;
-  /** Model name to use (default: llama3.2:3b) */
+  /** Model name to use (default: gemma-3-4b-it-q4_k_m) */
   localLlmModel: string;
   // ─── Perplexity Sonar API ────────────────────────────────────────────────────────
   /** Perplexity Sonar API キー (https://www.perplexity.ai/settings/api) */

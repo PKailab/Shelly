@@ -24,7 +24,7 @@ export type StreamingCallback = (chunk: string) => void;
 /** Local LLM設定 */
 export type LlmConfig = {
   baseUrl: string;   // e.g. "http://127.0.0.1:8080"
-  model: string;     // e.g. "qwen2.5-3b-instruct-q4_k_m"
+  model: string;     // e.g. "gemma-3-4b-it-Q4_K_M"
   enabled: boolean;
 };
 
