@@ -36,11 +36,14 @@ import { notifyCommandComplete } from '@/lib/command-notifier';
 
 /** Generate a collision-resistant request ID */
 function genRequestId(prefix: string): string {
-  // crypto.randomUUID() is available in React Native (Hermes)
-  const uuid = typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  return `${prefix}-${uuid}`;
+  try {
+    // crypto.randomUUID() available in newer Hermes / JSC
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return `${prefix}-${globalThis.crypto.randomUUID()}`;
+    }
+  } catch { /* fallback below */ }
+  // Fallback: timestamp + 9-char random (36^9 ≈ 1e14 combinations)
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 type QueueItem = {

@@ -104,9 +104,9 @@ export const useMcpStore = create<McpStore>((set, get) => ({
     for (const def of MCP_CATALOG) {
       if (def.recommended) {
         updated[def.id] = {
+          ...(updated[def.id] ?? {}),
           enabled: true,
           status: def.type === 'remote' || def.type === 'npx' ? 'running' : 'stopped',
-          ...(updated[def.id] ?? {}),
         };
       }
     }

@@ -115,7 +115,7 @@ export default function ProjectsScreen() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(null);
   useEffect(() => {
     debounceTimer.current = setTimeout(() => setDebouncedQuery(searchQuery), 300);
-    return () => clearTimeout(debounceTimer.current);
+    return () => { if (debounceTimer.current != null) clearTimeout(debounceTimer.current); };
   }, [searchQuery]);
 
   const filteredSessions = debouncedQuery

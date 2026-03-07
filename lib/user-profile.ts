@@ -84,7 +84,7 @@ export async function loadUserProfile(): Promise<UserProfile> {
     profileCache = { ...DEFAULT_PROFILE };
   }
 
-  return profileCache;
+  return profileCache!;
 }
 
 /**
