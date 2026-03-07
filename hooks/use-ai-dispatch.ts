@@ -71,7 +71,9 @@ function toTextContext(messages: ChatMessage[], maxPairs = 4): string {
   if (recent.length === 0) return '';
   const lines = recent.map((m) => {
     const role = m.role === 'user' ? 'User' : 'Assistant';
-    return `${role}: ${m.content.slice(0, 500)}`;
+    // Sanitize: strip control characters and limit length per message
+    const sanitized = m.content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, 500);
+    return `${role}: ${sanitized}`;
   });
   return `\n\n[会話コンテキスト]\n${lines.join('\n')}\n`;
 }

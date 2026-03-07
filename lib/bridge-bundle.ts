@@ -56,12 +56,16 @@ function clearSigkillTimer() {
 }
 
 const DANGEROUS_PATTERNS = [
-  /rm\\s+-[^\\s]*r[^\\s]*\\s+\\/(?:\\s|$)/,
-  /rm\\s+-[^\\s]*f[^\\s]*\\s+\\/(?:\\s|$)/,
-  /mkfs\\./,
-  /dd\\s+.*of=\\/dev\\//,
-  /:\\(\\)\\{.*:\\|.*&.*\\}/,
-  />\\s*\\/dev\\/sd/,
+  /rm\\s+-[^\\s]*r[^\\s]*f/i,             // rm -rf (any target)
+  /rm\\s+-[^\\s]*f[^\\s]*r/i,             // rm -fr (any target)
+  /mkfs\\./i,                              // format filesystem
+  /dd\\s+.*of=\\/dev\\//i,                // dd to device
+  /:\\(\\)\\{.*:\\|.*&.*\\}/,              // fork bomb
+  />\\s*\\/dev\\/sd/,                      // overwrite block device
+  /curl\\s.*\\|.*(?:bash|sh)/i,           // curl | bash
+  /wget\\s.*-O\\s/i,                      // wget -O (file overwrite)
+  /\\|\\s*(?:bash|sh|zsh)\\b/i,           // pipe to shell
+  />\\s*~\\/\\.(?:bashrc|profile|zshrc)/i, // overwrite shell config
 ];
 
 function isDangerous(cmd) {
