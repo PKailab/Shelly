@@ -6,7 +6,7 @@
  * Provides conversation context (last N messages) to each AI.
  */
 
-import { useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo, useEffect } from 'react';
 import { useChatStore, type ChatMessage, type ChatAgent } from '@/store/chat-store';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
@@ -111,7 +111,7 @@ function createThrottledUpdate(updateFn: (sid: string, mid: string, updates: Par
   let pending: { sid: string; mid: string; updates: Partial<ChatMessage> } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  return (sid: string, mid: string, updates: Partial<ChatMessage>) => {
+  const throttled = (sid: string, mid: string, updates: Partial<ChatMessage>) => {
     // Always flush immediately for final updates (isStreaming: false)
     if (updates.isStreaming === false) {
       if (timer) { clearTimeout(timer); timer = null; }
@@ -131,12 +131,19 @@ function createThrottledUpdate(updateFn: (sid: string, mid: string, updates: Par
       }, 50);
     }
   };
+
+  throttled.cleanup = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    pending = null;
+  };
+
+  return throttled;
 }
 
 export function useAIDispatch() {
   const { addMessage, updateMessage: rawUpdateMessage } = useChatStore();
   const throttledUpdate = useMemo(() => createThrottledUpdate(rawUpdateMessage), [rawUpdateMessage]);
-  // Use throttled update for streaming, raw for non-streaming
+  useEffect(() => () => throttledUpdate.cleanup(), [throttledUpdate]);
   const updateMessage = throttledUpdate;
   const settings = useTerminalStore((s) => s.settings);
   const connectionMode = useTerminalStore((s) => s.connectionMode);

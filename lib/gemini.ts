@@ -92,8 +92,7 @@ export async function geminiChatStream(
   ];
 
   const url =
-    `${GEMINI_API_BASE}/models/${model}:streamGenerateContent` +
-    `?alt=sse&key=${encodeURIComponent(apiKey)}`;
+    `${GEMINI_API_BASE}/models/${model}:streamGenerateContent?alt=sse`;
 
   try {
     const controller = new AbortController();
@@ -105,7 +104,7 @@ export async function geminiChatStream(
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         system_instruction: systemInstruction,
         contents,
@@ -265,8 +264,7 @@ export async function geminiMultimodalStream(
   const contents = [{ role: 'user' as const, parts }];
 
   const url =
-    `${GEMINI_API_BASE}/models/${model}:streamGenerateContent` +
-    `?alt=sse&key=${encodeURIComponent(apiKey)}`;
+    `${GEMINI_API_BASE}/models/${model}:streamGenerateContent?alt=sse`;
 
   try {
     const controller = new AbortController();
@@ -278,7 +276,7 @@ export async function geminiMultimodalStream(
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         system_instruction: systemInstruction,
         contents,
@@ -398,12 +396,11 @@ export async function validateGeminiApiKey(
 
   try {
     const url =
-      `${GEMINI_API_BASE}/models/${GEMINI_DEFAULT_MODEL}:generateContent` +
-      `?key=${encodeURIComponent(apiKey)}`;
+      `${GEMINI_API_BASE}/models/${GEMINI_DEFAULT_MODEL}:generateContent`;
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: 'hi' }] }],
         generationConfig: { maxOutputTokens: 5 },
