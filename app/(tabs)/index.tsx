@@ -6,7 +6,7 @@
  * Shell commands also routed through chat bubbles.
  */
 
-import React, { useEffect, useCallback, useState, useRef } from 'react';
+import React, { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -17,6 +17,7 @@ import {
   Text,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -90,6 +91,7 @@ export default function ChatScreen() {
   // Keep messages in ref to avoid handleSend re-creation on every message
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+  const isAnyStreaming = useMemo(() => messages.some(m => m.isStreaming), [messages]);
 
   // ── Bridge ──
   const { sendCommand, cancelCurrent, isConnected: isBridgeConnected, runCommand: bridgeRunCommand } = useTermuxBridge();
@@ -468,11 +470,20 @@ export default function ChatScreen() {
     commandInputRef.current?.setText(text);
   }, [chatSessionId, deleteMessagesFrom]);
 
-  // ── Delete: remove a single message ──
+  // ── Delete: remove a single message (with confirmation) ──
   const handleDelete = useCallback((messageId: string) => {
     if (!chatSessionId) return;
-    deleteMessage(chatSessionId, messageId);
-  }, [chatSessionId, deleteMessage]);
+    Alert.alert('メッセージを削除', 'このメッセージを削除しますか？', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除', style: 'destructive', onPress: () => {
+          const msg = messagesRef.current.find(m => m.id === messageId);
+          if (msg?.isStreaming) cancelStreaming();
+          deleteMessage(chatSessionId, messageId);
+        },
+      },
+    ]);
+  }, [chatSessionId, deleteMessage, cancelStreaming]);
 
   const handleCancel = useCallback(() => {
     cancelCurrent();
@@ -584,7 +595,7 @@ export default function ChatScreen() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onStopGenerating={handleCancel}
-            isStreaming={messages.some(m => m.isStreaming)}
+            isStreaming={isAnyStreaming}
           />
         </View>
 
@@ -594,7 +605,7 @@ export default function ChatScreen() {
           onHistoryUp={handleHistoryUp}
           onHistoryDown={handleHistoryDown}
           onCtrlC={handleCancel}
-          isRunning={messages.some(m => m.isStreaming)}
+          isRunning={isAnyStreaming}
           isBridgeConnected={isBridgeConnected}
         />
       </KeyboardAvoidingView>

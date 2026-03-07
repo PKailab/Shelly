@@ -233,10 +233,15 @@ export async function ollamaChat(
   config: LocalLlmConfig,
   messages: OllamaMessage[],
   timeoutMs = 60000,
+  externalSignal?: AbortSignal,
 ): Promise<{ success: boolean; content: string; error?: string }> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (externalSignal) {
+      if (externalSignal.aborted) { clearTimeout(timer); controller.abort(); }
+      else { externalSignal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); }, { once: true }); }
+    }
     const apiType = detectApiType(config.baseUrl);
 
     let url: string;
@@ -310,10 +315,15 @@ export async function ollamaChatStream(
   messages: OllamaMessage[],
   onChunk: (text: string, done: boolean) => void,
   timeoutMs = 120000,
+  externalSignal?: AbortSignal,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (externalSignal) {
+      if (externalSignal.aborted) { clearTimeout(timer); controller.abort(); }
+      else { externalSignal.addEventListener('abort', () => { clearTimeout(timer); controller.abort(); }, { once: true }); }
+    }
     const apiType = detectApiType(config.baseUrl);
 
     let url: string;
@@ -558,6 +568,7 @@ export async function orchestrateChatStream(
   customContext?: string,
   toolStatuses?: ToolStatus[],
   defaultAgent?: 'gemini-cli' | 'claude-code' | 'codex',
+  externalSignal?: AbortSignal,
 ): Promise<OrchestrationResult> {
   // LLMベースのインテントルーティング
   const routing = await routeIntent(userInput, config, toolStatuses ?? [], defaultAgent);
@@ -603,7 +614,7 @@ export async function orchestrateChatStream(
   const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
 
   if (!isReactNative) {
-    const result = await ollamaChatStream(config, messages, onChunk);
+    const result = await ollamaChatStream(config, messages, onChunk, 120000, externalSignal);
     if (result.success) {
       return {
         category: 'chat',
@@ -614,7 +625,7 @@ export async function orchestrateChatStream(
   }
 
   // Non-streaming request (always used on React Native, fallback on web)
-  const fallback = await ollamaChat(config, messages);
+  const fallback = await ollamaChat(config, messages, 60000, externalSignal);
   if (fallback.success && fallback.content) {
     onChunk(fallback.content, true);
     return {

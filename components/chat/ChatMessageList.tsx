@@ -5,7 +5,7 @@
  * Auto-scrolls to bottom on new messages.
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useMemo } from 'react';
 import { FlatList, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { ChatBubble } from './ChatBubble';
 import { useTheme } from '@/hooks/use-theme';
@@ -85,7 +85,7 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
     );
   }
 
-  const ListFooter = useCallback(() => {
+  const listFooter = useMemo(() => {
     if (!isStreaming || !onStopGenerating) return null;
     return (
       <View style={styles.stopRow}>
@@ -113,7 +113,7 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
       showsVerticalScrollIndicator={false}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
-      ListFooterComponent={ListFooter}
+      ListFooterComponent={listFooter ?? undefined}
     />
   );
 }

@@ -15,6 +15,7 @@ import Markdown from 'react-native-markdown-display';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import type { ChatMessage, ChatAgent } from '@/store/chat-store';
+import type { ThemeColorPalette } from '@/lib/theme';
 
 // ─── Agent Colors ────────────────────────────────────────────────────────────
 
@@ -249,7 +250,7 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
 
 // ─── Command Execution Sub-component ─────────────────────────────────────────
 
-function CommandExecView({ exec, colors }: { exec: { command: string; output: string; exitCode: number | null; isCollapsed: boolean }; colors: any }) {
+function CommandExecView({ exec, colors }: { exec: { command: string; output: string; exitCode: number | null; isCollapsed: boolean }; colors: ThemeColorPalette }) {
   const [collapsed, setCollapsed] = useState(exec.isCollapsed);
   const isError = exec.exitCode !== null && exec.exitCode !== 0;
   const outputLines = exec.output.split('\n');

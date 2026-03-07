@@ -19,6 +19,98 @@ function sanitizeUrl(url: string): string {
   return url.replace(/[?&]key=[^&]+/, '?key=***');
 }
 
+/** Shared SSE stream reader for Gemini responses */
+async function readGeminiSSE(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onChunk: (text: string, done: boolean) => void,
+): Promise<{ fullContent: string }> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullContent = '';
+  let finished = false;
+
+  while (!finished) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+      const jsonStr = trimmed.slice(5).trim();
+      if (jsonStr === '[DONE]') {
+        if (!finished) { onChunk('', true); finished = true; }
+        break;
+      }
+
+      if (jsonStr.length > MAX_CHUNK_SIZE) continue;
+
+      try {
+        const chunk = JSON.parse(jsonStr) as GeminiStreamChunk;
+        const candidate = chunk.candidates?.[0];
+        const text = candidate?.content?.parts?.[0]?.text ?? '';
+        const isDone =
+          candidate?.finishReason === 'STOP' ||
+          candidate?.finishReason === 'MAX_TOKENS';
+
+        if (text) {
+          fullContent += text;
+        }
+
+        if (isDone) {
+          onChunk(text || '', true);
+          finished = true;
+          break;
+        } else if (text) {
+          onChunk(text, false);
+        }
+      } catch {
+        // JSON parse error, skip
+      }
+    }
+  }
+
+  // Ensure done=true is sent if stream ended without explicit finish
+  if (!finished && fullContent) {
+    onChunk('', true);
+  }
+
+  return { fullContent };
+}
+
+/** Shared error handler for Gemini fetch responses */
+function formatGeminiError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const sanitized = message.includes('key=') ? sanitizeUrl(message) : message;
+  const isTimeout = sanitized.includes('abort') || sanitized.includes('timeout');
+  return isTimeout ? 'タイムアウト。ネットワーク接続を確認してください。' : sanitized;
+}
+
+/** Shared HTTP error handler for Gemini API responses */
+async function handleGeminiHttpError(res: Response): Promise<GeminiResult> {
+  const errText = await res.text().catch(() => '');
+  if (res.status === 400) {
+    return { success: false, error: 'リクエストが無効です。APIキーまたはモデル名を確認してください。' };
+  }
+  if (res.status === 403) {
+    return { success: false, error: 'APIキーが無効またはアクセス権限がありません。' };
+  }
+  if (res.status === 429) {
+    return { success: false, error: 'レート制限に達しました。しばらく待ってから再試行してください。' };
+  }
+  try {
+    const errJson = JSON.parse(errText);
+    const msg = errJson?.error?.message ?? errText.slice(0, 100);
+    return { success: false, error: `HTTP ${res.status}: ${msg}` };
+  } catch {
+    return { success: false, error: `HTTP ${res.status}: ${errText.slice(0, 100)}` };
+  }
+}
+
 /** 高精度モデル（複雑な推論・長文向き） */
 export const GEMINI_PRO_MODEL = 'gemini-2.0-flash-thinking-exp';
 
@@ -120,23 +212,7 @@ export async function geminiChatStream(
     clearTimeout(timer);
 
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      if (res.status === 400) {
-        return { success: false, error: 'リクエストが無効です。APIキーまたはモデル名を確認してください。' };
-      }
-      if (res.status === 403) {
-        return { success: false, error: 'APIキーが無効またはアクセス権限がありません。' };
-      }
-      if (res.status === 429) {
-        return { success: false, error: 'レート制限に達しました。しばらく待ってから再試行してください。' };
-      }
-      try {
-        const errJson = JSON.parse(errText);
-        const msg = errJson?.error?.message ?? errText.slice(0, 100);
-        return { success: false, error: `HTTP ${res.status}: ${msg}` };
-      } catch {
-        return { success: false, error: `HTTP ${res.status}: ${errText.slice(0, 100)}` };
-      }
+      return handleGeminiHttpError(res);
     }
 
     const reader = res.body?.getReader();
@@ -144,72 +220,10 @@ export async function geminiChatStream(
       return { success: false, error: 'レスポンスボディが読み取れません' };
     }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullContent = '';
-    let finished = false;
-
-    while (!finished) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data:')) continue;
-
-        const jsonStr = trimmed.slice(5).trim();
-        if (jsonStr === '[DONE]') {
-          if (!finished) { onChunk('', true); finished = true; }
-          break;
-        }
-
-        if (jsonStr.length > MAX_CHUNK_SIZE) continue;
-
-        try {
-          const chunk = JSON.parse(jsonStr) as GeminiStreamChunk;
-          const candidate = chunk.candidates?.[0];
-          const text = candidate?.content?.parts?.[0]?.text ?? '';
-          const isDone =
-            candidate?.finishReason === 'STOP' ||
-            candidate?.finishReason === 'MAX_TOKENS';
-
-          if (text) {
-            fullContent += text;
-          }
-
-          if (isDone) {
-            onChunk(text || '', true);
-            finished = true;
-            break;
-          } else if (text) {
-            onChunk(text, false);
-          }
-        } catch {
-          // JSON parse error, skip
-        }
-      }
-    }
-
-    // Ensure done=true is sent if stream ended without explicit finish
-    if (!finished && fullContent) {
-      onChunk('', true);
-    }
-
+    const { fullContent } = await readGeminiSSE(reader, onChunk);
     return { success: true, content: fullContent };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const sanitized = message.includes('key=') ? sanitizeUrl(message) : message;
-    const isTimeout = sanitized.includes('abort') || sanitized.includes('timeout');
-    return {
-      success: false,
-      error: isTimeout
-        ? 'タイムアウト。ネットワーク接続を確認してください。'
-        : sanitized,
-    };
+    return { success: false, error: formatGeminiError(err) };
   }
 }
 
@@ -292,23 +306,7 @@ export async function geminiMultimodalStream(
     clearTimeout(timer);
 
     if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      if (res.status === 400) {
-        return { success: false, error: 'リクエストが無効です。APIキーまたはモデル名を確認してください。' };
-      }
-      if (res.status === 403) {
-        return { success: false, error: 'APIキーが無効またはアクセス権限がありません。' };
-      }
-      if (res.status === 429) {
-        return { success: false, error: 'レート制限に達しました。しばらく待ってから再試行してください。' };
-      }
-      try {
-        const errJson = JSON.parse(errText);
-        const msg = errJson?.error?.message ?? errText.slice(0, 100);
-        return { success: false, error: `HTTP ${res.status}: ${msg}` };
-      } catch {
-        return { success: false, error: `HTTP ${res.status}: ${errText.slice(0, 100)}` };
-      }
+      return handleGeminiHttpError(res);
     }
 
     const reader = res.body?.getReader();
@@ -316,71 +314,10 @@ export async function geminiMultimodalStream(
       return { success: false, error: 'レスポンスボディが読み取れません' };
     }
 
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullContent = '';
-    let finished = false;
-
-    while (!finished) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data:')) continue;
-
-        const jsonStr = trimmed.slice(5).trim();
-        if (jsonStr === '[DONE]') {
-          if (!finished) { onChunk('', true); finished = true; }
-          break;
-        }
-
-        if (jsonStr.length > MAX_CHUNK_SIZE) continue;
-
-        try {
-          const chunk = JSON.parse(jsonStr) as GeminiStreamChunk;
-          const candidate = chunk.candidates?.[0];
-          const text = candidate?.content?.parts?.[0]?.text ?? '';
-          const isDone =
-            candidate?.finishReason === 'STOP' ||
-            candidate?.finishReason === 'MAX_TOKENS';
-
-          if (text) {
-            fullContent += text;
-          }
-
-          if (isDone) {
-            onChunk(text || '', true);
-            finished = true;
-            break;
-          } else if (text) {
-            onChunk(text, false);
-          }
-        } catch {
-          // JSON parse error, skip
-        }
-      }
-    }
-
-    if (!finished && fullContent) {
-      onChunk('', true);
-    }
-
+    const { fullContent } = await readGeminiSSE(reader, onChunk);
     return { success: true, content: fullContent };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const sanitized = message.includes('key=') ? sanitizeUrl(message) : message;
-    const isTimeout = sanitized.includes('abort') || sanitized.includes('timeout');
-    return {
-      success: false,
-      error: isTimeout
-        ? 'タイムアウト。ネットワーク接続を確認してください。'
-        : sanitized,
-    };
+    return { success: false, error: formatGeminiError(err) };
   }
 }
 

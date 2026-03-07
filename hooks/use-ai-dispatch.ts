@@ -289,6 +289,12 @@ export function useAIDispatch() {
           }
         },
         ollamaHistory,
+        undefined, // projectContext
+        undefined, // userProfileSummary
+        undefined, // customContext
+        undefined, // toolStatuses
+        undefined, // defaultAgent
+        signal,
       );
 
       if (result.handledBy !== 'local_llm') {
