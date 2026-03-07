@@ -170,13 +170,13 @@ export async function runAgentLoop(
     }
 
     // Call Gemini API
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
     let res: Response;
     try {
       res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: AGENT_SYSTEM_PROMPT }] },
@@ -318,12 +318,15 @@ const BLOCKED_AGENT_PATTERNS = [
   /nc\s.*-[el]/i,                     // netcat listeners
   /python.*-c.*import\s+(?:os|subprocess|socket)/i, // Python code exec
   /node.*-e.*(?:child_process|exec|spawn)/i,        // Node code exec
-  /eval\s/i,                          // eval
+  /(?:^|[;&|])\s*eval[\s(]/i,         // eval (including eval( and ;eval)
   /base64\s.*-d/i,                    // base64 decode (obfuscation)
   /\bdd\s+.*of=/i,                    // dd overwrite
   /mkfs/i,                            // format filesystem
-  /rm\s+-[^\s]*r[^\s]*\s+\//i,        // rm -rf /
+  /rm\s+-[^\s]*r[^\s]*f/i,            // rm -rf (any target)
+  /rm\s+-[^\s]*f[^\s]*r/i,            // rm -fr (any target)
   /chmod\s+[0-7]*7[0-7]*\s/i,         // world-writable permissions
+  /\$\(/,                             // subshell expansion $(...)
+  /`[^`]*`/,                          // backtick command substitution
 ];
 
 function isBlockedAgentCommand(cmd: string): boolean {

@@ -628,6 +628,7 @@ export function useTermuxBridge() {
 
         const requestId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const timeoutMs = opts?.timeoutMs ?? 120_000;
+        const MAX_BUF = 1_048_576; // 1MB buffer limit
         let stdoutBuf = '';
         let stderrBuf = '';
 
@@ -644,10 +645,10 @@ export function useTermuxBridge() {
 
         requestHandlersRef.current.set(requestId, (msg) => {
           if (msg.type === 'stdout') {
-            stdoutBuf += msg.data;
+            if (stdoutBuf.length < MAX_BUF) stdoutBuf += msg.data;
             opts?.onStream?.('stdout', msg.data);
           } else if (msg.type === 'stderr') {
-            stderrBuf += msg.data;
+            if (stderrBuf.length < MAX_BUF) stderrBuf += msg.data;
             opts?.onStream?.('stderr', msg.data);
           } else if (msg.type === 'exit') {
             clearTimeout(timer);
@@ -718,6 +719,7 @@ export function useTermuxBridge() {
 
         const requestId = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const timeoutMs = opts?.timeoutMs ?? 1_200_000;
+        const MAX_BUF = 1_048_576; // 1MB buffer limit
         let stdoutBuf = '';
         let stderrBuf = '';
 
@@ -734,10 +736,10 @@ export function useTermuxBridge() {
 
         requestHandlersRef.current.set(requestId, (msg) => {
           if (msg.type === 'stdout') {
-            stdoutBuf += msg.data;
+            if (stdoutBuf.length < MAX_BUF) stdoutBuf += msg.data;
             opts?.onStream?.('stdout', msg.data);
           } else if (msg.type === 'stderr') {
-            stderrBuf += msg.data;
+            if (stderrBuf.length < MAX_BUF) stderrBuf += msg.data;
             opts?.onStream?.('stderr', msg.data);
           } else if (msg.type === 'exit') {
             clearTimeout(timer);
