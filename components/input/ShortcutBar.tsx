@@ -43,6 +43,7 @@ const SHORTCUT_KEYS: ShortcutKey[] = [
   { label: 'PgUp', key: 'pageup',   width: 46 },
   { label: 'PgDn', key: 'pagedown', width: 46 },
   { label: '^C', key: 'ctrl_c', isAction: true, width: 40 },
+  { label: '^D', key: 'ctrl_d', isAction: true, width: 40 },
 ];
 
 type ToastMessage = 'no_running' | 'not_connected' | null;
@@ -52,6 +53,7 @@ type Props = {
   onHistoryUp: () => void;
   onHistoryDown: () => void;
   onCtrlC?: () => void;
+  onCtrlD?: () => void;
   isRunning?: boolean;
   isBridgeConnected?: boolean;
 };
@@ -133,6 +135,7 @@ export function ShortcutBar({
   onHistoryUp,
   onHistoryDown,
   onCtrlC,
+  onCtrlD,
   isRunning = false,
   isBridgeConnected = true,
 }: Props) {
@@ -189,6 +192,16 @@ export function ShortcutBar({
       handleCtrlC();
       return;
     }
+    if (shortcut.isAction && shortcut.key === 'ctrl_d') {
+      if (!isRunning) {
+        haptic(Haptics.ImpactFeedbackStyle.Light);
+        showToast('no_running');
+        return;
+      }
+      haptic(Haptics.ImpactFeedbackStyle.Medium);
+      onCtrlD?.();
+      return;
+    }
     haptic();
     playSound('key_press');
 
@@ -215,7 +228,7 @@ export function ShortcutBar({
       setCtrlActive(false);
       setAltActive(false);
     }
-  }, [handleCtrlC, haptic, ctrlActive, altActive, onHistoryUp, onHistoryDown, onSpecialKey]);
+  }, [handleCtrlC, haptic, ctrlActive, altActive, onHistoryUp, onHistoryDown, onSpecialKey, isRunning, onCtrlD, showToast]);
 
   const handleLongPress = useCallback((shortcut: ShortcutKey) => {
     if (!shortcut.longPressKey) return;
@@ -245,8 +258,9 @@ export function ShortcutBar({
           const isCtrlKey    = shortcut.key === 'ctrl';
           const isCtrlCKey   = shortcut.key === 'ctrl_c';
           const isActive     = isCtrlKey ? ctrlActive : false;
-          const isCtrlCReady = isCtrlCKey && isRunning;
-          const isCtrlCDim   = isCtrlCKey && !isRunning;
+          const isCtrlDKey    = shortcut.key === 'ctrl_d';
+          const isCtrlCReady = (isCtrlCKey || isCtrlDKey) && isRunning;
+          const isCtrlCDim   = (isCtrlCKey || isCtrlDKey) && !isRunning;
 
           return (
             <AnimatedKey

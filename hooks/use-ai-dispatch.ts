@@ -24,6 +24,7 @@ function mapTargetToAgent(target: string): ChatAgent | undefined {
   const map: Record<string, ChatAgent> = {
     claude: 'claude', gemini: 'gemini', local: 'local',
     perplexity: 'perplexity', team: 'team', git: 'git', codex: 'codex',
+    agent: 'gemini', // agent mode uses Gemini function calling
   };
   return map[target];
 }
@@ -147,7 +148,7 @@ export function useAIDispatch() {
   const updateMessage = throttledUpdate;
   const settings = useTerminalStore((s) => s.settings);
   const connectionMode = useTerminalStore((s) => s.connectionMode);
-  const { sendCommand, runCommand: bridgeRunCommand } = useTermuxBridge();
+  const { sendCommand, runCommand: bridgeRunCommand, readFile: bridgeReadFile, writeFile: bridgeWriteFile, editFile: bridgeEditFile, listFiles: bridgeListFiles } = useTermuxBridge();
   const terminalRunCommand = useTerminalStore((s) => s.runCommand);
 
   // AbortController for streaming cancellation
@@ -168,14 +169,21 @@ export function useAIDispatch() {
     return msg.id;
   }, [addMessage]);
 
-  /** Cancel any in-progress AI streaming */
+  /** Cancel any in-progress AI streaming — saves partial content */
   const cancelStreaming = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
-    // Clean up isStreaming state on the current message (use raw to bypass throttle)
     if (streamingMsgRef.current) {
       const { sessionId, msgId } = streamingMsgRef.current;
-      rawUpdateMessage(sessionId, msgId, { isStreaming: false, streamingText: undefined });
+      // Find the message to preserve partial streamingText as content
+      const session = useChatStore.getState().sessions.find(s => s.id === sessionId);
+      const msg = session?.messages.find(m => m.id === msgId);
+      const partialContent = msg?.streamingText || msg?.content || '';
+      rawUpdateMessage(sessionId, msgId, {
+        content: partialContent ? partialContent + '\n\n*[生成中断]*' : '',
+        isStreaming: false,
+        streamingText: undefined,
+      });
       streamingMsgRef.current = null;
     }
   }, [rawUpdateMessage]);
@@ -504,13 +512,23 @@ export function useAIDispatch() {
       }
 
       try {
-        const { buildChatModeClaudeCommand } = await import('@/lib/cli-permission-proxy');
-        const autoApprove = settings.autoApproveLevel ?? 'safe';
+        const { buildChatModeClaudeCommand, detectPermissionPrompt, shouldAutoApprove } = await import('@/lib/cli-permission-proxy');
+        const autoApprove = (settings.autoApproveLevel ?? 'safe') as import('@/lib/cli-permission-proxy').AutoApproveLevel;
         const contextualPrompt = promptWithFiles + toTextContext(messages);
         const cliCommand = buildChatModeClaudeCommand(contextualPrompt, autoApprove);
-        updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: `$ ${cliCommand}\n\n`, streamingStartTime: Date.now() });
+        let accumulated = `$ ${cliCommand}\n\n`;
+        updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: accumulated, streamingStartTime: Date.now() });
 
-        const result = await bridgeRunCommand(cliCommand);
+        const result = await bridgeRunCommand(cliCommand, {
+          onStream: (type, data) => {
+            if (signal.aborted) return;
+            accumulated += data;
+            updateMessage(chatSessionId, msgId, {
+              streamingText: accumulated,
+              tokenCount: Math.round(accumulated.length / 4),
+            });
+          },
+        });
         let output = result.stdout || '';
         if (result.stderr) output += `\n--- stderr ---\n${result.stderr}`;
         updateMessage(chatSessionId, msgId, {
@@ -519,9 +537,86 @@ export function useAIDispatch() {
           executions: [{ command: cliCommand, output, exitCode: result.exitCode, isCollapsed: output.split('\n').length > 10 }],
         });
       } catch (err) {
+        if (!signal.aborted) {
+          updateMessage(chatSessionId, msgId, {
+            content: '', error: `Claude Code実行エラー: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false,
+          });
+        }
+      }
+      return { handled: true };
+    }
+
+    // ── Agent mode (Gemini function calling + bridge tools) ──
+    if (target === 'agent') {
+      const msgId = addAssistantMessage(chatSessionId, 'gemini');
+      streamingMsgRef.current = { sessionId: chatSessionId, msgId };
+      const apiKey = settings.geminiApiKey ?? '';
+      if (!apiKey) {
         updateMessage(chatSessionId, msgId, {
-          content: '', error: `Claude Code実行エラー: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false,
+          content: 'Gemini APIキーが設定されていません。\n@agent はGemini APIのfunction callingを使用します。\nhttps://aistudio.google.com/app/apikey で無料取得できます。',
+          isStreaming: false,
+          error: 'APIキー未設定',
         });
+        return { handled: true };
+      }
+
+      if (connectionMode !== 'termux') {
+        updateMessage(chatSessionId, msgId, {
+          content: '@agent はTermuxブリッジ接続が必要です。Settingsで接続を確認してください。',
+          isStreaming: false,
+          error: 'Termux未接続',
+        });
+        return { handled: true };
+      }
+
+      let accumulated = '🤖 エージェントモード起動\n';
+      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: accumulated, streamingStartTime: Date.now() });
+
+      try {
+        const { runAgentLoop } = await import('@/lib/ai-tool-agent');
+
+        const tools = {
+          readFile: bridgeReadFile,
+          writeFile: bridgeWriteFile,
+          editFile: bridgeEditFile,
+          listFiles: bridgeListFiles,
+          runCommand: bridgeRunCommand,
+        };
+
+        const result = await runAgentLoop(
+          apiKey,
+          promptWithFiles,
+          tools as any,
+          (text) => {
+            if (signal.aborted) return;
+            accumulated += text;
+            updateMessage(chatSessionId, msgId, {
+              streamingText: accumulated,
+              tokenCount: Math.round(accumulated.length / 4),
+            });
+          },
+          (toolName, args) => {
+            // Tool call notification — already streamed in onStream
+          },
+          settings.geminiModel ?? 'gemini-2.0-flash',
+          signal,
+        );
+
+        // result.response is already streamed via onStream, no need to append again
+        updateMessage(chatSessionId, msgId, {
+          content: accumulated,
+          streamingText: undefined,
+          isStreaming: false,
+          tokenCount: Math.round(accumulated.length / 4),
+        });
+      } catch (err) {
+        if (!signal.aborted) {
+          updateMessage(chatSessionId, msgId, {
+            content: accumulated || '',
+            error: `エージェントエラー: ${err instanceof Error ? err.message : String(err)}`,
+            isStreaming: false,
+          });
+        }
       }
       return { handled: true };
     }

@@ -94,7 +94,7 @@ export default function ChatScreen() {
   const isAnyStreaming = useMemo(() => messages.some(m => m.isStreaming), [messages]);
 
   // ── Bridge ──
-  const { sendCommand, cancelCurrent, isConnected: isBridgeConnected, runCommand: bridgeRunCommand } = useTermuxBridge();
+  const { sendCommand, sendStdin, cancelCurrent, isConnected: isBridgeConnected, runCommand: bridgeRunCommand, hasActiveCommand } = useTermuxBridge();
 
   // ── AI dispatch (extracted from handleSend) ──
   const { dispatch: aiDispatch, cancelStreaming } = useAIDispatch();
@@ -136,6 +136,14 @@ export default function ChatScreen() {
       userProfileRef.current = formatProfileForPrompt(p);
     });
   }, []);
+
+  // ── Sync cwd when chat session has a projectPath ──
+  useEffect(() => {
+    if (!isBridgeConnected || !chatSession?.projectPath) return;
+    // Send cd to bridge server to sync working directory (escape path for shell)
+    const escapedPath = chatSession.projectPath.replace(/'/g, "'\\''");
+    bridgeRunCommand(`cd '${escapedPath}'`).catch(() => {});
+  }, [chatSessionId, chatSession?.projectPath, isBridgeConnected]);
 
   // ── Project context ──
   useEffect(() => {
@@ -400,7 +408,7 @@ export default function ChatScreen() {
     // ── AI routing → dispatch to useAIDispatch hook ──
     addUserMessage(input);
 
-    let target = parsed.target;
+    let target: string = parsed.target;
 
     // Natural language → default to local LLM or show hint
     if (parsed.layer === 'natural') {
@@ -567,7 +575,27 @@ export default function ChatScreen() {
                       });
                     }
                     addUserMessage(`$ ${cmd}`);
-                    executeCommandSafely(cmd);
+                    // Execute and show result in chat (not terminal-store)
+                    if (chatSessionId && connectionMode === 'termux') {
+                      const msgId = addAssistantMessage(undefined);
+                      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '実行中...' });
+                      bridgeRunCommand(cmd).then((result) => {
+                        const output = result.stdout || '';
+                        const stderr = result.stderr ? `\n--- stderr ---\n${result.stderr}` : '';
+                        updateMessage(chatSessionId, msgId, {
+                          content: output + stderr,
+                          isStreaming: false,
+                          executions: [{
+                            command: cmd,
+                            output: output + stderr,
+                            exitCode: result.exitCode,
+                            isCollapsed: (output + stderr).split('\n').length > 10,
+                          }],
+                        });
+                      });
+                    } else {
+                      executeCommandSafely(cmd);
+                    }
                   }}
                 >
                   <Text style={[styles.safetyBtnText, { color: '#FFFFFF', fontWeight: '700' }]}>実行する</Text>
@@ -605,7 +633,8 @@ export default function ChatScreen() {
           onHistoryUp={handleHistoryUp}
           onHistoryDown={handleHistoryDown}
           onCtrlC={handleCancel}
-          isRunning={isAnyStreaming}
+          onStdin={hasActiveCommand ? sendStdin : undefined}
+          isRunning={isAnyStreaming || hasActiveCommand}
           isBridgeConnected={isBridgeConnected}
         />
       </KeyboardAvoidingView>

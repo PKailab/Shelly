@@ -15,6 +15,7 @@
  *
  * Client → Server:
  *   { type: "run",    requestId: string, command: string }
+ *   { type: "stdin",  requestId: string, data: string }
  *   { type: "cancel", requestId: string }
  *   { type: "ping" }
  *
@@ -49,9 +50,33 @@ type ServerMessage =
   | { type: 'ready';         requestId?: string }
   | { type: 'projectCreated'; requestId: string; projectPath: string; filesWritten: number }
   | { type: 'fileWritten';    requestId: string; filePath: string }
-  | { type: 'progress';       requestId: string; message: string; current: number; total: number };
+  | { type: 'progress';       requestId: string; message: string; current: number; total: number }
+  | { type: 'fileRead';       requestId: string; filePath: string; content: string; size: number }
+  | { type: 'fileList';       requestId: string; dirPath: string; entries: FileEntry[]; total: number }
+  | { type: 'fileEdited';     requestId: string; filePath: string; editsApplied: number };
 
 export type ProjectFileSpec = { path: string; content: string };
+
+export type FileEntry = {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size: number;
+};
+
+export type ReadFileResult =
+  | { ok: true; content: string; filePath: string; size: number }
+  | { ok: false; error: string };
+
+export type ListFilesResult =
+  | { ok: true; entries: FileEntry[]; dirPath: string; total: number }
+  | { ok: false; error: string };
+
+export type EditFileEdit = { oldText: string; newText: string };
+
+export type EditFileResult =
+  | { ok: true; filePath: string; editsApplied: number }
+  | { ok: false; error: string };
 
 export type CreateProjectResult =
   | { ok: true;  projectPath: string; filesWritten: number }
@@ -352,6 +377,16 @@ export function useTermuxBridge() {
 
     return blockId;
   }, [startTermuxBlock, processQueue]);
+
+  // ── Public: send stdin to active process ─────────────────────────────────
+
+  const sendStdin = useCallback((data: string) => {
+    const active = activeItemRef.current;
+    if (!active) return;
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'stdin', requestId: active.requestId, data }));
+  }, []);
 
   // ── Public: cancel current ─────────────────────────────────────────────────
 
@@ -719,12 +754,128 @@ export function useTermuxBridge() {
     []
   );
 
+  // ── Public: readFile ────────────────────────────────────────────────────────
+
+  const readFile = useCallback(
+    (filePath: string, encoding?: string): Promise<ReadFileResult> => {
+      return new Promise((resolve) => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          resolve({ ok: false, error: 'Termuxに接続されていません。' });
+          return;
+        }
+
+        const requestId = `rf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const cleanup = () => { requestHandlersRef.current.delete(requestId); };
+
+        const timer = setTimeout(() => {
+          cleanup();
+          resolve({ ok: false, error: 'ファイル読み取りがタイムアウトしました。' });
+        }, 10000);
+
+        requestHandlersRef.current.set(requestId, (msg) => {
+          if (msg.type === 'fileRead' && 'content' in msg) {
+            clearTimeout(timer); cleanup();
+            resolve({ ok: true, content: (msg as any).content, filePath: (msg as any).filePath, size: (msg as any).size });
+          } else if (msg.type === 'error' && 'message' in msg) {
+            clearTimeout(timer); cleanup();
+            resolve({ ok: false, error: (msg as any).message });
+          }
+        });
+
+        ws.send(JSON.stringify({ type: 'readFile', requestId, filePath, encoding }));
+      });
+    },
+    []
+  );
+
+  // ── Public: listFiles ─────────────────────────────────────────────────────
+
+  const listFiles = useCallback(
+    (dirPath?: string, opts?: { recursive?: boolean; maxDepth?: number; includeHidden?: boolean }): Promise<ListFilesResult> => {
+      return new Promise((resolve) => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          resolve({ ok: false, error: 'Termuxに接続されていません。' });
+          return;
+        }
+
+        const requestId = `lf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const cleanup = () => { requestHandlersRef.current.delete(requestId); };
+
+        const timer = setTimeout(() => {
+          cleanup();
+          resolve({ ok: false, error: 'ディレクトリ一覧取得がタイムアウトしました。' });
+        }, 15000);
+
+        requestHandlersRef.current.set(requestId, (msg) => {
+          if (msg.type === 'fileList' && 'entries' in msg) {
+            clearTimeout(timer); cleanup();
+            resolve({ ok: true, entries: (msg as any).entries, dirPath: (msg as any).dirPath, total: (msg as any).total });
+          } else if (msg.type === 'error' && 'message' in msg) {
+            clearTimeout(timer); cleanup();
+            resolve({ ok: false, error: (msg as any).message });
+          }
+        });
+
+        ws.send(JSON.stringify({
+          type: 'listFiles',
+          requestId,
+          dirPath: dirPath || '.',
+          recursive: opts?.recursive,
+          maxDepth: opts?.maxDepth,
+          includeHidden: opts?.includeHidden,
+        }));
+      });
+    },
+    []
+  );
+
+  // ── Public: editFile (search-and-replace patches) ─────────────────────────
+
+  const editFile = useCallback(
+    (filePath: string, edits: EditFileEdit[]): Promise<EditFileResult> => {
+      return new Promise((resolve) => {
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          resolve({ ok: false, error: 'Termuxに接続されていません。' });
+          return;
+        }
+
+        const requestId = `ef-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const cleanup = () => { requestHandlersRef.current.delete(requestId); };
+
+        const timer = setTimeout(() => {
+          cleanup();
+          resolve({ ok: false, error: 'ファイル編集がタイムアウトしました。' });
+        }, 10000);
+
+        requestHandlersRef.current.set(requestId, (msg) => {
+          if (msg.type === 'fileEdited' && 'editsApplied' in msg) {
+            clearTimeout(timer); cleanup();
+            resolve({ ok: true, filePath: (msg as any).filePath, editsApplied: (msg as any).editsApplied });
+          } else if (msg.type === 'error' && 'message' in msg) {
+            clearTimeout(timer); cleanup();
+            resolve({ ok: false, error: (msg as any).message });
+          }
+        });
+
+        ws.send(JSON.stringify({ type: 'editFile', requestId, filePath, edits }));
+      });
+    },
+    []
+  );
+
   return {
     sendCommand,
+    sendStdin,
     cancelCurrent,
     testConnection,
     createProject,
     writeFile,
+    readFile,
+    listFiles,
+    editFile,
     openFolder,
     runCommand,
     runRawCommand,

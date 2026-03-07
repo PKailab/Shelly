@@ -60,6 +60,7 @@ type Props = {
   onHistoryUp: () => string;
   onHistoryDown: () => string;
   onCtrlC?: () => void;
+  onStdin?: (data: string) => void;
   isRunning?: boolean;
   isBridgeConnected?: boolean;
 };
@@ -79,6 +80,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
   onHistoryUp,
   onHistoryDown,
   onCtrlC,
+  onStdin,
   isRunning = false,
   isBridgeConnected = true,
 }: Props, ref: React.Ref<CommandInputHandle>) {
@@ -212,6 +214,18 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
   const handleSend = useCallback(() => {
     const cmd = inputText.trim();
     if (!cmd && attachedImages.length === 0 && attachedFiles.length === 0) return;
+
+    // If a process is running and onStdin is available, send as stdin
+    if (isRunning && onStdin) {
+      onStdin(inputText + '\n');
+      setInputText('');
+      setInputHeight(40);
+      if (settings.hapticFeedback) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      return;
+    }
+
     if (settings.hapticFeedback) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -231,7 +245,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
     setInputHeight(40);
     setAttachedImages([]);
     setAttachedFiles([]);
-  }, [inputText, attachedImages, attachedFiles, onSend, settings.hapticFeedback, sendScale]);
+  }, [inputText, attachedImages, attachedFiles, onSend, onStdin, isRunning, settings.hapticFeedback, sendScale]);
 
   const handlePaste = useCallback(async () => {
     try {
@@ -408,10 +422,11 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
+  const isStdinMode = isRunning && !!onStdin;
   const isActive = inputText.trim().length > 0 || attachedImages.length > 0 || attachedFiles.length > 0;
-  const promptSymbol = isNaturalMode ? 'AI' : '$';
-  const promptColor = isNaturalMode ? colors.aiPurple : colors.accent;
-  const placeholder = isNaturalMode ? '\u8CEA\u554F\u3084\u6307\u793A\u3092\u5165\u529B...' : '\u30B3\u30DE\u30F3\u30C9\u3092\u5165\u529B...';
+  const promptSymbol = isStdinMode ? '>' : isNaturalMode ? 'AI' : '$';
+  const promptColor = isStdinMode ? colors.warning ?? '#F59E0B' : isNaturalMode ? colors.aiPurple : colors.accent;
+  const placeholder = isStdinMode ? 'stdin入力...' : isNaturalMode ? '\u8CEA\u554F\u3084\u6307\u793A\u3092\u5165\u529B...' : '\u30B3\u30DE\u30F3\u30C9\u3092\u5165\u529B...';
 
   // Animated styles
   const sendAnimStyle = useAnimatedStyle(() => ({
@@ -431,6 +446,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
         onHistoryUp={handleHistoryUp}
         onHistoryDown={handleHistoryDown}
         onCtrlC={onCtrlC}
+        onCtrlD={isStdinMode ? () => onStdin?.('\x04') : undefined}
         isRunning={isRunning}
         isBridgeConnected={isBridgeConnected}
       />

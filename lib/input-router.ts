@@ -13,7 +13,7 @@ import { t } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RouteTarget = 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'team' | 'browser' | 'git';
+export type RouteTarget = 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'team' | 'browser' | 'git' | 'agent';
 
 export type InputLayer =
   | 'mention'        // @claude / @gemini / @local
@@ -71,6 +71,9 @@ const MENTION_PATTERNS: Array<{ pattern: RegExp; target: RouteTarget; label: str
   { pattern: /^@team\s*/i,         target: 'team',        label: 'Team Table' },
   { pattern: /^@table\s*/i,       target: 'team',        label: 'Team Table' },
   { pattern: /^@git\s*/i,          target: 'git',         label: 'Git Guide' },
+  { pattern: /^@agent\s*/i,        target: 'agent',       label: 'AI Agent' },
+  { pattern: /^@edit\s*/i,         target: 'agent',       label: 'AI Agent' },
+  { pattern: /^@code\s*/i,         target: 'agent',       label: 'AI Agent' },
 ];
 
 // ─── 自然言語 + ツール名キーワード ────────────────────────────────────────────
@@ -416,6 +419,7 @@ export function getTargetLabel(target: RouteTarget): string {
     team: 'Team Table',
     browser: 'Browser',
     git: 'Git Guide',
+    agent: 'AI Agent',
   };
   return labels[target];
 }
@@ -431,6 +435,7 @@ export function getTargetColor(target: RouteTarget): string {
     team:       '#EC4899', // ピンク（Team Tableブランドカラー）
     browser:    '#4ADE80', // グリーン
     git:        '#F97316', // オレンジ（Git公式カラー）
+    agent:      '#EF4444', // レッド（AI Agent）
   };
   return colors[target];
 }
