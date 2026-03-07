@@ -695,7 +695,7 @@ export function useTermuxBridge() {
     (folderPath: string): void => {
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
-      const requestId = `of-${Date.now()}`;
+      const requestId = genRequestId('of');
       ws.send(JSON.stringify({ type: 'openFolder', requestId, folderPath }));
     },
     []
