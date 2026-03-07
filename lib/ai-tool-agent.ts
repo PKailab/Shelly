@@ -339,7 +339,7 @@ function summarizeArgs(toolName: string, args: Record<string, any>): string {
     case 'writeFile': return `${args.filePath}, ${args.content?.length ?? 0}文字`;
     case 'editFile': return `${args.filePath}, ${args.edits?.length ?? 0}箇所`;
     case 'listFiles': return args.dirPath || '.';
-    case 'runCommand': return args.command?.slice(0, 60);
+    case 'runCommand': return args.command?.slice(0, 60) ?? '(no command)';
     default: return JSON.stringify(args).slice(0, 60);
   }
 }

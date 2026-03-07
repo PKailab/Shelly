@@ -34,6 +34,15 @@ import { AppState, AppStateStatus } from 'react-native';
 import { useTerminalStore } from '@/store/terminal-store';
 import { notifyCommandComplete } from '@/lib/command-notifier';
 
+/** Generate a collision-resistant request ID */
+function genRequestId(prefix: string): string {
+  // crypto.randomUUID() is available in React Native (Hermes)
+  const uuid = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return `${prefix}-${uuid}`;
+}
+
 type QueueItem = {
   requestId: string;
   command: string;
@@ -369,7 +378,7 @@ export function useTermuxBridge() {
 
   const sendCommand = useCallback((command: string) => {
     const blockId = startTermuxBlock(command);
-    const requestId = `req-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const requestId = genRequestId('req');
 
     blockStartTimeRef.current[blockId] = Date.now();
     queueRef.current.push({ requestId, command, blockId });
@@ -526,7 +535,7 @@ export function useTermuxBridge() {
           return;
         }
 
-        const requestId = `cp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('cp');
         const cleanup = () => { requestHandlersRef.current.delete(requestId); };
 
         const timer = setTimeout(() => {
@@ -565,7 +574,7 @@ export function useTermuxBridge() {
           return;
         }
 
-        const requestId = `wf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('wf');
         const cleanup = () => { requestHandlersRef.current.delete(requestId); };
 
         const timer = setTimeout(() => {
@@ -626,7 +635,7 @@ export function useTermuxBridge() {
           return;
         }
 
-        const requestId = `exec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('exec');
         const timeoutMs = opts?.timeoutMs ?? 120_000;
         const MAX_BUF = 1_048_576; // 1MB buffer limit
         let stdoutBuf = '';
@@ -692,6 +701,7 @@ export function useTermuxBridge() {
   /**
    * runRawCommand — allowlist不要の生コマンド実行（セットアップ用）
    *
+   * @internal セットアップ操作専用。AI生成コマンドを渡さないこと。
    * ⚠️ セキュリティ注意: 'run' メッセージを使用するため allowlist 制限なし。
    * llama.cpp セットアップ・モデルダウンロード等、セットアップ操作専用。
    * AI生成コマンドを直接渡さないこと（prompt injection リスク）。
@@ -702,6 +712,7 @@ export function useTermuxBridge() {
       opts?: {
         onStream?: (type: 'stdout' | 'stderr', data: string) => void;
         timeoutMs?: number;
+        reason?: string;
       }
     ): Promise<{ stdout: string; stderr: string; exitCode: number }> => {
       return new Promise((resolve) => {
@@ -715,9 +726,9 @@ export function useTermuxBridge() {
           return;
         }
 
-        console.warn('[Security] runRawCommand invoked (no allowlist):', cmd.slice(0, 80));
+        console.warn(`[Security] runRawCommand invoked (no allowlist) reason=${opts?.reason ?? 'unspecified'}:`, cmd.slice(0, 80));
 
-        const requestId = `raw-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('raw');
         const timeoutMs = opts?.timeoutMs ?? 1_200_000;
         const MAX_BUF = 1_048_576; // 1MB buffer limit
         let stdoutBuf = '';
@@ -773,7 +784,7 @@ export function useTermuxBridge() {
           return;
         }
 
-        const requestId = `rf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('rf');
         const cleanup = () => { requestHandlersRef.current.delete(requestId); };
 
         const timer = setTimeout(() => {
@@ -808,7 +819,7 @@ export function useTermuxBridge() {
           return;
         }
 
-        const requestId = `lf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('lf');
         const cleanup = () => { requestHandlersRef.current.delete(requestId); };
 
         const timer = setTimeout(() => {
@@ -850,7 +861,7 @@ export function useTermuxBridge() {
           return;
         }
 
-        const requestId = `ef-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const requestId = genRequestId('ef');
         const cleanup = () => { requestHandlersRef.current.delete(requestId); };
 
         const timer = setTimeout(() => {

@@ -55,6 +55,10 @@ function clearSigkillTimer() {
   }
 }
 
+// NOTE: This list is intentionally less strict than ai-tool-agent.ts BLOCKED_AGENT_PATTERNS.
+// Bridge serves user-typed commands from the terminal UI, so $(), backticks, ssh, eval etc.
+// are legitimate user operations. Agent-generated commands have stricter filtering in
+// ai-tool-agent.ts (Layer 1). This is Layer 2 — catching universally destructive patterns.
 const DANGEROUS_PATTERNS = [
   /rm\\s+-[^\\s]*r[^\\s]*f/i,             // rm -rf (any target)
   /rm\\s+-[^\\s]*f[^\\s]*r/i,             // rm -fr (any target)

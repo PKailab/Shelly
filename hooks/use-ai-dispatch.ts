@@ -66,13 +66,16 @@ function buildFileContext(files: FileAttachment[]): string {
 }
 
 /** Build conversation context as plain text (for CLI-based agents like Claude) */
+/** Max characters per message in context (prevents prompt bloat) */
+const CONTEXT_MSG_MAX_CHARS = 500;
+
 function toTextContext(messages: ChatMessage[], maxPairs = 4): string {
   const recent = messages.slice(-(maxPairs * 2));
   if (recent.length === 0) return '';
   const lines = recent.map((m) => {
     const role = m.role === 'user' ? 'User' : 'Assistant';
     // Sanitize: strip control characters and limit length per message
-    const sanitized = m.content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, 500);
+    const sanitized = m.content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, CONTEXT_MSG_MAX_CHARS);
     return `${role}: ${sanitized}`;
   });
   return `\n\n[会話コンテキスト]\n${lines.join('\n')}\n`;
