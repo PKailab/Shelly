@@ -34,11 +34,11 @@ export type AgentMessage = {
 };
 
 export type BridgeTools = {
-  readFile: (filePath: string, encoding?: string) => Promise<{ ok: boolean; content?: string; error?: string }>;
+  readFile: (filePath: string, encoding?: string) => Promise<{ ok: true; content: string; filePath: string; size: number } | { ok: false; error: string }>;
   writeFile: (filePath: string, content: string) => Promise<{ ok: boolean; error?: string }>;
-  editFile: (filePath: string, edits: { oldText: string; newText: string }[]) => Promise<{ ok: boolean; error?: string; editsApplied?: number }>;
-  listFiles: (dirPath?: string, opts?: { recursive?: boolean; maxDepth?: number }) => Promise<{ ok: boolean; entries?: any[]; error?: string }>;
-  runCommand: (cmd: string) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
+  editFile: (filePath: string, edits: { oldText: string; newText: string }[]) => Promise<{ ok: true; filePath: string; editsApplied: number } | { ok: false; error: string }>;
+  listFiles: (dirPath?: string, opts?: { recursive?: boolean; maxDepth?: number; includeHidden?: boolean }) => Promise<{ ok: true; entries: any[]; dirPath: string; total: number } | { ok: false; error: string }>;
+  runCommand: (cmd: string, opts?: { cwd?: string; env?: Record<string, string>; onStream?: (type: 'stdout' | 'stderr', data: string) => void; timeoutMs?: number }) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
 };
 
 export type OnStreamCallback = (text: string) => void;
@@ -227,7 +227,12 @@ export async function runAgentLoop(
       onToolCall?.(name, args);
       onStream?.(`\n🔧 ${name}(${summarizeArgs(name, args)})...\n`);
 
-      const result = await executeTool(name, args, tools);
+      let result: any;
+      try {
+        result = await executeTool(name, args, tools);
+      } catch (err) {
+        result = { error: `Tool execution failed: ${err instanceof Error ? err.message : String(err)}` };
+      }
       const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
 
       // Truncate large results
@@ -258,29 +263,34 @@ async function executeTool(name: string, args: Record<string, any>, tools: Bridg
   switch (name) {
     case 'readFile': {
       const result = await tools.readFile(args.filePath);
-      if (result.ok) return { content: result.content };
-      return { error: result.error };
+      if (result.ok === false) return { error: result.error };
+      return { content: result.content };
     }
     case 'writeFile': {
       const result = await tools.writeFile(args.filePath, args.content);
-      if (result.ok) return { success: true };
-      return { error: result.error };
+      if (!result.ok) return { error: result.error };
+      return { success: true };
     }
     case 'editFile': {
       const result = await tools.editFile(args.filePath, args.edits);
-      if (result.ok) return { success: true, editsApplied: result.editsApplied };
-      return { error: result.error };
+      if (result.ok === false) return { error: result.error };
+      return { success: true, editsApplied: result.editsApplied };
     }
     case 'listFiles': {
       const result = await tools.listFiles(args.dirPath, {
         recursive: args.recursive,
         maxDepth: args.maxDepth,
       });
-      if (result.ok) return { entries: result.entries };
-      return { error: result.error };
+      if (result.ok === false) return { error: result.error };
+      return { entries: result.entries };
     }
     case 'runCommand': {
-      const result = await tools.runCommand(args.command);
+      // Safety: block dangerous patterns from AI-generated commands
+      const cmd = args.command as string;
+      if (isBlockedAgentCommand(cmd)) {
+        return { error: `Blocked: command not allowed in agent mode: ${cmd.slice(0, 60)}` };
+      }
+      const result = await tools.runCommand(cmd);
       return {
         stdout: result.stdout.slice(-4000),
         stderr: result.stderr.slice(-2000),
@@ -293,6 +303,32 @@ async function executeTool(name: string, args: Record<string, any>, tools: Bridg
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+/**
+ * Block dangerous commands from AI-generated runCommand calls.
+ * Prevents prompt injection attacks where Gemini generates malicious commands.
+ */
+const BLOCKED_AGENT_PATTERNS = [
+  /curl\s.*\|.*(?:bash|sh)/i,         // curl | bash (remote code exec)
+  /wget\s.*-O\s/i,                    // wget -O (file overwrite)
+  /\|\s*(?:bash|sh|zsh)\b/i,          // pipe to shell
+  />\s*~\/\.(?:bashrc|profile|zshrc)/i, // overwrite shell config
+  /ssh\s/i,                           // SSH connections
+  /scp\s/i,                           // SCP transfers
+  /nc\s.*-[el]/i,                     // netcat listeners
+  /python.*-c.*import\s+(?:os|subprocess|socket)/i, // Python code exec
+  /node.*-e.*(?:child_process|exec|spawn)/i,        // Node code exec
+  /eval\s/i,                          // eval
+  /base64\s.*-d/i,                    // base64 decode (obfuscation)
+  /\bdd\s+.*of=/i,                    // dd overwrite
+  /mkfs/i,                            // format filesystem
+  /rm\s+-[^\s]*r[^\s]*\s+\//i,        // rm -rf /
+  /chmod\s+[0-7]*7[0-7]*\s/i,         // world-writable permissions
+];
+
+function isBlockedAgentCommand(cmd: string): boolean {
+  return BLOCKED_AGENT_PATTERNS.some(p => p.test(cmd));
+}
 
 function summarizeArgs(toolName: string, args: Record<string, any>): string {
   switch (toolName) {

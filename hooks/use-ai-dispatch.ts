@@ -586,7 +586,7 @@ export function useAIDispatch() {
         const result = await runAgentLoop(
           apiKey,
           promptWithFiles,
-          tools as any,
+          tools,
           (text) => {
             if (signal.aborted) return;
             accumulated += text;

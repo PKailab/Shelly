@@ -365,6 +365,14 @@ function handleReadFile(ws, requestId, filePath, opts) {
   }
 
   const resolved = path.resolve(currentCwd, filePath);
+
+  // Home directory restriction
+  const homeDir = os.homedir();
+  if (!resolved.startsWith(homeDir + path.sep) && resolved !== homeDir) {
+    send(ws, { type: 'error', requestId, message: \`Read blocked: path outside home directory: \${resolved}\` });
+    return;
+  }
+
   console.log(\`[shelly-bridge] [\${requestId}] READ_FILE: \${resolved}\`);
 
   try {
@@ -401,6 +409,14 @@ function handleListFiles(ws, requestId, dirPath, opts) {
   }
 
   const resolved = path.resolve(currentCwd, dirPath || '.');
+
+  // Home directory restriction
+  const homeDir = os.homedir();
+  if (!resolved.startsWith(homeDir + path.sep) && resolved !== homeDir) {
+    send(ws, { type: 'error', requestId, message: \`List blocked: path outside home directory: \${resolved}\` });
+    return;
+  }
+
   const recursive = opts && opts.recursive;
   const maxDepth = (opts && opts.maxDepth) || 3;
   const includeHidden = opts && opts.includeHidden;
@@ -492,9 +508,13 @@ function handleEditFile(ws, requestId, filePath, edits) {
       if (!edit.oldText && edit.oldText !== '') continue;
       if (edit.newText == null) continue;
 
-      if (content.includes(edit.oldText)) {
+      const occurrences = content.split(edit.oldText).length - 1;
+      if (occurrences === 1) {
         content = content.replace(edit.oldText, edit.newText);
         applied++;
+      } else if (occurrences > 1) {
+        send(ws, { type: 'error', requestId, message: \`Edit \${applied + 1} failed: oldText matches \${occurrences} times (must be unique)\` });
+        return;
       } else {
         send(ws, { type: 'error', requestId, message: \`Edit \${applied + 1} failed: oldText not found in file\` });
         return;

@@ -535,16 +535,16 @@ export function useTermuxBridge() {
         }, 60000);
 
         requestHandlersRef.current.set(requestId, (msg) => {
-          if (msg.type === 'progress' && 'message' in msg) {
-            onProgress?.((msg as any).message, (msg as any).current, (msg as any).total);
-          } else if (msg.type === 'projectCreated' && 'projectPath' in msg) {
+          if (msg.type === 'progress') {
+            onProgress?.(msg.message, msg.current, msg.total);
+          } else if (msg.type === 'projectCreated') {
             clearTimeout(timer);
             cleanup();
-            resolve({ ok: true, projectPath: (msg as any).projectPath, filesWritten: (msg as any).filesWritten });
-          } else if (msg.type === 'error' && 'message' in msg) {
+            resolve({ ok: true, projectPath: msg.projectPath, filesWritten: msg.filesWritten });
+          } else if (msg.type === 'error') {
             clearTimeout(timer);
             cleanup();
-            resolve({ ok: false, error: (msg as any).message });
+            resolve({ ok: false, error: msg.message });
           }
         });
 
@@ -577,9 +577,9 @@ export function useTermuxBridge() {
           if (msg.type === 'fileWritten') {
             clearTimeout(timer); cleanup();
             resolve({ ok: true });
-          } else if (msg.type === 'error' && 'message' in msg) {
+          } else if (msg.type === 'error') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: false, error: (msg as any).message });
+            resolve({ ok: false, error: msg.message });
           }
         });
 
@@ -643,21 +643,24 @@ export function useTermuxBridge() {
         }, timeoutMs);
 
         requestHandlersRef.current.set(requestId, (msg) => {
-          if (msg.type === 'stdout' && 'data' in msg) {
-            stdoutBuf += (msg as any).data;
-            opts?.onStream?.('stdout', (msg as any).data);
-          } else if (msg.type === 'stderr' && 'data' in msg) {
-            stderrBuf += (msg as any).data;
-            opts?.onStream?.('stderr', (msg as any).data);
-          } else if (msg.type === 'exit' || msg.type === 'cancelled') {
+          if (msg.type === 'stdout') {
+            stdoutBuf += msg.data;
+            opts?.onStream?.('stdout', msg.data);
+          } else if (msg.type === 'stderr') {
+            stderrBuf += msg.data;
+            opts?.onStream?.('stderr', msg.data);
+          } else if (msg.type === 'exit') {
             clearTimeout(timer);
             cleanup();
-            const code = msg.type === 'cancelled' ? 130 : (msg as { type: 'exit'; requestId: string; code: number }).code;
-            resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: code });
-          } else if (msg.type === 'error' && 'message' in msg) {
+            resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: msg.code });
+          } else if (msg.type === 'cancelled') {
             clearTimeout(timer);
             cleanup();
-            resolve({ stdout: stdoutBuf, stderr: stderrBuf + '\n' + (msg as any).message, exitCode: 1 });
+            resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: 130 });
+          } else if (msg.type === 'error') {
+            clearTimeout(timer);
+            cleanup();
+            resolve({ stdout: stdoutBuf, stderr: stderrBuf + '\n' + msg.message, exitCode: 1 });
           }
         });
 
@@ -730,21 +733,24 @@ export function useTermuxBridge() {
         }, timeoutMs);
 
         requestHandlersRef.current.set(requestId, (msg) => {
-          if (msg.type === 'stdout' && 'data' in msg) {
-            stdoutBuf += (msg as any).data;
-            opts?.onStream?.('stdout', (msg as any).data);
-          } else if (msg.type === 'stderr' && 'data' in msg) {
-            stderrBuf += (msg as any).data;
-            opts?.onStream?.('stderr', (msg as any).data);
-          } else if (msg.type === 'exit' || msg.type === 'cancelled') {
+          if (msg.type === 'stdout') {
+            stdoutBuf += msg.data;
+            opts?.onStream?.('stdout', msg.data);
+          } else if (msg.type === 'stderr') {
+            stderrBuf += msg.data;
+            opts?.onStream?.('stderr', msg.data);
+          } else if (msg.type === 'exit') {
             clearTimeout(timer);
             cleanup();
-            const code = msg.type === 'cancelled' ? 130 : (msg as { type: 'exit'; requestId: string; code: number }).code;
-            resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: code });
-          } else if (msg.type === 'error' && 'message' in msg) {
+            resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: msg.code });
+          } else if (msg.type === 'cancelled') {
             clearTimeout(timer);
             cleanup();
-            resolve({ stdout: stdoutBuf, stderr: stderrBuf + '\n' + (msg as any).message, exitCode: 1 });
+            resolve({ stdout: stdoutBuf, stderr: stderrBuf, exitCode: 130 });
+          } else if (msg.type === 'error') {
+            clearTimeout(timer);
+            cleanup();
+            resolve({ stdout: stdoutBuf, stderr: stderrBuf + '\n' + msg.message, exitCode: 1 });
           }
         });
 
@@ -774,12 +780,12 @@ export function useTermuxBridge() {
         }, 10000);
 
         requestHandlersRef.current.set(requestId, (msg) => {
-          if (msg.type === 'fileRead' && 'content' in msg) {
+          if (msg.type === 'fileRead') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: true, content: (msg as any).content, filePath: (msg as any).filePath, size: (msg as any).size });
-          } else if (msg.type === 'error' && 'message' in msg) {
+            resolve({ ok: true, content: msg.content, filePath: msg.filePath, size: msg.size });
+          } else if (msg.type === 'error') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: false, error: (msg as any).message });
+            resolve({ ok: false, error: msg.message });
           }
         });
 
@@ -809,12 +815,12 @@ export function useTermuxBridge() {
         }, 15000);
 
         requestHandlersRef.current.set(requestId, (msg) => {
-          if (msg.type === 'fileList' && 'entries' in msg) {
+          if (msg.type === 'fileList') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: true, entries: (msg as any).entries, dirPath: (msg as any).dirPath, total: (msg as any).total });
-          } else if (msg.type === 'error' && 'message' in msg) {
+            resolve({ ok: true, entries: msg.entries, dirPath: msg.dirPath, total: msg.total });
+          } else if (msg.type === 'error') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: false, error: (msg as any).message });
+            resolve({ ok: false, error: msg.message });
           }
         });
 
@@ -851,12 +857,12 @@ export function useTermuxBridge() {
         }, 10000);
 
         requestHandlersRef.current.set(requestId, (msg) => {
-          if (msg.type === 'fileEdited' && 'editsApplied' in msg) {
+          if (msg.type === 'fileEdited') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: true, filePath: (msg as any).filePath, editsApplied: (msg as any).editsApplied });
-          } else if (msg.type === 'error' && 'message' in msg) {
+            resolve({ ok: true, filePath: msg.filePath, editsApplied: msg.editsApplied });
+          } else if (msg.type === 'error') {
             clearTimeout(timer); cleanup();
-            resolve({ ok: false, error: (msg as any).message });
+            resolve({ ok: false, error: msg.message });
           }
         });
 
