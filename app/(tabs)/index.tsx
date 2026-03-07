@@ -538,11 +538,24 @@ export default function TerminalScreen() {
         // Fallback to CLI (code/research/file_ops or error)
         updateAiBlock(blockId, { isStreaming: false, streamingText: undefined });
         if (result.delegatedCommand) {
+          // CLI委譲先の情報をブロックに表示
+          const toolLabel = result.handledBy === 'gemini' ? 'Gemini CLI' : result.handledBy === 'codex' ? 'Codex CLI' : 'Claude Code';
+          updateAiBlock(blockId, {
+            logSummary: `[${toolLabel}] ${parsed.prompt.slice(0, 50)}${parsed.prompt.length > 50 ? '…' : ''}`,
+            response: `${toolLabel}に委譲しました。\n理由: ${(result as any).reasoning || ''}`,
+            isStreaming: false,
+          });
           if (connectionMode === 'termux') {
             sendCommand(result.delegatedCommand);
           } else {
             runCommand(result.delegatedCommand);
           }
+        } else if ((result as any).response) {
+          // orchestrateTaskがresponseを返した場合（setupMessage等）
+          updateAiBlock(blockId, {
+            response: (result as any).response,
+            isStreaming: false,
+          });
         } else {
           updateAiBlock(blockId, {
             response: 'Local LLMに接続できませんでした。Settingsで接続を確認してください。',

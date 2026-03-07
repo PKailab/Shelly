@@ -562,9 +562,27 @@ export async function orchestrateChatStream(
   // LLMベースのインテントルーティング
   const routing = await routeIntent(userInput, config, toolStatuses ?? [], defaultAgent);
 
-  // セットアップが必要 or ローカルLLM以外 → 通常フローに委譲
-  if (routing.setupRequired || routing.tool !== 'local-llm') {
+  // セットアップが必要 → 通常フローに委譲（セットアップ案内を返す）
+  if (routing.setupRequired) {
     return orchestrateTask(userInput, config, conversationHistory, projectContext, userProfileSummary, customContext, toolStatuses, defaultAgent);
+  }
+
+  // local-llm以外にルーティングされても、chatストリームとして呼ばれた場合は
+  // まずローカルLLMで応答を試みる（応答テキストが表示されない問題を防止）。
+  // delegatedCommandが必要な場合はフォールバックで処理する。
+  if (routing.tool !== 'local-llm') {
+    // ただしtermux/file_ops判定の場合はそのまま委譲
+    if (routing.tool === 'termux') {
+      return orchestrateTask(userInput, config, conversationHistory, projectContext, userProfileSummary, customContext, toolStatuses, defaultAgent);
+    }
+    // code/research系: delegatedCommandを返しつつ、AiBlockにもルーティング情報を載せる
+    const result = await orchestrateTask(userInput, config, conversationHistory, projectContext, userProfileSummary, customContext, toolStatuses, defaultAgent);
+    // orchestrateTaskがlocal_llmで応答を返した場合はonChunk経由で渡す
+    if (result.handledBy === 'local_llm' && result.response) {
+      onChunk(result.response, true);
+      return result;
+    }
+    return result;
   }
 
   const systemContent = buildSystemPrompt({
