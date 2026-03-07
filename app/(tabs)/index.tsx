@@ -63,6 +63,8 @@ export default function ChatScreen() {
     createSession: createChatSession,
     addMessage,
     updateMessage,
+    deleteMessage,
+    deleteMessagesFrom,
   } = useChatStore();
   // Reactive selector for active session (re-renders when session/messages change)
   const chatSession = useChatStore((s) =>
@@ -435,6 +437,43 @@ export default function ChatScreen() {
     }
   }, [chatSessionId, connectionMode, sendCommand, activeSession.id, activeSession.currentDir, settings, addMessage, updateMessage, setLastInputMode, router, addUserMessage, addAssistantMessage, bridgeRunCommand, execForContext, aiDispatch, isBridgeConnected]);
 
+  // ── Regenerate: re-send the user message that preceded an assistant message ──
+  const handleRegenerate = useCallback((assistantMsgId: string) => {
+    if (!chatSessionId) return;
+    const msgs = messagesRef.current;
+    const idx = msgs.findIndex((m) => m.id === assistantMsgId);
+    if (idx === -1) return;
+    // Find the preceding user message
+    let userMsg: ChatMessage | undefined;
+    for (let i = idx - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') { userMsg = msgs[i]; break; }
+    }
+    if (!userMsg) return;
+    // Strip "$ " prefix from shell commands so parseInput routes correctly
+    const originalInput = userMsg.content.startsWith('$ ')
+      ? userMsg.content.slice(2)
+      : userMsg.content;
+    // Delete from the user message onward
+    deleteMessagesFrom(chatSessionId, userMsg.id);
+    // Delay re-send to next tick so messagesRef picks up the deletion
+    setTimeout(() => handleSend(originalInput), 0);
+  }, [chatSessionId, deleteMessagesFrom, handleSend]);
+
+  // ── Edit: remove from edited message onward, put text back in input ──
+  const handleEdit = useCallback((messageId: string, content: string) => {
+    if (!chatSessionId) return;
+    deleteMessagesFrom(chatSessionId, messageId);
+    // Strip "$ " prefix from shell commands so parseInput routes correctly
+    const text = content.startsWith('$ ') ? content.slice(2) : content;
+    commandInputRef.current?.setText(text);
+  }, [chatSessionId, deleteMessagesFrom]);
+
+  // ── Delete: remove a single message ──
+  const handleDelete = useCallback((messageId: string) => {
+    if (!chatSessionId) return;
+    deleteMessage(chatSessionId, messageId);
+  }, [chatSessionId, deleteMessage]);
+
   const handleCancel = useCallback(() => {
     cancelCurrent();
     cancelStreaming();
@@ -541,6 +580,11 @@ export default function ChatScreen() {
             messages={messages}
             fontSize={settings.fontSize ?? 14}
             onSampleTap={(text) => commandInputRef.current?.setText(text)}
+            onRegenerate={handleRegenerate}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onStopGenerating={handleCancel}
+            isStreaming={messages.some(m => m.isStreaming)}
           />
         </View>
 

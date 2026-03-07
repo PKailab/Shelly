@@ -23,9 +23,14 @@ type Props = {
   messages: ChatMessage[];
   fontSize?: number;
   onSampleTap?: (text: string) => void;
+  onRegenerate?: (messageId: string) => void;
+  onEdit?: (messageId: string, content: string) => void;
+  onDelete?: (messageId: string) => void;
+  onStopGenerating?: () => void;
+  isStreaming?: boolean;
 };
 
-export function ChatMessageList({ messages, fontSize, onSampleTap }: Props) {
+export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate, onEdit, onDelete, onStopGenerating, isStreaming }: Props) {
   const { colors } = useTheme();
   const listRef = useRef<FlatList>(null);
   const prevCount = useRef(messages.length);
@@ -41,8 +46,14 @@ export function ChatMessageList({ messages, fontSize, onSampleTap }: Props) {
   }, [messages.length]);
 
   const renderItem = useCallback(({ item }: { item: ChatMessage }) => (
-    <ChatBubble message={item} fontSize={fontSize} />
-  ), [fontSize]);
+    <ChatBubble
+      message={item}
+      fontSize={fontSize}
+      onRegenerate={onRegenerate}
+      onEdit={onEdit}
+      onDelete={onDelete}
+    />
+  ), [fontSize, onRegenerate, onEdit, onDelete]);
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
 
@@ -74,6 +85,24 @@ export function ChatMessageList({ messages, fontSize, onSampleTap }: Props) {
     );
   }
 
+  const ListFooter = useCallback(() => {
+    if (!isStreaming || !onStopGenerating) return null;
+    return (
+      <View style={styles.stopRow}>
+        <TouchableOpacity
+          style={[styles.stopBtn, { borderColor: colors.border, backgroundColor: colors.surfaceHigh }]}
+          onPress={onStopGenerating}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Stop generating"
+        >
+          <View style={[styles.stopIcon, { backgroundColor: colors.inactive }]} />
+          <Text style={[styles.stopText, { color: colors.foreground }]}>Stop generating</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }, [isStreaming, onStopGenerating, colors]);
+
   return (
     <FlatList
       ref={listRef}
@@ -84,6 +113,7 @@ export function ChatMessageList({ messages, fontSize, onSampleTap }: Props) {
       showsVerticalScrollIndicator={false}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
+      ListFooterComponent={ListFooter}
     />
   );
 }
@@ -139,5 +169,28 @@ const styles = StyleSheet.create({
   sampleDesc: {
     fontSize: 10,
     fontFamily: 'monospace',
+  },
+  stopRow: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  stopBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  stopIcon: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
+  stopText: {
+    fontSize: 13,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
 });

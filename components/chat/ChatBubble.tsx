@@ -52,11 +52,14 @@ function getAgentLabel(agent?: ChatAgent): string {
 type Props = {
   message: ChatMessage;
   fontSize?: number;
+  onRegenerate?: (messageId: string) => void;
+  onEdit?: (messageId: string, content: string) => void;
+  onDelete?: (messageId: string) => void;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14 }: Props) {
+export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete }: Props) {
   const { colors } = useTheme();
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,9 +102,23 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14 }: P
           <Text style={[styles.messageText, { color: colors.foreground, fontSize }]} selectable>
             {message.content}
           </Text>
-          <Text style={[styles.timestamp, { color: colors.inactive }]}>
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          <View style={styles.bottomRow}>
+            <View style={styles.actionGroup}>
+              {onEdit && (
+                <TouchableOpacity onPress={() => onEdit(message.id, message.content)} activeOpacity={0.7} style={styles.copyBtn} accessibilityRole="button" accessibilityLabel="Edit message">
+                  <MaterialIcons name="edit" size={12} color={colors.inactive} />
+                </TouchableOpacity>
+              )}
+              {onDelete && (
+                <TouchableOpacity onPress={() => onDelete(message.id)} activeOpacity={0.7} style={styles.copyBtn} accessibilityRole="button" accessibilityLabel="Delete message">
+                  <MaterialIcons name="delete-outline" size={12} color={colors.inactive} />
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={[styles.timestamp, { color: colors.inactive }]}>
+              {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
         </View>
       </Animated.View>
     );
@@ -208,6 +225,16 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14 }: P
               <TouchableOpacity onPress={handleShare} activeOpacity={0.7} style={styles.copyBtn} accessibilityRole="button" accessibilityLabel="Share message">
                 <MaterialIcons name="share" size={12} color={colors.inactive} />
               </TouchableOpacity>
+              {onRegenerate && message.role === 'assistant' && (
+                <TouchableOpacity onPress={() => onRegenerate(message.id)} activeOpacity={0.7} style={styles.copyBtn} accessibilityRole="button" accessibilityLabel="Regenerate response">
+                  <MaterialIcons name="refresh" size={12} color={colors.inactive} />
+                </TouchableOpacity>
+              )}
+              {onDelete && (
+                <TouchableOpacity onPress={() => onDelete(message.id)} activeOpacity={0.7} style={styles.copyBtn} accessibilityRole="button" accessibilityLabel="Delete message">
+                  <MaterialIcons name="delete-outline" size={12} color={colors.inactive} />
+                </TouchableOpacity>
+              )}
             </View>
           ) : <View />}
           <Text style={[styles.timestamp, { color: colors.inactive }]}>

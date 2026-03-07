@@ -66,6 +66,9 @@ type ChatStore = {
   setActiveSession: (id: string) => void;
   addMessage: (sessionId: string, message: ChatMessage) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
+  deleteMessage: (sessionId: string, messageId: string) => void;
+  /** Delete a message and all messages after it (for edit+resend) */
+  deleteMessagesFrom: (sessionId: string, messageId: string) => void;
   getActiveSession: () => ChatSession | null;
   searchSessions: (query: string) => ChatSession[];
 };
@@ -199,6 +202,34 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     if (updates.isStreaming === false) {
       get().save();
     }
+  },
+
+  deleteMessage: (sessionId, messageId) => {
+    set((state) => {
+      const sessionIdx = state.sessions.findIndex((s) => s.id === sessionId);
+      if (sessionIdx === -1) return state;
+      const session = state.sessions[sessionIdx];
+      const newMessages = session.messages.filter((m) => m.id !== messageId);
+      const newSessions = [...state.sessions];
+      newSessions[sessionIdx] = { ...session, messages: newMessages, updatedAt: Date.now() };
+      return { sessions: newSessions };
+    });
+    get().save();
+  },
+
+  deleteMessagesFrom: (sessionId, messageId) => {
+    set((state) => {
+      const sessionIdx = state.sessions.findIndex((s) => s.id === sessionId);
+      if (sessionIdx === -1) return state;
+      const session = state.sessions[sessionIdx];
+      const msgIdx = session.messages.findIndex((m) => m.id === messageId);
+      if (msgIdx === -1) return state;
+      const newMessages = session.messages.slice(0, msgIdx);
+      const newSessions = [...state.sessions];
+      newSessions[sessionIdx] = { ...session, messages: newMessages, updatedAt: Date.now() };
+      return { sessions: newSessions };
+    });
+    get().save();
   },
 
   getActiveSession: () => {
