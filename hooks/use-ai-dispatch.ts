@@ -69,6 +69,25 @@ function buildFileContext(files: FileAttachment[]): string {
 /** Max characters per message in context (prevents prompt bloat) */
 const CONTEXT_MSG_MAX_CHARS = 500;
 
+/**
+ * Estimate token count from text.
+ * ASCII chars ≈ 4 chars/token, CJK chars ≈ 1.5 chars/token.
+ */
+function estimateTokens(text: string): number {
+  let cjk = 0;
+  let ascii = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    // CJK Unified Ideographs + Hiragana + Katakana + Fullwidth
+    if ((code >= 0x3000 && code <= 0x9FFF) || (code >= 0xF900 && code <= 0xFAFF) || (code >= 0xFF00 && code <= 0xFFEF)) {
+      cjk++;
+    } else {
+      ascii++;
+    }
+  }
+  return Math.round(cjk / 1.5 + ascii / 4);
+}
+
 function toTextContext(messages: ChatMessage[], maxPairs = 4): string {
   const recent = messages.slice(-(maxPairs * 2));
   if (recent.length === 0) return '';
@@ -232,7 +251,7 @@ export function useAIDispatch() {
               accumulated += chunk;
               updateMessage(chatSessionId, msgId, {
                 streamingText: accumulated,
-                tokenCount: Math.round(accumulated.length / 4),
+                tokenCount: estimateTokens(accumulated),
                 isStreaming: !done,
               });
             }
@@ -241,7 +260,7 @@ export function useAIDispatch() {
                 content: accumulated,
                 streamingText: undefined,
                 isStreaming: false,
-                tokenCount: Math.round(accumulated.length / 4),
+                tokenCount: estimateTokens(accumulated),
               });
             }
           },
@@ -288,7 +307,7 @@ export function useAIDispatch() {
             accumulatedText += chunk;
             updateMessage(chatSessionId, msgId, {
               streamingText: accumulatedText,
-              tokenCount: Math.round(accumulatedText.length / 4),
+              tokenCount: estimateTokens(accumulatedText),
               isStreaming: !done,
             });
           }
@@ -297,7 +316,7 @@ export function useAIDispatch() {
               content: accumulatedText,
               streamingText: undefined,
               isStreaming: false,
-              tokenCount: Math.round(accumulatedText.length / 4),
+              tokenCount: estimateTokens(accumulatedText),
             });
           }
         },
@@ -363,7 +382,7 @@ export function useAIDispatch() {
             accumulated += chunk;
             updateMessage(chatSessionId, msgId, {
               streamingText: accumulated,
-              tokenCount: Math.round(accumulated.length / 4),
+              tokenCount: estimateTokens(accumulated),
               isStreaming: !done,
             });
           }
@@ -371,7 +390,7 @@ export function useAIDispatch() {
           if (done) {
             updateMessage(chatSessionId, msgId, {
               content: accumulated, streamingText: undefined, isStreaming: false,
-              tokenCount: Math.round(accumulated.length / 4), citations,
+              tokenCount: estimateTokens(accumulated), citations,
             });
           }
         }, settings.perplexityModel ?? undefined, pplxHistory, signal);
@@ -412,14 +431,14 @@ export function useAIDispatch() {
             accumulated += chunk;
             updateMessage(chatSessionId, msgId, {
               streamingText: accumulated,
-              tokenCount: Math.round(accumulated.length / 4),
+              tokenCount: estimateTokens(accumulated),
               isStreaming: !done,
             });
           }
           if (done) {
             updateMessage(chatSessionId, msgId, {
               content: accumulated, streamingText: undefined, isStreaming: false,
-              tokenCount: Math.round(accumulated.length / 4),
+              tokenCount: estimateTokens(accumulated),
             });
           }
         }, settings.geminiModel ?? 'gemini-2.0-flash', geminiHistory, signal);
@@ -497,7 +516,7 @@ export function useAIDispatch() {
         const facilitatorLabel = teamResult.facilitator?.label ?? 'ファシリ';
         const memberDetails = teamResult.members.filter(m => !m.isFacilitator).map(m => `\n--- ${m.label} ---\n${m.response}`).join('\n');
         const finalText = `=== まとめ (${facilitatorLabel}) ===\n${teamResult.facilitatorSummary}\n\n──── 各エージェントの回答 ────${memberDetails}`;
-        updateMessage(chatSessionId, msgId, { content: finalText, streamingText: undefined, isStreaming: false, tokenCount: Math.round(finalText.length / 4) });
+        updateMessage(chatSessionId, msgId, { content: finalText, streamingText: undefined, isStreaming: false, tokenCount: estimateTokens(finalText) });
       } catch (err) {
         updateMessage(chatSessionId, msgId, { content: '', error: `@teamエラー: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false });
       }
@@ -530,7 +549,7 @@ export function useAIDispatch() {
             accumulated += data;
             updateMessage(chatSessionId, msgId, {
               streamingText: accumulated,
-              tokenCount: Math.round(accumulated.length / 4),
+              tokenCount: estimateTokens(accumulated),
             });
           },
         });
@@ -538,7 +557,7 @@ export function useAIDispatch() {
         if (result.stderr) output += `\n--- stderr ---\n${result.stderr}`;
         updateMessage(chatSessionId, msgId, {
           content: output, streamingText: undefined, isStreaming: false,
-          tokenCount: Math.round(output.length / 4),
+          tokenCount: estimateTokens(output),
           executions: [{ command: cliCommand, output, exitCode: result.exitCode, isCollapsed: output.split('\n').length > 10 }],
         });
       } catch (err) {
@@ -597,7 +616,7 @@ export function useAIDispatch() {
             accumulated += text;
             updateMessage(chatSessionId, msgId, {
               streamingText: accumulated,
-              tokenCount: Math.round(accumulated.length / 4),
+              tokenCount: estimateTokens(accumulated),
             });
           },
           (toolName, args) => {
@@ -612,7 +631,7 @@ export function useAIDispatch() {
           content: accumulated,
           streamingText: undefined,
           isStreaming: false,
-          tokenCount: Math.round(accumulated.length / 4),
+          tokenCount: estimateTokens(accumulated),
         });
       } catch (err) {
         if (!signal.aborted) {
@@ -645,7 +664,7 @@ export function useAIDispatch() {
     }
 
     return { handled: false };
-  }, [addMessage, updateMessage, settings, connectionMode, sendCommand, terminalRunCommand, bridgeRunCommand, addAssistantMessage]);
+  }, [updateMessage, settings, connectionMode, sendCommand, terminalRunCommand, bridgeRunCommand, addAssistantMessage]);
 
   return { dispatch, cancelStreaming };
 }

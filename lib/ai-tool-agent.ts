@@ -325,6 +325,7 @@ const BLOCKED_AGENT_PATTERNS = [
   /rm\s+-[^\s]*r[^\s]*f/i,            // rm -rf (any target)
   /rm\s+-[^\s]*f[^\s]*r/i,            // rm -fr (any target)
   /chmod\s+[0-7]*7[0-7]*\s/i,         // world-writable permissions
+  />\s*\/(?:etc|proc|sys|dev)\//i,    // redirect to system paths
   /\$\(/,                             // subshell expansion $(...)
   /`[^`]*`/,                          // backtick command substitution
 ];

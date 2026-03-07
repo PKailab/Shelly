@@ -87,7 +87,8 @@ export default function ProjectsScreen() {
       const scanDirs = ['~/dev', '~/projects', '~/Shelly', '~/storage/shared/Documents/development'];
       const entries: ProjectEntry[] = [];
       for (const dir of scanDirs) {
-        const listing = await exec(`ls -1 ${dir} 2>/dev/null | head -20`);
+        // dir is from hardcoded scanDirs (no user input), safe for shell interpolation
+        const listing = await exec(`ls -1 "${dir}" 2>/dev/null | head -20`);
         if (!listing) continue;
         const items = listing.split('\n').filter(Boolean);
         for (const item of items) {

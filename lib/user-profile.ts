@@ -234,8 +234,10 @@ export function formatProfileForPrompt(profile: UserProfile): string {
  * ユーザー入力から自己紹介的な情報を抽出する
  */
 function extractFacts(input: string): string[] {
+  // Sanitize: strip control characters and limit input length to prevent regex abuse
+  const sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, 1000);
   const facts: string[] = [];
-  const lower = input.toLowerCase();
+  const lower = sanitized.toLowerCase();
 
   // 「俺は〜」「私は〜」「名前は〜」パターン
   const selfPatterns = [
@@ -248,7 +250,7 @@ function extractFacts(input: string): string[] {
 
   for (const pat of selfPatterns) {
     let match;
-    while ((match = pat.exec(input)) !== null) {
+    while ((match = pat.exec(sanitized)) !== null) {
       const fact = match[1].trim();
       if (fact.length >= 2) facts.push(fact);
     }
@@ -262,7 +264,7 @@ function extractFacts(input: string): string[] {
 
   for (const pat of prefPatterns) {
     let match;
-    while ((match = pat.exec(input)) !== null) {
+    while ((match = pat.exec(sanitized)) !== null) {
       const pref = match[1].trim();
       if (pref.length >= 2) facts.push(`${pref}を好む`);
     }
@@ -275,7 +277,7 @@ function extractFacts(input: string): string[] {
 
   for (const pat of rememberPatterns) {
     let match;
-    while ((match = pat.exec(input)) !== null) {
+    while ((match = pat.exec(sanitized)) !== null) {
       facts.push(match[1].trim());
     }
   }

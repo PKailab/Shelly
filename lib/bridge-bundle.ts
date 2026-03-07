@@ -108,6 +108,9 @@ function handleRun(ws, requestId, command, opts) {
     return;
   }
 
+  // Single-process model: only one command runs at a time per bridge instance.
+  // This prevents resource contention on mobile devices. Concurrent exec requests
+  // from multiple tabs are queued client-side (use-termux-bridge.ts processQueue).
   if (activeProcess) {
     send(ws, { type: 'error', requestId, message: 'Another command is already running.' });
     return;
