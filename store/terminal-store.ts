@@ -154,6 +154,10 @@ type TerminalState = {
   // Actions — input mode
   setLastInputMode: (mode: 'shell' | 'natural') => void;
 
+  // Actions — session persistence
+  saveSessionState: () => Promise<void>;
+  loadSessionState: () => Promise<void>;
+
   // Actions — AI blocks
   /** Add an AI routing/response block to the active session's entries */
   addAiBlock: (block: AiBlock) => void;
@@ -191,6 +195,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       sessions: [...state.sessions, createSession(id, name)],
       activeSessionId: id,
     }));
+    get().saveSessionState();
   },
 
   removeSession: (id: string) => {
@@ -199,6 +204,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const newSessions = sessions.filter((s) => s.id !== id);
     const newActive = activeSessionId === id ? newSessions[0].id : activeSessionId;
     set({ sessions: newSessions, activeSessionId: newActive });
+    get().saveSessionState();
   },
 
   setActiveSession: (id: string) => {
@@ -212,6 +218,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         s.id === targetId ? { ...s, blocks: [], entries: [] } : s
       ),
     }));
+    get().saveSessionState();
   },
 
   navigateHistory: (direction: 'up' | 'down') => {
@@ -396,6 +403,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const updatedSessions = [...sessions];
     updatedSessions[sIdx] = updatedSession;
     set({ sessions: updatedSessions });
+    // Auto-save session state after command completes
+    get().saveSessionState();
   },
 
   errorBlock: (blockId: string, message: string) => {
@@ -531,6 +540,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       useSoundStore.getState().setEnabled(settings.soundEffects ?? true);
       useSoundStore.getState().setVolume(settings.soundVolume ?? 0.6);
       set({ settings, termuxSettings, isSettingsLoaded: true });
+      // Restore terminal sessions
+      await get().loadSessionState();
     } catch {
       set({ isSettingsLoaded: true });
     }
@@ -574,6 +585,63 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setLastInputMode: (mode: 'shell' | 'natural') => {
     set({ lastInputMode: mode });
+  },
+
+  // ── Session persistence ─────────────────────────────────────────────────────
+
+  saveSessionState: async () => {
+    try {
+      const { sessions, activeSessionId } = get();
+      // Serialize sessions: keep last 50 blocks per session, strip running state
+      const serializable = sessions.map((s) => ({
+        id: s.id,
+        name: s.name,
+        currentDir: s.currentDir,
+        commandHistory: s.commandHistory.slice(0, 100),
+        blocks: s.blocks
+          .filter((b) => !b.isRunning) // skip running blocks
+          .slice(-50) // keep last 50
+          .map((b) => ({
+            ...b,
+            isRunning: false,
+            isInterpreting: false,
+            llmInterpretationStreaming: undefined,
+            blockStatus: b.exitCode === 0 ? 'done' : b.exitCode !== null ? 'error' : undefined,
+          })),
+        entries: s.entries
+          .filter((e: any) => !e.isStreaming) // skip streaming AI blocks
+          .slice(-50),
+      }));
+      await AsyncStorage.setItem('shelly_terminal_sessions', JSON.stringify({
+        sessions: serializable,
+        activeSessionId,
+      }));
+    } catch (e) {
+      console.warn('[SessionPersist] save failed:', e);
+    }
+  },
+
+  loadSessionState: async () => {
+    try {
+      const raw = await AsyncStorage.getItem('shelly_terminal_sessions');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!data.sessions || !Array.isArray(data.sessions) || data.sessions.length === 0) return;
+      // Restore sessions with defaults for missing fields
+      const restored: TabSession[] = data.sessions.map((s: any) => ({
+        ...createSession(s.id, s.name),
+        currentDir: s.currentDir || '/home/user',
+        commandHistory: s.commandHistory || [],
+        blocks: (s.blocks || []).map((b: any) => ({ ...b, isRunning: false })),
+        entries: (s.entries || []).map((e: any) => ({ ...e, isStreaming: false })),
+      }));
+      const activeId = data.activeSessionId && restored.some((s: TabSession) => s.id === data.activeSessionId)
+        ? data.activeSessionId
+        : restored[0].id;
+      set({ sessions: restored, activeSessionId: activeId });
+    } catch (e) {
+      console.warn('[SessionPersist] load failed:', e);
+    }
   },
 
   // ── AI blocks ──────────────────────────────────────────────────────────────
