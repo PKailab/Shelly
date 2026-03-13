@@ -35,6 +35,7 @@ import { loadUserProfile, learnFromCommand, learnFromAgentUse, learnFromUserInpu
 import { requestNotificationPermission } from '@/lib/command-notifier';
 import { checkCommandSafety, needsConfirmation, dangerLevelColor } from '@/lib/command-safety';
 import { useTheme } from '@/hooks/use-theme';
+import { VoiceChat } from '@/components/VoiceChat';
 
 import { generateId } from '@/lib/id';
 
@@ -176,6 +177,7 @@ export default function ChatScreen() {
   } | null>(null);
   const [intentExplanation, setIntentExplanation] = useState<string>('');
   const [isExplainingIntent, setIsExplainingIntent] = useState(false);
+  const [showVoiceChat, setShowVoiceChat] = useState(false);
 
   useEffect(() => {
     if (!safetyDialog?.visible) {
@@ -607,7 +609,7 @@ export default function ChatScreen() {
       )}
 
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      <ChatHeader />
+      <ChatHeader onVoiceChat={() => setShowVoiceChat(true)} />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -638,6 +640,8 @@ export default function ChatScreen() {
           isBridgeConnected={isBridgeConnected}
         />
       </KeyboardAvoidingView>
+
+      <VoiceChat visible={showVoiceChat} onClose={() => setShowVoiceChat(false)} />
     </View>
   );
 }

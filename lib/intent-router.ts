@@ -218,7 +218,18 @@ function fallbackRoute(
   toolStatuses: ToolStatus[],
   defaultAgent: RoutingTool = 'gemini-cli',
 ): RoutingDecision {
+  const input = userInput.toLowerCase();
   const category = classifyTask(userInput);
+
+  // 明示的にツール名を指定している場合、そのツールにルーティング
+  const mentionsClaude = ['claude', 'クロード', 'クロードコード'].some((k) => input.includes(k));
+  const mentionsGemini = ['gemini', 'ジェミニ'].some((k) => input.includes(k));
+  if (mentionsClaude && !mentionsGemini) {
+    return buildDecision('claude-code', 'Claude Codeで実行します', userInput, toolStatuses, true);
+  }
+  if (mentionsGemini && !mentionsClaude) {
+    return buildDecision('gemini-cli', 'Gemini CLIで実行します', userInput, toolStatuses, true);
+  }
 
   // インストール済みのCLIを確認
   const hasClaudeCode = toolStatuses.some((s) => s.id === 'claude-code' && s.installed);

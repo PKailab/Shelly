@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useCallback, useEffect, useMemo } from 'react';
-import { FlatList, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { FlatList, View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { ChatBubble } from './ChatBubble';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
@@ -32,6 +32,9 @@ type Props = {
 
 export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate, onEdit, onDelete, onStopGenerating, isStreaming }: Props) {
   const { colors } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  // Bucket width to avoid unnecessary re-renders on minor dimension changes
+  const widthBucket = Math.round(screenWidth / 50);
   const listRef = useRef<FlatList>(null);
   const prevCount = useRef(messages.length);
 
@@ -105,6 +108,7 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
 
   return (
     <FlatList
+      key={`chat-list-${widthBucket}`}
       ref={listRef}
       data={messages}
       renderItem={renderItem}

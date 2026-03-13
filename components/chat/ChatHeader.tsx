@@ -12,7 +12,11 @@ import { withAlpha } from '@/lib/theme-utils';
 import { useChatStore } from '@/store/chat-store';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 
-export function ChatHeader() {
+type ChatHeaderProps = {
+  onVoiceChat?: () => void;
+};
+
+export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
   const { colors } = useTheme();
   const { isConnected } = useTermuxBridge();
   const { getActiveSession, createSession } = useChatStore();
@@ -30,15 +34,28 @@ export function ChatHeader() {
         </Text>
         <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4ADE80' : colors.inactive }]} />
       </View>
-      <TouchableOpacity
-        onPress={handleNewChat}
-        style={styles.newChatBtn}
-        activeOpacity={0.7}
-        accessibilityRole="button"
-        accessibilityLabel="New chat"
-      >
-        <MaterialIcons name="add" size={20} color={colors.accent} />
-      </TouchableOpacity>
+      <View style={styles.rightActions}>
+        {onVoiceChat && (
+          <TouchableOpacity
+            onPress={onVoiceChat}
+            style={styles.newChatBtn}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Voice chat"
+          >
+            <MaterialIcons name="record-voice-over" size={18} color={colors.accent} />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          onPress={handleNewChat}
+          style={styles.newChatBtn}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="New chat"
+        >
+          <MaterialIcons name="add" size={20} color={colors.accent} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -67,6 +84,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 0,
   },
   newChatBtn: {
     padding: 10,

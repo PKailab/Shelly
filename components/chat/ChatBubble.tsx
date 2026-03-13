@@ -180,7 +180,10 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
             )}
           </View>
         ) : message.isStreaming ? (
-          <ActivityIndicator size="small" color={agentColor} style={{ alignSelf: 'flex-start', marginTop: 4 }} />
+          <View style={[styles.markdownWrap, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+            <ActivityIndicator size="small" color={agentColor} />
+            <Text style={{ color: agentColor, fontSize: 12, fontFamily: 'monospace', opacity: 0.7 }}>考え中...</Text>
+          </View>
         ) : null}
 
         {/* Command executions */}
@@ -330,6 +333,7 @@ const styles = StyleSheet.create({
   },
   assistantBubble: {
     flex: 1,
+    maxWidth: '88%',
     borderRadius: 16,
     borderTopLeftRadius: 4,
     borderWidth: 1,

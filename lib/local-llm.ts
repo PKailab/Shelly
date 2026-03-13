@@ -143,6 +143,17 @@ export function classifyTask(userInput: string): TaskCategory {
   ];
   if (fileOpsKeywords.some((k) => input.includes(k))) return 'file_ops';
 
+  // CLI実行キーワード（特定のAIツール名を含む → code扱い）
+  const cliExecKeywords = [
+    'claude code', 'クロードコード', 'クロード', 'claude',
+    'gemini cli', 'ジェミニ', 'codex', 'コデックス',
+    '実行して', '起動して', '使って', '動かして', '走らせて', '立ち上げて',
+    'run ', 'start ', 'launch ', 'execute ',
+  ];
+  const hasCliName = ['claude', 'クロード', 'gemini', 'ジェミニ', 'codex', 'コデックス'].some((k) => input.includes(k));
+  const hasExecVerb = ['実行', '起動', '使って', '動かして', '走らせ', '立ち上げ', 'run', 'start', 'launch', 'execute'].some((k) => input.includes(k));
+  if (hasCliName && hasExecVerb) return 'code';
+
   // コード生成キーワード
   const codeKeywords = [
     'コードを書いて', 'コードを作って', '実装して', 'プログラムを',

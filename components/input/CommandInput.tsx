@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
   },
   attachMenu: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     marginHorizontal: 10,
     marginBottom: 4,
     overflow: 'hidden',
@@ -768,11 +768,11 @@ const styles = StyleSheet.create({
   attachMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    minHeight: 44,
+    minHeight: 34,
   },
   attachMenuLabel: {
     fontSize: 13,
@@ -787,8 +787,8 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   smallBtn: {
-    width: 44,
-    height: 44,
+    width: 36,
+    height: 36,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
