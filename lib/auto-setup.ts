@@ -87,7 +87,7 @@ sleep 3
 ttyd -p 7681 bash &
 node ~/shelly-bridge/server.js &
 # Auto-start llama-server if model exists
-MODEL=$(find ~/models ~/llama.cpp/models -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null | head -1)
+MODEL=$((find ~/models ~/llama.cpp/models -maxdepth 2 -name "gemma*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk '!seen[$0]++' | head -1)
 if [ -n "$MODEL" ] && which llama-server >/dev/null 2>&1; then
   llama-server -m "$MODEL" --host 0.0.0.0 --port 8080 -ngl 0 -c 2048 &
 fi
@@ -263,9 +263,9 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
       });
 
       if (detectResult.success) {
-        // GGUFモデルを検索（~/models/, ~/llama.cpp/models/, ~/Downloads/ など）
+        // GGUFモデルを検索（gemma優先、~/models/, ~/llama.cpp/models/, ~/Downloads/）
         const modelResult = await runTermuxCommand({
-          command: 'find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null | head -1',
+          command: '(find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "gemma*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk "!seen[$0]++" | head -1',
         });
 
         // llama-serverが存在すればモデルを指定して起動
@@ -273,7 +273,7 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
           await runTermuxCommand({
             command: [
               'pkill -f "llama-server" 2>/dev/null; sleep 0.5;',
-              'MODEL=$(find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null | head -1);',
+              'MODEL=$((find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "gemma*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk "!seen[\\$0]++" | head -1);',
               'if [ -n "$MODEL" ] && which llama-server >/dev/null 2>&1; then',
               '  nohup llama-server -m "$MODEL" --host 0.0.0.0 --port 8080 -ngl 0 -c 2048 > /dev/null 2>&1 &',
               '  echo "STARTED";',
@@ -281,15 +281,15 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
             ].join(' '),
           });
 
-          // llama-serverの起動を待つ
-          await new Promise((r) => setTimeout(r, 5000));
+          // llama-serverの起動を待つ（モデルロードに30秒以上かかることがある）
+          await new Promise((r) => setTimeout(r, 10000));
 
-          // 再度接続確認
+          // 再度接続確認（10回×3秒 = 最大30秒リトライ）
           const llmCheck = await retry(
             () => checkOllamaConnection('http://127.0.0.1:8080'),
             (r) => r.available,
-            5,
-            2000,
+            10,
+            3000,
           );
           if (llmCheck.available) {
             llmDetected = true;

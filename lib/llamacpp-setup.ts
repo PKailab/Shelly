@@ -69,10 +69,10 @@ export const MODEL_CATALOG: LlamaCppModel[] = [
     language: 'multilingual',
     useCase: 'balanced',
     quantization: 'Q4_K_M',
-    huggingFaceRepo: 'google/gemma-3-4b-it-GGUF',
+    huggingFaceRepo: 'bartowski/google_gemma-3-4b-it-GGUF',
     filename: 'gemma-3-4b-it-Q4_K_M.gguf',
     downloadUrl:
-      'https://huggingface.co/google/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf',
+      'https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf',
     recommended: true,
   },
   {
