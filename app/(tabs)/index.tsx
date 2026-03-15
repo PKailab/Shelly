@@ -40,11 +40,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { VoiceChat } from '@/components/VoiceChat';
 
 import { generateId } from '@/lib/id';
+import { useTranslation } from '@/lib/i18n';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -293,20 +295,20 @@ export default function ChatScreen() {
       const msgId = addAssistantMessage(demoAgent, undefined);
 
       const demoResponses: Record<string, string> = {
-        'ls': '```\nDocuments/  Downloads/  Pictures/  Music/\npackage.json  README.md  .gitignore\n```\n\n*Demo mode* — Termuxに接続するとリアルなコマンドが実行できます',
-        'git status': '```\nOn branch main\nYour branch is up to date with \'origin/main\'.\n\nnothing to commit, working tree clean\n```\n\n*Demo mode*',
-        'pwd': '```\n/home/user/projects\n```\n\n*Demo mode*',
+        'ls': `\`\`\`\nDocuments/  Downloads/  Pictures/  Music/\npackage.json  README.md  .gitignore\n\`\`\`\n\n${t('chat.demo_suffix')}`,
+        'git status': `\`\`\`\nOn branch main\nYour branch is up to date with 'origin/main'.\n\nnothing to commit, working tree clean\n\`\`\`\n\n${t('chat.demo_suffix_short')}`,
+        'pwd': `\`\`\`\n/home/user/projects\n\`\`\`\n\n${t('chat.demo_suffix_short')}`,
       };
       const aiDemoResponses: Record<string, string> = {
-        claude: `こんにちは！Claude AIです。\n\nこれは**デモモード**の応答です。実際に使用するには:\n- **Termux**をインストールしてClaude Codeをセットアップ\n\n\`@claude コードをレビューして\` のように質問できます。\n\n*Demo mode*`,
-        gemini: `こんにちは！Gemini AIです。\n\nこれは**デモモード**の応答です。実際に使用するには:\n- **Settings** → Gemini APIキーを設定\n- https://aistudio.google.com/app/apikey で無料取得\n\n画像添付でマルチモーダル分析もできます。\n\n*Demo mode*`,
-        perplexity: `こんにちは！Perplexity AIです。\n\nこれは**デモモード**の応答です。実際に使用するには:\n- **Settings** → Perplexity APIキーを設定\n\nWeb検索ベースの回答と論文引用が特徴です。\n\n*Demo mode*`,
-        local: `こんにちは！Local LLMです。\n\nこれは**デモモード**の応答です。実際に使用するには:\n- **Ollama**をセットアップ（\`ollama serve\`）\n- **Settings**でLocal LLMを有効化\n\nプライベートなオフラインAIとして動作します。\n\n*Demo mode*`,
+        claude: t('chat.demo_claude'),
+        gemini: t('chat.demo_gemini'),
+        perplexity: t('chat.demo_perplexity'),
+        local: t('chat.demo_local'),
       };
       const demoText = (isDemoMention && demoAgent && aiDemoResponses[demoAgent])
         ? aiDemoResponses[demoAgent]
         : demoResponses[parsed.prompt.trim()]
-          ?? `Shellyへようこそ! 🐚\n\n現在 **デモモード** で動作中です。\n\n実際に使うには:\n1. **Termux** をインストール\n2. **Terminal** タブでセットアップ\n3. AIを使うには **Settings** でAPIキーを設定\n\n入力例:\n- \`ls\` — ファイル一覧\n- \`@claude 質問\` — Claude AI\n- \`@gemini 質問\` — Gemini AI`;
+          ?? t('chat.demo_welcome');
 
       // Simulate streaming for demo feel (with cleanup ref)
       let i = 0;
@@ -336,19 +338,19 @@ export default function ChatScreen() {
     if (parsed.layer === 'command' && /^shelly\s+context/i.test(parsed.prompt.trim())) {
       addUserMessage(input);
       const msgId = addAssistantMessage('local');
-      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '解析中...' });
+      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: t('chat.context_analyzing') });
       try {
         const cwd = activeSession.currentDir;
         const ctx = await generateProjectContext(cwd, execForContext);
         projectContextRef.current = ctx;
         updateMessage(chatSessionId, msgId, {
-          content: `.shelly/context.md を生成しました (${ctx.length}文字)\n\n${ctx.slice(0, 1500)}${ctx.length > 1500 ? '\n...(省略)' : ''}`,
+          content: `.shelly/context.md generated (${ctx.length} chars)\n\n${ctx.slice(0, 1500)}${ctx.length > 1500 ? '\n...(truncated)' : ''}`,
           isStreaming: false,
         });
       } catch (err) {
         updateMessage(chatSessionId, msgId, {
           content: '',
-          error: `context.md 生成失敗: ${err instanceof Error ? err.message : String(err)}`,
+          error: t('chat.context_gen_failed', { error: err instanceof Error ? err.message : String(err) }),
           isStreaming: false,
         });
       }
@@ -379,7 +381,7 @@ export default function ChatScreen() {
 
       addUserMessage(`$ ${parsed.prompt}`);
       const msgId = addAssistantMessage(undefined);
-      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '実行中...' });
+      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: t('chat.cmd_running') });
 
       if (connectionMode === 'termux') {
         try {
@@ -399,15 +401,15 @@ export default function ChatScreen() {
         } catch (err) {
           updateMessage(chatSessionId, msgId, {
             content: '',
-            error: `実行エラー: ${err instanceof Error ? err.message : String(err)}`,
+            error: `Error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }
       } else {
         updateMessage(chatSessionId, msgId, {
-          content: 'Termuxに接続してください。',
+          content: t('chat.connect_termux'),
           isStreaming: false,
-          error: '未接続',
+          error: t('chat.not_connected'),
         });
       }
       return;
@@ -427,7 +429,7 @@ export default function ChatScreen() {
       } else {
         const msgId = addAssistantMessage(undefined);
         updateMessage(chatSessionId, msgId, {
-          content: 'AIが未設定です。@mentionでツールを指定するか、Settingsでセットアップしてください。\n\n例: `@gemini 質問`, `@local 質問`',
+          content: t('chat.no_ai_configured'),
           isStreaming: false,
         });
         return;
@@ -438,7 +440,7 @@ export default function ChatScreen() {
     if (target === 'browser') {
       const url = parsed.prompt.trim();
       const msgId = addAssistantMessage(undefined);
-      updateMessage(chatSessionId, msgId, { content: `ブラウザで開きます: ${url}`, isStreaming: false });
+      updateMessage(chatSessionId, msgId, { content: t('chat.opening_browser', { url }), isStreaming: false });
       useTerminalStore.setState({ pendingBrowserUrl: url } as any);
       router.push('/(tabs)/browser' as any);
       return;
@@ -449,7 +451,7 @@ export default function ChatScreen() {
     if (!result.handled) {
       const msgId = addAssistantMessage(undefined);
       updateMessage(chatSessionId, msgId, {
-        content: `未対応のエージェントです: @${target}\n\n対応エージェント: @claude, @gemini, @local, @perplexity, @team, @git`,
+        content: t('chat.unsupported_agent', { target }),
         isStreaming: false,
       });
     }
@@ -489,10 +491,10 @@ export default function ChatScreen() {
   // ── Delete: remove a single message (with confirmation) ──
   const handleDelete = useCallback((messageId: string) => {
     if (!chatSessionId) return;
-    Alert.alert('メッセージを削除', 'このメッセージを削除しますか？', [
-      { text: 'キャンセル', style: 'cancel' },
+    Alert.alert(t('chat.delete_title'), t('chat.delete_confirm'), [
+      { text: t('chat.cancel'), style: 'cancel' },
       {
-        text: '削除', style: 'destructive', onPress: () => {
+        text: t('chat.delete'), style: 'destructive', onPress: () => {
           const msg = messagesRef.current.find(m => m.id === messageId);
           if (msg?.isStreaming) cancelStreaming();
           deleteMessage(chatSessionId, messageId);
@@ -533,10 +535,10 @@ export default function ChatScreen() {
             <View style={[styles.safetyDialog, { backgroundColor: colors.surfaceHigh }]}>
               <View style={[styles.safetyHeader, { borderLeftColor: safetyDialog.color }]}>
                 <Text style={[styles.safetyLevel, { color: safetyDialog.color }]}>
-                  {safetyDialog.level} RISK
+                  {t('chat.safety_risk', { level: safetyDialog.level })}
                 </Text>
                 <Text style={[styles.safetyTitle, { color: colors.foreground }]}>
-                  実行前に確認
+                  {t('chat.safety_confirm')}
                 </Text>
               </View>
               <Text style={[styles.safetyMessage, { color: colors.muted }]}>
@@ -548,7 +550,7 @@ export default function ChatScreen() {
                     <ActivityIndicator size="small" color="#A78BFA" style={{ marginRight: 8 }} />
                   )}
                   <Text style={styles.intentText}>
-                    {intentExplanation || '解析中...'}
+                    {intentExplanation || t('chat.context_analyzing')}
                   </Text>
                 </View>
               )}
@@ -563,7 +565,7 @@ export default function ChatScreen() {
                   style={[styles.safetyBtn, { backgroundColor: colors.surface }]}
                   onPress={() => setSafetyDialog(null)}
                 >
-                  <Text style={[styles.safetyBtnText, { color: colors.muted }]}>キャンセル</Text>
+                  <Text style={[styles.safetyBtnText, { color: colors.muted }]}>{t('chat.safety_cancel')}</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.safetyBtn, { backgroundColor: safetyDialog.color }]}
@@ -586,7 +588,7 @@ export default function ChatScreen() {
                     // Execute and show result in chat (not terminal-store)
                     if (chatSessionId && connectionMode === 'termux') {
                       const msgId = addAssistantMessage(undefined);
-                      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '実行中...' });
+                      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: t('chat.cmd_running') });
                       bridgeRunCommand(cmd).then((result) => {
                         const output = result.stdout || '';
                         const stderr = result.stderr ? `\n--- stderr ---\n${result.stderr}` : '';
@@ -606,7 +608,7 @@ export default function ChatScreen() {
                     }
                   }}
                 >
-                  <Text style={[styles.safetyBtnText, { color: '#FFFFFF', fontWeight: '700' }]}>実行する</Text>
+                  <Text style={[styles.safetyBtnText, { color: '#FFFFFF', fontWeight: '700' }]}>{t('chat.safety_run')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -645,6 +647,7 @@ export default function ChatScreen() {
           onStdin={hasActiveCommand ? sendStdin : undefined}
           isRunning={isAnyStreaming || hasActiveCommand}
           isBridgeConnected={isBridgeConnected}
+          showShortcutBar={false}
         />
       </KeyboardAvoidingView>
 

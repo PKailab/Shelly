@@ -37,6 +37,7 @@ import { CreatorProject } from '@/store/types';
 import { buildRunCommand } from '@/lib/creator-engine';
 import { exportProjects } from '@/lib/project-io';
 import { ImportProjectsModal } from '@/components/creator/ImportProjectsModal';
+import { useTranslation } from '@/lib/i18n';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ type TabId = 'create' | 'history' | 'tools';
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CreatorScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabId>('create');
 
@@ -121,7 +123,7 @@ export default function CreatorScreen() {
         const firstStep = steps[0];
         if (firstStep) {
           advanceBuildStep(firstStep.id, 'running');
-          updateBuildStepMessage(firstStep.id, '作業フォルダを用意しているよ…');
+          updateBuildStepMessage(firstStep.id, 'Preparing workspace...');
         }
 
         const files = currentProject.files.map((f) => ({
@@ -149,7 +151,7 @@ export default function CreatorScreen() {
           }
           await finishProject(result.projectPath);
         } else {
-          failProject(`ファイルの作成に失敗したよ: ${(result as { ok: false; error: string }).error}`);
+          failProject(`Failed to create files: ${(result as { ok: false; error: string }).error}`);
           if (Platform.OS !== 'web') {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           }
@@ -230,8 +232,8 @@ export default function CreatorScreen() {
     }
     insertCommand(cmd);
     Alert.alert(
-      'Terminalに送ったよ',
-      'Terminalタブでコマンドを確認して実行してね。',
+      'Sent to Terminal',
+      'Check and run the command in the Terminal tab.',
       [{ text: 'OK' }]
     );
   }, [currentProject, insertCommand]);
@@ -242,8 +244,8 @@ export default function CreatorScreen() {
       openFolder(`Projects/${currentProject.path}`);
     } else {
       Alert.alert(
-        'フォルダを開く',
-        `保存場所: ~/Projects/${currentProject.path}\n\nTermuxに接続するとフォルダを直接開けるよ。`,
+        t('creator.open_folder'),
+        t('creator.open_folder_msg', { path: currentProject.path }),
         [{ text: 'OK' }]
       );
     }
@@ -267,12 +269,12 @@ export default function CreatorScreen() {
   // Export / Import handlers
   const handleExportProjects = useCallback(async () => {
     if (projects.length === 0) {
-      Alert.alert('エクスポート', 'プロジェクトがまだないよ。');
+      Alert.alert(t('settings.export'), t('creator.export_empty'));
       return;
     }
     const ok = await exportProjects(projects);
     if (!ok) {
-      Alert.alert('エラー', 'エクスポートできなかったよ。もう一度試してみて。');
+      Alert.alert(t('settings.error_label'), t('creator.export_failed'));
     }
   }, [projects]);
 
@@ -288,8 +290,8 @@ export default function CreatorScreen() {
       openFolder(`Projects/${project.path}`);
     } else {
       Alert.alert(
-        '保存場所',
-        `~/Projects/${project.path}\n\nTermuxに接続するとフォルダを直接開けるよ。`,
+        t('creator.location_title'),
+        t('creator.location_msg', { path: project.path }),
         [{ text: 'OK' }]
       );
     }
@@ -301,7 +303,7 @@ export default function CreatorScreen() {
   }, [cloneProject]);
 
   const handleHistoryImprove = useCallback((project: CreatorProject) => {
-    startPlanning(`${project.userInput} をもっと良くして`);
+    startPlanning(`${project.userInput} — improved version`);
     setActiveTab('create');
   }, [startPlanning]);
 
@@ -327,7 +329,7 @@ export default function CreatorScreen() {
             </View>
           )}
         </View>
-        <Text style={styles.headerTagline}>自然言語で制作</Text>
+        <Text style={styles.headerTagline}>{t('creator.tagline')}</Text>
       </View>
 
       {/* Tab bar */}
@@ -337,7 +339,7 @@ export default function CreatorScreen() {
           onPress={() => setActiveTab('create')}
         >
           <Text style={[styles.tabText, activeTab === 'create' && styles.tabTextActive]}>
-            ✦ 作る
+            ✦ Create
           </Text>
         </Pressable>
         <Pressable
@@ -345,7 +347,7 @@ export default function CreatorScreen() {
           onPress={() => setActiveTab('history')}
         >
           <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
-            📂 履歴 {projects.length > 0 ? `(${projects.length})` : ''}
+            📂 History {projects.length > 0 ? `(${projects.length})` : ''}
           </Text>
         </Pressable>
         <Pressable
@@ -418,7 +420,7 @@ export default function CreatorScreen() {
             onCancel={termuxCancelCurrent}
             onSendToTerminal={(cmd) => {
               insertCommand(cmd);
-              Alert.alert('Terminalに送ったよ', 'Terminalタブでコマンドを確認して実行してね。', [{ text: 'OK' }]);
+              Alert.alert(t('creator.sent_title'), t('creator.sent_message'), [{ text: 'OK' }]);
             }}
             onTestConnection={termuxTestConnection}
             localLlmConfig={{

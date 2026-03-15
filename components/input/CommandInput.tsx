@@ -38,6 +38,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { SPRING_CONFIGS } from '@/hooks/use-motion';
 import { playSound } from '@/lib/sounds';
+import { useTranslation } from '@/lib/i18n';
 
 export type ImageAttachment = {
   uri: string;
@@ -63,6 +64,7 @@ type Props = {
   onStdin?: (data: string) => void;
   isRunning?: boolean;
   isBridgeConnected?: boolean;
+  showShortcutBar?: boolean;
 };
 
 export type CommandInputHandle = {
@@ -82,9 +84,11 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
   onCtrlC,
   onStdin,
   isRunning = false,
+  showShortcutBar = true,
   isBridgeConnected = true,
 }: Props, ref: React.Ref<CommandInputHandle>) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [inputText, setInputText] = useState('');
   const [inputHeight, setInputHeight] = useState(40);
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
@@ -324,11 +328,11 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
         if (SENSITIVE_PATTERNS.test(asset.name)) {
           const confirmed = await new Promise<boolean>((resolve) => {
             Alert.alert(
-              '機密ファイルの検出',
-              `${asset.name} は機密情報を含む可能性があります。\nAIに送信してもよろしいですか？`,
+              t('input.sensitive_title'),
+              t('input.sensitive_message', { name: asset.name }),
               [
-                { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
-                { text: '添付する', style: 'destructive', onPress: () => resolve(true) },
+                { text: t('input.sensitive_cancel'), style: 'cancel', onPress: () => resolve(false) },
+                { text: t('input.sensitive_attach'), style: 'destructive', onPress: () => resolve(true) },
               ],
             );
           });
@@ -349,7 +353,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
               // Read full content then truncate (readAsStringAsync doesn't support length option)
               const fullContent = await FileSystem.readAsStringAsync(asset.uri);
               file.content = fullContent.slice(0, MAX_FILE_SIZE) +
-                `\n\n... (${Math.round(fileSize / 1024)}KB中、先頭100KBのみ読み込み)`;
+                `\n\n... (${Math.round(fileSize / 1024)}KB, first 100KB only)`;
             } else {
               file.content = await FileSystem.readAsStringAsync(asset.uri);
             }
@@ -426,7 +430,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
   const isActive = inputText.trim().length > 0 || attachedImages.length > 0 || attachedFiles.length > 0;
   const promptSymbol = isStdinMode ? '>' : isNaturalMode ? 'AI' : '$';
   const promptColor = isStdinMode ? colors.warning ?? '#F59E0B' : isNaturalMode ? colors.aiPurple : colors.accent;
-  const placeholder = isStdinMode ? 'stdin入力...' : isNaturalMode ? '\u8CEA\u554F\u3084\u6307\u793A\u3092\u5165\u529B...' : '\u30B3\u30DE\u30F3\u30C9\u3092\u5165\u529B...';
+  const placeholder = isStdinMode ? t('input.placeholder_stdin') : isNaturalMode ? t('input.placeholder_ai') : t('input.placeholder_shell');
 
   // Animated styles
   const sendAnimStyle = useAnimatedStyle(() => ({
@@ -441,15 +445,17 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
 
   return (
     <View style={[styles.wrapper, { backgroundColor: colors.surfaceHigh, borderTopColor: colors.borderLight, paddingBottom: bottomPad }]}>
-      <ShortcutBar
-        onSpecialKey={handleSpecialKey}
-        onHistoryUp={handleHistoryUp}
-        onHistoryDown={handleHistoryDown}
-        onCtrlC={onCtrlC}
-        onCtrlD={isStdinMode ? () => onStdin?.('\x04') : undefined}
-        isRunning={isRunning}
-        isBridgeConnected={isBridgeConnected}
-      />
+      {showShortcutBar && (
+        <ShortcutBar
+          onSpecialKey={handleSpecialKey}
+          onHistoryUp={handleHistoryUp}
+          onHistoryDown={handleHistoryDown}
+          onCtrlC={onCtrlC}
+          onCtrlD={isStdinMode ? () => onStdin?.('\x04') : undefined}
+          isRunning={isRunning}
+          isBridgeConnected={isBridgeConnected}
+        />
+      )}
 
       {mentionState ? (
         <MentionDropdown query={mentionState.query} onSelect={handleMentionSelect} />
@@ -529,7 +535,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
             accessibilityLabel="Pick image from gallery"
           >
             <MaterialIcons name="photo-library" size={18} color={attachedImages.length >= MAX_IMAGES ? colors.borderHeavy : colors.accent} />
-            <Text style={[styles.attachMenuLabel, { color: attachedImages.length >= MAX_IMAGES ? colors.borderHeavy : colors.foreground }]}>Gallery</Text>
+            <Text style={[styles.attachMenuLabel, { color: attachedImages.length >= MAX_IMAGES ? colors.borderHeavy : colors.foreground }]}>{t('input.gallery')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.attachMenuItem, { borderBottomColor: colors.border }]}
@@ -537,10 +543,10 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
             activeOpacity={0.7}
             disabled={attachedImages.length >= MAX_IMAGES}
             accessibilityRole="button"
-            accessibilityLabel="Take photo"
+            accessibilityLabel={t('input.camera')}
           >
             <MaterialIcons name="camera-alt" size={18} color={attachedImages.length >= MAX_IMAGES ? colors.borderHeavy : colors.accent} />
-            <Text style={[styles.attachMenuLabel, { color: attachedImages.length >= MAX_IMAGES ? colors.borderHeavy : colors.foreground }]}>Camera</Text>
+            <Text style={[styles.attachMenuLabel, { color: attachedImages.length >= MAX_IMAGES ? colors.borderHeavy : colors.foreground }]}>{t('input.camera')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.attachMenuItem, { borderBottomColor: colors.border }]}
@@ -548,20 +554,20 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
             activeOpacity={0.7}
             disabled={attachedFiles.length >= 4}
             accessibilityRole="button"
-            accessibilityLabel="Attach file"
+            accessibilityLabel={t('input.file')}
           >
             <MaterialIcons name="attach-file" size={18} color={attachedFiles.length >= 4 ? colors.borderHeavy : colors.accent} />
-            <Text style={[styles.attachMenuLabel, { color: attachedFiles.length >= 4 ? colors.borderHeavy : colors.foreground }]}>File</Text>
+            <Text style={[styles.attachMenuLabel, { color: attachedFiles.length >= 4 ? colors.borderHeavy : colors.foreground }]}>{t('input.file')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.attachMenuItem, { borderBottomColor: colors.border }]}
             onPress={() => { setShowAttachMenu(false); handlePaste(); }}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel="Paste from clipboard"
+            accessibilityLabel={t('input.paste')}
           >
             <MaterialIcons name="content-paste" size={18} color={colors.accent} />
-            <Text style={[styles.attachMenuLabel, { color: colors.foreground }]}>Paste</Text>
+            <Text style={[styles.attachMenuLabel, { color: colors.foreground }]}>{t('input.paste')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.attachMenuItem}
@@ -569,10 +575,10 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
             activeOpacity={0.7}
             disabled={speechState.status === 'transcribing'}
             accessibilityRole="button"
-            accessibilityLabel="Voice input"
+            accessibilityLabel={t('input.voice')}
           >
             <MaterialIcons name="mic" size={18} color={speechState.status === 'recording' ? '#FF4444' : colors.accent} />
-            <Text style={[styles.attachMenuLabel, { color: colors.foreground }]}>Voice</Text>
+            <Text style={[styles.attachMenuLabel, { color: colors.foreground }]}>{t('input.voice')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -658,7 +664,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
       {speechState.status === 'recording' && (
         <View style={[styles.recordingIndicator, { backgroundColor: withAlpha(colors.error, 0.1) }]}>
           <Animated.View style={[styles.recordingDot, recordingAnimStyle]} />
-          <Text style={styles.recordingText}>{'\u9332\u97F3\u4E2D...'}</Text>
+          <Text style={styles.recordingText}>{t('input.recording')}</Text>
         </View>
       )}
     </View>

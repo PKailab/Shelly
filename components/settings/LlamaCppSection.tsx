@@ -65,7 +65,7 @@ export function LlamaCppSection({
 
   const handleSetup = useCallback(async () => {
     if (!isConnected) {
-      Alert.alert('未接続', 'Termux Bridgeを先に接続してください。\nTermuxで shelly-bridge を起動してください。');
+      Alert.alert('Not connected', 'Connect to Termux Bridge first.\nStart shelly-bridge in Termux.');
       return;
     }
 
@@ -73,22 +73,22 @@ export function LlamaCppSection({
     const totalMin = Math.round(estimateTotalSetupTime(steps) / 60);
 
     Alert.alert(
-      'llama.cpp セットアップ',
-      `Termux上でllama.cppをインストールします。\n\n所要時間: 約${totalMin}分\n\n続けますか？`,
+      'llama.cpp Setup',
+      `Install llama.cpp on Termux.\n\nEstimated time: ~${totalMin} min\n\nContinue?`,
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'セットアップ開始',
+          text: 'Start setup',
           onPress: async () => {
             setIsSettingUp(true);
             setShowSetupLog(true);
-            setSetupLog(['[shelly] llama.cpp セットアップ開始...']);
+            setSetupLog(['[shelly] llama.cpp setup starting...']);
 
             for (const step of steps) {
               setSetupLog((prev) => [...prev, `[shelly] ${step.label}...`]);
               const result = await onRunCommand(step.command, step.label);
               if (!result.success && step.critical) {
-                setSetupLog((prev) => [...prev, `[ERROR] ${step.label} 失敗。セットアップを中断しました。`]);
+                setSetupLog((prev) => [...prev, `[ERROR] ${step.label}  failed. Setup aborted.`]);
                 setIsSettingUp(false);
                 return;
               }
@@ -97,7 +97,7 @@ export function LlamaCppSection({
               }
             }
 
-            setSetupLog((prev) => [...prev, '[shelly] セットアップ完了！']);
+            setSetupLog((prev) => [...prev, '[shelly] Setup complete!']);
             setIsSettingUp(false);
             onUpdateLocalLlmUrl('http://127.0.0.1:8080');
           },
@@ -110,17 +110,17 @@ export function LlamaCppSection({
 
   const handleDownload = useCallback(async (model: LlamaCppModel) => {
     if (!isConnected) {
-      Alert.alert('未接続', 'Termux Bridgeを先に接続してください。');
+      Alert.alert('Not connected', 'Connect to Termux Bridge first.');
       return;
     }
     setLoadingModelId(model.id);
     const cmd = buildDownloadCommand(model);
-    const result = await onRunCommand(cmd, `${model.name} ダウンロード`);
+    const result = await onRunCommand(cmd, `${model.name} download`);
     setLoadingModelId(null);
     if (result.success) {
-      Alert.alert('完了', `${model.name} のダウンロードが完了しました。`);
+      Alert.alert('Done', `${model.name}  download complete.`);
     } else {
-      Alert.alert('エラー', 'ダウンロードに失敗しました。');
+      Alert.alert('Error', 'Download failed.');
     }
   }, [isConnected, onRunCommand]);
 
@@ -128,24 +128,24 @@ export function LlamaCppSection({
 
   const handleStartServer = useCallback(async (model: LlamaCppModel) => {
     if (!isConnected) {
-      Alert.alert('未接続', 'Termux Bridgeを先に接続してください。');
+      Alert.alert('Not connected', 'Connect to Termux Bridge first.');
       return;
     }
     const script = buildDaemonStartScript(model);
-    const result = await onRunCommand(script, `${model.name} 起動`);
+    const result = await onRunCommand(script, `${model.name} start`);
     if (result.success) {
       setServerStatus('running');
       onSelectModel(model);
       onUpdateLocalLlmUrl('http://127.0.0.1:8080');
     } else {
-      Alert.alert('エラー', '起動に失敗しました。');
+      Alert.alert('Error', 'Failed to start.');
     }
   }, [isConnected, onRunCommand, onSelectModel, onUpdateLocalLlmUrl]);
 
   const handleStopServer = useCallback(async () => {
     if (!isConnected) return;
     const cmd = buildStopCommand();
-    const result = await onRunCommand(cmd, 'llama-server 停止');
+    const result = await onRunCommand(cmd, 'llama-server stop');
     if (result.success) {
       setServerStatus('stopped');
     }
@@ -154,22 +154,22 @@ export function LlamaCppSection({
   const handleCheckStatus = useCallback(async () => {
     if (!isConnected) return;
     const cmd = buildStatusCommand();
-    const result = await onRunCommand(cmd, 'サーバー状態確認');
+    const result = await onRunCommand(cmd, 'Server status check');
     setServerStatus(result.success ? 'running' : 'stopped');
   }, [isConnected, onRunCommand]);
 
   const handleDeleteModel = useCallback(async (model: LlamaCppModel) => {
     Alert.alert(
-      'モデルを削除',
-      `${model.name} を削除しますか？`,
+      'Delete model',
+      `Delete ${model.name}?`,
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: '削除',
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             const cmd = buildDeleteModelCommand(model);
-            await onRunCommand(cmd, `${model.name} 削除`);
+            await onRunCommand(cmd, `${model.name} delete`);
           },
         },
       ]
@@ -195,7 +195,7 @@ export function LlamaCppSection({
             : <MaterialIcons name="build" size={16} color={isConnected ? '#00D4AA' : '#4B5563'} />
           }
           <Text style={[styles.setupBtnText, !isConnected && styles.setupBtnTextDisabled]}>
-            {isSettingUp ? 'セットアップ中...' : 'llama.cpp セットアップ'}
+            {isSettingUp ? 'Setting up...' : 'llama.cpp Setup'}
           </Text>
         </TouchableOpacity>
 
@@ -207,8 +207,8 @@ export function LlamaCppSection({
             styles.statusDotGray,
           ]} />
           <Text style={styles.statusBtnText}>
-            {serverStatus === 'running' ? '稼働中' :
-             serverStatus === 'stopped' ? '停止中' : '不明'}
+            {serverStatus === 'running' ? 'Running' :
+             serverStatus === 'stopped' ? 'Stopped' : 'Unknown'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -228,14 +228,14 @@ export function LlamaCppSection({
       {serverStatus === 'running' && (
         <TouchableOpacity style={styles.stopBtn} onPress={handleStopServer}>
           <MaterialIcons name="stop" size={16} color="#F87171" />
-          <Text style={styles.stopBtnText}>サーバーを停止</Text>
+          <Text style={styles.stopBtnText}>Stop server</Text>
         </TouchableOpacity>
       )}
 
       {/* ── インストール済みモデル ──────────────────────────────────────── */}
       {installedModels.length > 0 && (
         <>
-          <Text style={styles.catalogLabel}>インストール済み</Text>
+          <Text style={styles.catalogLabel}>Installed</Text>
           {installedModels.map((model) => {
             const isActive = activeModelId === model.id;
             return (
@@ -244,7 +244,7 @@ export function LlamaCppSection({
                   <View style={styles.installedInfo}>
                     <View style={styles.modelTitleRow}>
                       <Text style={styles.modelName}>{model.name}</Text>
-                      {isActive && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>使用中</Text></View>}
+                      {isActive && <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>Active</Text></View>}
                     </View>
                     <Text style={styles.modelMeta}>{model.sizeGb}GB · RAM {model.ramRequiredGb}GB</Text>
                   </View>
@@ -254,7 +254,7 @@ export function LlamaCppSection({
                         style={[styles.actionBtn, styles.actionBtnPrimary]}
                         onPress={() => handleStartServer(model)}
                       >
-                        <Text style={styles.actionBtnPrimaryText}>起動</Text>
+                        <Text style={styles.actionBtnPrimaryText}>Start</Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
@@ -269,13 +269,13 @@ export function LlamaCppSection({
             );
           })}
           <Text style={styles.storageSummary}>
-            ストレージ使用量: {installedModels.reduce((sum, m) => sum + m.sizeGb, 0).toFixed(1)}GB
+            Storage used: {installedModels.reduce((sum, m) => sum + m.sizeGb, 0).toFixed(1)}GB
           </Text>
         </>
       )}
 
       {/* ── モデルカタログ（未インストールのみ） ──────────────────────────── */}
-      <Text style={styles.catalogLabel}>モデルカタログ</Text>
+      <Text style={styles.catalogLabel}>Model Catalog</Text>
       {notInstalledModels.map((model) => {
         const isExpanded = expandedModelId === model.id;
         const isLoading = loadingModelId === model.id;
@@ -289,7 +289,7 @@ export function LlamaCppSection({
             >
               <View style={styles.modelTitleRow}>
                 <Text style={styles.modelName}>{model.name}</Text>
-                {isRec && <View style={styles.recBadge}><Text style={styles.recBadgeText}>推奨</Text></View>}
+                {isRec && <View style={styles.recBadge}><Text style={styles.recBadgeText}>Recommended</Text></View>}
                 {model.badge && <View style={styles.badge}><Text style={styles.badgeText}>{model.badge}</Text></View>}
               </View>
               <Text style={styles.modelMeta}>{model.sizeGb}GB · RAM {model.ramRequiredGb}GB · {model.quantization}</Text>
@@ -306,7 +306,7 @@ export function LlamaCppSection({
                   >
                     {isLoading
                       ? <ActivityIndicator size="small" color="#0A0A0A" />
-                      : <Text style={styles.actionBtnPrimaryText}>ダウンロード ({model.sizeGb}GB)</Text>
+                      : <Text style={styles.actionBtnPrimaryText}>Download ({model.sizeGb}GB)</Text>
                     }
                   </TouchableOpacity>
                 </View>

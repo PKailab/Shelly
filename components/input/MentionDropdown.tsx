@@ -3,23 +3,24 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
+import { useTranslation } from '@/lib/i18n';
 
 export type MentionOption = {
   trigger: string;
   label: string;
-  description: string;
+  descKey: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   color: string;
 };
 
 const MENTION_OPTIONS: MentionOption[] = [
-  { trigger: '@local',      label: 'Local LLM',   description: 'ローカルAIに質問',       icon: 'memory',         color: '#8B5CF6' },
-  { trigger: '@claude',     label: 'Claude Code',  description: 'コード生成・修正',        icon: 'code',           color: '#F59E0B' },
-  { trigger: '@gemini',     label: 'Gemini',       description: '調査・検索・画像分析',     icon: 'travel-explore', color: '#3B82F6' },
-  { trigger: '@perplexity', label: 'Perplexity',   description: 'リアルタイムWeb検索',     icon: 'search',         color: '#20B2AA' },
-  { trigger: '@git',        label: 'Git Guide',    description: 'Git操作ガイド',           icon: 'account-tree',   color: '#F97316' },
-  { trigger: '@team',       label: 'Team Table',   description: 'マルチAI並列実行',        icon: 'groups',         color: '#EC4899' },
-  { trigger: '@open',       label: 'Browser',      description: 'URLをブラウザで開く',     icon: 'open-in-browser', color: '#4ADE80' },
+  { trigger: '@local',      label: 'Local LLM',   descKey: 'mention.local_desc',       icon: 'memory',         color: '#8B5CF6' },
+  { trigger: '@claude',     label: 'Claude Code',  descKey: 'mention.claude_desc',      icon: 'code',           color: '#F59E0B' },
+  { trigger: '@gemini',     label: 'Gemini',       descKey: 'mention.gemini_desc',      icon: 'travel-explore', color: '#3B82F6' },
+  { trigger: '@perplexity', label: 'Perplexity',   descKey: 'mention.perplexity_desc',  icon: 'search',         color: '#20B2AA' },
+  { trigger: '@git',        label: 'Git Guide',    descKey: 'mention.git_desc',         icon: 'account-tree',   color: '#F97316' },
+  { trigger: '@team',       label: 'Team Table',   descKey: 'mention.team_desc',        icon: 'groups',         color: '#EC4899' },
+  { trigger: '@open',       label: 'Browser',      descKey: 'mention.browser_desc',     icon: 'open-in-browser', color: '#4ADE80' },
 ];
 
 type Props = {
@@ -29,6 +30,7 @@ type Props = {
 
 function MentionDropdownInner({ query, onSelect }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   const filtered = useMemo(() => {
     if (!query) return MENTION_OPTIONS;
@@ -58,7 +60,7 @@ function MentionDropdownInner({ query, onSelect }: Props) {
           </View>
           <View style={styles.textWrap}>
             <Text style={[styles.trigger, { color: option.color }]}>{option.trigger}</Text>
-            <Text style={[styles.desc, { color: colors.inactive }]}>{option.description}</Text>
+            <Text style={[styles.desc, { color: colors.inactive }]}>{t(option.descKey)}</Text>
           </View>
         </Pressable>
       ))}

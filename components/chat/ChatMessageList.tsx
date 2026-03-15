@@ -10,14 +10,8 @@ import { FlatList, View, Text, StyleSheet, TouchableOpacity, useWindowDimensions
 import { ChatBubble } from './ChatBubble';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
+import { useTranslation } from '@/lib/i18n';
 import type { ChatMessage } from '@/store/chat-store';
-
-const SAMPLE_PROMPTS = [
-  { label: 'ls -la', desc: 'List files' },
-  { label: '@claude Explain this project', desc: 'Ask Claude' },
-  { label: '@gemini Summarize README', desc: 'Ask Gemini' },
-  { label: 'git status', desc: 'Git status' },
-];
 
 type Props = {
   messages: ChatMessage[];
@@ -32,6 +26,14 @@ type Props = {
 
 export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate, onEdit, onDelete, onStopGenerating, isStreaming }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+
+  const SAMPLE_PROMPTS = [
+    { label: 'ls -la', desc: t('chat.sample_list_files') },
+    { label: '@claude Explain this project', desc: t('chat.sample_ask_claude') },
+    { label: '@gemini Summarize README', desc: t('chat.sample_ask_gemini') },
+    { label: 'git status', desc: t('chat.sample_git_status') },
+  ];
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   // Force re-mount when screen dimensions change significantly (fold/unfold)
   const layoutKey = `${Math.round(screenWidth / 40)}-${Math.round(screenHeight / 40)}`;
@@ -63,10 +65,9 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
   if (messages.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Shelly</Text>
+        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t('chat.empty_title')}</Text>
         <Text style={[styles.emptySubtitle, { color: colors.muted }]}>
-          何でも聞いてください{'\n'}
-          @claude @gemini @local でAIを指定できます
+          {t('chat.empty_subtitle')}
         </Text>
         <View style={styles.sampleGrid}>
           {SAMPLE_PROMPTS.map((s) => (
@@ -96,10 +97,10 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
           onPress={onStopGenerating}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel="Stop generating"
+          accessibilityLabel={t('chat.stop_generating')}
         >
           <View style={[styles.stopIcon, { backgroundColor: colors.inactive }]} />
-          <Text style={[styles.stopText, { color: colors.foreground }]}>Stop generating</Text>
+          <Text style={[styles.stopText, { color: colors.foreground }]}>{t('chat.stop_generating')}</Text>
         </TouchableOpacity>
       </View>
     );

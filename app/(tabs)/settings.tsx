@@ -30,24 +30,25 @@ import { CursorShape, ThemeVariant, BridgeStatus } from '@/store/types';
 import { LlamaCppSection } from '@/components/settings/LlamaCppSection';
 import { McpSection } from '@/components/settings/McpSection';
 import { LlamaCppModel, MODEL_CATALOG, buildStartAllScript, getRecommendedModel } from '@/lib/llamacpp-setup';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, t } from '@/lib/i18n';
 import { useI18n, AVAILABLE_LOCALES, type Locale } from '@/lib/i18n';
 import { useTheme, useThemeStore, BUILTIN_THEMES, getAllThemes, type Theme } from '@/lib/theme-engine';
 import { useDotfilesStore } from '@/lib/dotfiles-sync';
 import { resetSetupWizard, SetupWizard } from '@/components/SetupWizard';
 import { PackageManager as PackageManagerModal } from '@/components/PackageManager';
 import { saveCustomContext, loadCustomContext, DEFAULT_CUSTOM_CONTEXT } from '@/lib/shelly-system-prompt';
+import { AuthWizard } from '@/components/AuthWizard';
 
 const THEME_OPTIONS: { value: ThemeVariant; label: string; bg: string }[] = [
-  { value: 'black', label: '漆黒', bg: '#0D0D0D' },
-  { value: 'navy',  label: '濃紺', bg: '#0A0E1A' },
-  { value: 'gray',  label: 'グレー', bg: '#1C1C1E' },
+  { value: 'black', label: 'Black', bg: '#0D0D0D' },
+  { value: 'navy',  label: 'Navy', bg: '#0A0E1A' },
+  { value: 'gray',  label: 'Gray', bg: '#1C1C1E' },
 ];
 
 const CURSOR_OPTIONS: { value: CursorShape; label: string; preview: string }[] = [
-  { value: 'block',     label: 'ブロック',       preview: '█' },
-  { value: 'underline', label: 'アンダーライン', preview: '_' },
-  { value: 'bar',       label: 'バー',           preview: '|' },
+  { value: 'block',     label: 'Block',       preview: '█' },
+  { value: 'underline', label: 'Underline', preview: '_' },
+  { value: 'bar',       label: 'Bar',           preview: '|' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -82,12 +83,12 @@ function SettingRow({
 }
 
 function BridgeStatusBadge({ status }: { status: BridgeStatus }) {
-  const config: Record<BridgeStatus, { label: string; color: string; bg: string }> = {
-    idle:         { label: '未接続',   color: '#4B5563', bg: '#4B556320' },
-    connecting:   { label: '接続中...', color: '#FBBF24', bg: '#FBBF2420' },
-    connected:    { label: '接続済み', color: '#4ADE80', bg: '#4ADE8020' },
-    disconnected: { label: '切断',     color: '#6B7280', bg: '#6B728020' },
-    error:        { label: 'エラー',   color: '#F87171', bg: '#F8717120' },
+  const config: Record<BridgeStatus, { labelKey: string; color: string; bg: string }> = {
+    idle:         { labelKey: 'settings.not_connected',       color: '#4B5563', bg: '#4B556320' },
+    connecting:   { labelKey: 'settings.status_connecting',   color: '#FBBF24', bg: '#FBBF2420' },
+    connected:    { labelKey: 'settings.status_connected',    color: '#4ADE80', bg: '#4ADE8020' },
+    disconnected: { labelKey: 'settings.status_disconnected', color: '#6B7280', bg: '#6B728020' },
+    error:        { labelKey: 'settings.error_label',         color: '#F87171', bg: '#F8717120' },
   };
   const c = config[status];
   return (
@@ -95,7 +96,7 @@ function BridgeStatusBadge({ status }: { status: BridgeStatus }) {
       {status === 'connecting' && (
         <ActivityIndicator size="small" color={c.color} style={{ transform: [{ scale: 0.6 }], marginRight: 2 }} />
       )}
-      <Text style={[statusBadgeStyles.text, { color: c.color }]}>{c.label}</Text>
+      <Text style={[statusBadgeStyles.text, { color: c.color }]}>{t(c.labelKey)}</Text>
     </View>
   );
 }
@@ -154,6 +155,7 @@ export default function SettingsScreen() {
   const [bridgeUpdateResult, setBridgeUpdateResult] = useState<'success' | 'fail' | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [showAuthWizard, setShowAuthWizard] = useState(false);
 
   // Local LLM state
   const [llmUrlInput, setLlmUrlInput] = useState(settings.localLlmUrl);
@@ -328,21 +330,21 @@ export default function SettingsScreen() {
   const handleWsUrlSave = () => {
     const trimmed = wsUrlInput.trim();
     if (!trimmed.startsWith('ws://') && !trimmed.startsWith('wss://')) {
-      Alert.alert('URLエラー', 'ws:// または wss:// で始まるURLを入力してください');
+      Alert.alert(t('settings.url_error'), t('settings.url_ws_hint'));
       return;
     }
     updateTermuxSettings({ wsUrl: trimmed });
-    Alert.alert('保存完了', `WebSocket URL を更新しました:\n${trimmed}`);
+    Alert.alert(t('settings.saved'), t('settings.ws_url_updated', { url: trimmed }));
   };
 
   const handleTtyUrlSave = () => {
     const trimmed = ttyUrlInput.trim();
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      Alert.alert('URLエラー', 'http:// または https:// で始まるURLを入力してください');
+      Alert.alert(t('settings.url_error'), t('settings.url_http_hint'));
       return;
     }
     updateTermuxSettings({ ttyUrl: trimmed });
-    Alert.alert('保存完了', `TTY URL を更新しました:\n${trimmed}`);
+    Alert.alert(t('settings.saved'), t('settings.tty_url_updated', { url: trimmed }));
   };
 
   const handleOpenTermux = () => {
@@ -354,24 +356,24 @@ export default function SettingsScreen() {
   const handleLlmUrlSave = () => {
     const trimmed = llmUrlInput.trim();
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      Alert.alert('URLエラー', 'http:// または https:// で始まるURLを入力してください');
+      Alert.alert(t('settings.url_error'), t('settings.url_http_hint'));
       return;
     }
     updateSettings({ localLlmUrl: trimmed });
-    Alert.alert('保存完了', `Local LLM URL を更新しました:\n${trimmed}`);
+    Alert.alert(t('settings.saved'), t('settings.llm_url_updated', { url: trimmed }));
   };
 
   const handleLlmModelSave = () => {
     const trimmed = llmModelInput.trim();
     if (!trimmed) {
-      Alert.alert('エラー', 'モデル名を入力してください');
+      Alert.alert(t('settings.error_label'), t('settings.model_error'));
       return;
     }
     updateSettings({ localLlmModel: trimmed });
     // Sync activeModelId if the name matches a catalog entry
     const match = MODEL_CATALOG.find((m) => m.filename.replace('.gguf', '') === trimmed || m.id === trimmed);
     if (match) setActiveModelId(match.id);
-    Alert.alert('保存完了', `モデルを更新しました: ${trimmed}`);
+    Alert.alert(t('settings.saved'), t('settings.model_updated', { model: trimmed }));
   };
 
   const handleTestLlm = useCallback(async () => {
@@ -388,19 +390,19 @@ export default function SettingsScreen() {
         const models: string[] = (data?.models ?? []).map((m: { name: string }) => m.name);
         setLlmTestResult('success');
         Alert.alert(
-          'llama-server接続成功 ✓',
-          'llama-serverに接続できました。'
+          t('settings.llm_success_title'),
+          t('settings.llm_success_msg')
         );
       } else {
         setLlmTestResult('fail');
         Alert.alert(
-          'llama-server接続失敗',
-          `${settings.localLlmUrl} に接続できませんでした。\n\nTermuxでllama-serverが起動しているか確認してください:\n$ llama-server --model ~/models/qwen2.5-3b-instruct-q4_k_m.gguf --port 8080 --host 127.0.0.1`
+          t('settings.llm_fail_title'),
+          t('settings.llm_fail_msg', { url: settings.localLlmUrl })
         );
       }
     } catch {
       setLlmTestResult('fail');
-      Alert.alert('llama-server接続失敗', '接続中にエラーが発生しました。');
+      Alert.alert(t('settings.llm_fail_title'), t('settings.llm_fail_error'));
     } finally {
       setIsTestingLlm(false);
     }
@@ -413,11 +415,11 @@ export default function SettingsScreen() {
       const ok = await testConnection();
       setTestResult(ok ? 'success' : 'fail');
       if (ok) {
-        Alert.alert('接続成功 ✓', 'Termuxブリッジサーバに接続できました。');
+        Alert.alert(t('settings.bridge_success_title'), t('settings.bridge_success_msg'));
       } else {
         Alert.alert(
-          '接続失敗',
-          `${termuxSettings.wsUrl} に接続できませんでした。\n\nTermuxでブリッジサーバが起動しているか確認してください。`
+          t('settings.bridge_fail_title'),
+          t('settings.bridge_fail_msg', { url: termuxSettings.wsUrl })
         );
       }
     } finally {
@@ -438,8 +440,8 @@ export default function SettingsScreen() {
       const b64 = Buffer.from(script).toString('base64');
       const installCmd = `echo '${b64}' | base64 -d > ~/shelly-bridge/start-shelly.sh && chmod +x ~/shelly-bridge/start-shelly.sh && echo 'OK: ~/shelly-bridge/start-shelly.sh'`;
       await Share.share({
-        message: `# Termuxに以下を1行貼り付けてEnter:\n${installCmd}\n\n# 保存後はこれだけでOK:\n# ~/shelly-bridge/start-shelly.sh`,
-        title: 'Shelly 起動コマンド',
+        message: `# Paste this line into Termux and press Enter:\n${installCmd}\n\n# After saving, just run:\n# ~/shelly-bridge/start-shelly.sh`,
+        title: 'Shelly Start Command',
       });
       return;
     }
@@ -451,14 +453,14 @@ export default function SettingsScreen() {
         // chmod +xも実行
         await runRawCommand('chmod +x ~/shelly-bridge/start-shelly.sh', { timeoutMs: 5000 });
         Alert.alert(
-          '一括起動スクリプトを保存しました ✓',
-          `start-shelly.sh をTermuxに書き込みました。\n\n次回からはこれだけでOK:\n~/shelly-bridge/start-shelly.sh\n\n(両方停止: Ctrl+C)`
+          t('settings.script_saved_title'),
+          t('settings.script_saved_msg')
         );
       } else {
-        Alert.alert('保存失敗', result.error ?? '不明なエラー');
+        Alert.alert(t('settings.save_failed'), result.error ?? t('settings.unexpected_error'));
       }
     } catch {
-      Alert.alert('エラー', '予期しないエラーが発生しました。');
+      Alert.alert(t('settings.error_label'), t('settings.unexpected_error'));
     } finally {
       setIsGeneratingScript(false);
     }
@@ -467,8 +469,8 @@ export default function SettingsScreen() {
   const handleUpdateBridge = useCallback(async () => {
     if (bridgeStatus !== 'connected') {
       Alert.alert(
-        'Termux未接続',
-        'Termuxブリッジに接続してから更新してください。\n\nTermuxで以下を実行してください:\nnode ~/shelly-bridge/bridge.js'
+        t('settings.termux_not_connected'),
+        t('settings.termux_not_connected_msg')
       );
       return;
     }
@@ -482,16 +484,16 @@ export default function SettingsScreen() {
       if (result.ok) {
         setBridgeUpdateResult('success');
         Alert.alert(
-          'Bridge更新完了 ✓',
-          `server.js v${BRIDGE_SERVER_VERSION} をTermuxに書き込みました。\n\n次のステップ:\n1. Termuxで古いbridgeを停止 (Ctrl+C)\n2. 新しいbridgeを起動:\n   node ~/shelly-bridge/server.js\n3. ShellyのSettings → 接続テスト`
+          t('settings.bridge_updated_title'),
+          t('settings.bridge_updated_msg', { version: BRIDGE_SERVER_VERSION })
         );
       } else {
         setBridgeUpdateResult('fail');
-        Alert.alert('更新失敗', `ファイルの書き込みに失敗しました:\n${result.error}`);
+        Alert.alert(t('settings.update_failed'), t('settings.update_failed_msg', { error: result.error ?? '' }));
       }
     } catch (e) {
       setBridgeUpdateResult('fail');
-      Alert.alert('更新失敗', '予期しないエラーが発生しました。');
+      Alert.alert(t('settings.update_failed'), t('settings.unexpected_error'));
     } finally {
       setIsUpdatingBridge(false);
     }
@@ -499,30 +501,30 @@ export default function SettingsScreen() {
 
   const handleExportProjects = useCallback(async () => {
     if (projects.length === 0) {
-      Alert.alert('エクスポート', 'プロジェクトがまだないよ。');
+      Alert.alert(t('settings.export'), t('settings.export_empty'));
       return;
     }
     const ok = await exportProjects(projects);
     if (!ok) {
-      Alert.alert('エラー', 'エクスポートできなかったよ。もう一度試してみて。');
+      Alert.alert(t('settings.error_label'), t('settings.export_failed'));
     }
   }, [projects]);
 
   const handleExportSnippets = useCallback(async () => {
     if (snippets.length === 0) {
-      Alert.alert('エクスポート', 'スニペットがありません。先にスニペットを保存してください。');
+      Alert.alert(t('settings.export'), t('settings.export_no_snippets'));
       return;
     }
     const ok = await exportSnippets(snippets);
     if (!ok) {
-      Alert.alert('エクスポート', 'キャンセルされました。');
+      Alert.alert(t('settings.export'), t('settings.export_cancelled'));
     }
   }, [snippets]);
 
   const handleExportLog = useCallback(async () => {
     const allBlocks = sessions.flatMap((s) =>
       s.blocks.map((b) => {
-        const ts = new Date(b.timestamp).toLocaleString('ja-JP');
+        const ts = new Date(b.timestamp).toLocaleString('en-US');
         const output = b.output.map((l) => l.text).join('\n');
         const mode = b.connectionMode ? ` [${b.connectionMode}]` : '';
         return `[${ts}]${mode} $ ${b.command}\n${output}`;
@@ -530,13 +532,13 @@ export default function SettingsScreen() {
     );
 
     if (allBlocks.length === 0) {
-      Alert.alert('エクスポート', 'ログがありません。コマンドを実行してからお試しください。');
+      Alert.alert(t('settings.export'), t('settings.export_no_logs'));
       return;
     }
 
     const logText = [
       '# Shelly Terminal Log',
-      `# Export: ${new Date().toLocaleString('ja-JP')}`,
+      `# Export: ${new Date().toLocaleString('en-US')}`,
       '# ─────────────────────────────────',
       '',
       ...allBlocks,
@@ -545,18 +547,18 @@ export default function SettingsScreen() {
     try {
       await Share.share({ message: logText, title: 'Shelly Terminal Log' });
     } catch {
-      Alert.alert('エラー', 'ログのエクスポートに失敗しました');
+      Alert.alert(t('settings.error_label'), t('settings.export_log_error'));
     }
   }, [sessions]);
 
   const handleClearAll = () => {
     Alert.alert(
-      '全セッションをクリア',
-      '全てのコマンド履歴を削除しますか？',
+      t('settings.clear_all_title'),
+      t('settings.clear_all_msg'),
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: t('settings.clear_cancel'), style: 'cancel' },
         {
-          text: '削除',
+          text: t('settings.clear_delete'),
           style: 'destructive',
           onPress: () => sessions.forEach((s) => clearSession(s.id)),
         },
@@ -569,15 +571,15 @@ export default function SettingsScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#111111" />
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>設定</Text>
+        <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
         {/* ── Display ──────────────────────────────────────────────────────── */}
-        <SectionHeader title="表示" />
+        <SectionHeader title="Display" />
 
-        <SettingRow label="フォントサイズ" description={`現在: ${settings.fontSize}px`}>
+        <SettingRow label="Font size" description={`Current: ${settings.fontSize}px`}>
           <View style={styles.stepper}>
             <Pressable onPress={() => handleFontSizeChange(-1)} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -589,7 +591,7 @@ export default function SettingsScreen() {
           </View>
         </SettingRow>
 
-        <SettingRow label="行間" description={`現在: ${settings.lineHeight.toFixed(1)}×`}>
+        <SettingRow label="Line height" description={`Current: ${settings.lineHeight.toFixed(1)}x`}>
           <View style={styles.stepper}>
             <Pressable onPress={() => handleLineHeightChange(-0.1)} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -602,10 +604,10 @@ export default function SettingsScreen() {
         </SettingRow>
 
               {/* ── Glass Background ────────────────────────────────────── */}
-        <SectionHeader title="ガラス背景" subtitle="壁紙と透明度でターミナルをカスタマイズ" />
+        <SectionHeader title="Glass background" subtitle="Customize terminal with wallpaper and opacity" />
         {/* 壁紙選択 */}
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>壁紙</Text>
+          <Text style={styles.wsUrlLabel}>Wallpaper</Text>
           <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
             <Pressable
               onPress={async () => {
@@ -622,7 +624,7 @@ export default function SettingsScreen() {
             >
               <MaterialIcons name="image" size={18} color="#4ADE80" />
               <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
-                {settings.wallpaperUri ? '壁紙を変更' : '壁紙を選択'}
+                {settings.wallpaperUri ? 'Change wallpaper' : 'Select wallpaper'}
               </Text>
             </Pressable>
             {settings.wallpaperUri ? (
@@ -635,13 +637,13 @@ export default function SettingsScreen() {
             ) : null}
           </View>
           <Text style={styles.wsUrlHint}>
-            {settings.wallpaperUri ? '壁紙設定済み — 下の透明度で調整できます' : 'フォトライブラリから画像を選択してください'}
+            {settings.wallpaperUri ? 'Wallpaper set — adjust opacity below' : 'Select an image from your photo library'}
           </Text>
         </View>
         {/* 背景透明度 */}
         <SettingRow
-          label="背景透明度"
-          description={`ターミナル背景の不透明度: ${Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%`}
+          label="Background opacity"
+          description={`Terminal background opacity: ${Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%`}
         >
           <View style={styles.stepper}>
             <Pressable
@@ -661,8 +663,8 @@ export default function SettingsScreen() {
         </SettingRow>
         {/* ブラー強度 */}
         <SettingRow
-          label="ブラー強度"
-          description={`壁紙のぼかし具合: ${settings.blurIntensity ?? 0}`}
+          label="Blur intensity"
+          description={`Wallpaper blur amount: ${settings.blurIntensity ?? 0}`}
         >
           <View style={styles.stepper}>
             <Pressable
@@ -681,7 +683,7 @@ export default function SettingsScreen() {
           </View>
         </SettingRow>
         {/* ── Theme ──────────────────────────────────────────────────── */}
-        <SectionHeader title="テーマ" />
+        <SectionHeader title="Theme" />
         <View style={styles.themeOptions}>
           {THEME_OPTIONS.map((theme) => (
             <Pressable
@@ -703,7 +705,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Cursor ───────────────────────────────────────────────────────── */}
-        <SectionHeader title="カーソル形状" />
+        <SectionHeader title="Cursor shape" />
         <View style={styles.cursorOptions}>
           {CURSOR_OPTIONS.map((cursor) => (
             <Pressable
@@ -731,9 +733,9 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Behavior ─────────────────────────────────────────────────────── */}
-        <SectionHeader title="動作" />
+        <SectionHeader title="Behavior" />
 
-        <SettingRow label="タップ振動" description="ボタン操作時にバイブレーション">
+        <SettingRow label="Tap vibration" description="Vibrate on button press">
           <Switch
             value={settings.hapticFeedback}
             onValueChange={(v) => updateSettings({ hapticFeedback: v })}
@@ -742,7 +744,7 @@ export default function SettingsScreen() {
           />
         </SettingRow>
 
-        <SettingRow label="自動スクロール" description="出力後に最下部へスクロール">
+        <SettingRow label="Auto-scroll" description="Scroll to bottom after output">
           <Switch
             value={settings.autoScroll}
             onValueChange={(v) => updateSettings({ autoScroll: v })}
@@ -752,10 +754,10 @@ export default function SettingsScreen() {
         </SettingRow>
 
         <SettingRow
-          label="高コントラスト出力"
+          label="High contrast output"
           description={settings.highContrastOutput
-            ? 'stdout #E8E8E8 / stderr #FF7878 — OLED最適化'
-            : 'テーマ依存色（暗い画面では見えにくい場合あり）'}
+            ? 'stdout #E8E8E8 / stderr #FF7878 — OLED optimized'
+            : 'Theme-dependent colors (may be hard to read on dark screens)'}
         >
           <Switch
             value={settings.highContrastOutput ?? true}
@@ -766,11 +768,11 @@ export default function SettingsScreen() {
         </SettingRow>
 
         <SettingRow
-          label="体験モード"
+          label="Experience mode"
           description={
             (settings.experienceMode ?? 'learning') === 'learning'
-              ? '学習モード: 安全確認を多く表示・AIによるコマンド解説付き'
-              : '高速モード: 確認を最小限に・解説なし（経験者向け）'
+              ? 'Learning mode: More safety prompts with AI command explanations'
+              : 'Fast mode: Minimal prompts, no explanations (for experienced users)'
           }
         >
           <View style={styles.segmentRow}>
@@ -780,16 +782,16 @@ export default function SettingsScreen() {
               ]} onPress={() => updateSettings({ experienceMode: mode })}>
                 <Text style={[styles.segmentBtnText,
                   (settings.experienceMode ?? 'learning') === mode && styles.segmentBtnTextActive,
-                ]}>{mode === 'learning' ? '学習' : '高速'}</Text>
+                ]}>{mode === 'learning' ? 'Learn' : 'Fast'}</Text>
               </Pressable>
             ))}
           </View>
         </SettingRow>
 
         {/* ── Sound & Effects ─────────────────────────────────────────────── */}
-        <SectionHeader title="サウンド＆エフェクト" />
+        <SectionHeader title="Sound & Effects" />
 
-        <SettingRow label="効果音" description="UI操作時のサウンドフィードバック">
+        <SettingRow label="Sound effects" description="Sound feedback on UI actions">
           <Switch
             value={settings.soundEffects ?? true}
             onValueChange={(v) => updateSettings({ soundEffects: v })}
@@ -798,7 +800,7 @@ export default function SettingsScreen() {
           />
         </SettingRow>
 
-        <SettingRow label="音量" description={`${Math.round((settings.soundVolume ?? 0.6) * 100)}%`}>
+        <SettingRow label="Volume" description={`${Math.round((settings.soundVolume ?? 0.6) * 100)}%`}>
           <View style={styles.stepper}>
             <Pressable
               onPress={() => updateSettings({ soundVolume: Math.max(0, (settings.soundVolume ?? 0.6) - 0.1) })}
@@ -823,7 +825,7 @@ export default function SettingsScreen() {
         >
           <MaterialIcons name={showAdvanced ? 'expand-less' : 'expand-more'} size={18} color="#6B7280" />
           <Text style={[styles.actionButtonText, { color: '#9CA3AF' }]}>
-            {showAdvanced ? '上級設定を閉じる' : '上級設定を表示'}
+            {showAdvanced ? 'Hide advanced settings' : 'Show advanced settings'}
           </Text>
           <MaterialIcons name="settings" size={16} color="#6B7280" />
         </Pressable>
@@ -831,19 +833,19 @@ export default function SettingsScreen() {
         {showAdvanced && (<>
         {/* ── Termux Bridge ─────────────────────────────────────────────────── */}
         <SectionHeader
-          title="Termux連携"
-          subtitle="WebSocket経由でTermuxの実シェルに接続します"
+          title="Termux Integration"
+          subtitle="Connect to Termux shell via WebSocket"
         />
 
         {/* Status row */}
         <View style={styles.termuxStatusRow}>
-          <Text style={styles.termuxStatusLabel}>接続状態</Text>
+          <Text style={styles.termuxStatusLabel}>Connection status</Text>
           <BridgeStatusBadge status={bridgeStatus} />
         </View>
 
         {/* Current mode */}
         <View style={styles.termuxStatusRow}>
-          <Text style={styles.termuxStatusLabel}>現在のモード</Text>
+          <Text style={styles.termuxStatusLabel}>Current mode</Text>
           <View style={styles.modeChips}>
             {(['termux', 'disconnected'] as const).map((m) => (
               <Pressable
@@ -882,18 +884,18 @@ export default function SettingsScreen() {
               onSubmitEditing={handleWsUrlSave}
             />
             <Pressable onPress={handleWsUrlSave} style={styles.wsUrlSaveBtn}>
-              <Text style={styles.wsUrlSaveBtnText}>保存</Text>
+              <Text style={styles.wsUrlSaveBtnText}>Save</Text>
             </Pressable>
           </View>
           <Text style={styles.wsUrlHint}>
-            Termux側で起動するブリッジサーバのURL。{'\n'}
-            同一端末の場合は ws://127.0.0.1:8765 のまま使用できます。{'\n'}
-            起動コマンド: node ~/shelly-bridge/server.js
+            Bridge server URL running in Termux.{'\n'}
+            Use ws://127.0.0.1:8765 for same device.{'\n'}
+            Start command: node ~/shelly-bridge/server.js
           </Text>
         </View>
 
         {/* Auto-reconnect */}
-        <SettingRow label="自動再接続" description="切断時に自動で再接続を試みる（最大5回）">
+        <SettingRow label="Auto-reconnect" description="Auto-reconnect on disconnect (max 5 times)">
           <Switch
             value={termuxSettings.autoReconnect}
             onValueChange={(v) => updateTermuxSettings({ autoReconnect: v })}
@@ -903,7 +905,7 @@ export default function SettingsScreen() {
         </SettingRow>
 
         {/* Timeout */}
-        <SettingRow label="タイムアウト" description={`コマンド実行タイムアウト: ${termuxSettings.timeoutSeconds}秒`}>
+        <SettingRow label="Timeout" description={`Command timeout: ${termuxSettings.timeoutSeconds}s`}>
           <View style={styles.stepper}>
             <Pressable onPress={() => handleTimeoutChange(-5)} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -932,12 +934,12 @@ export default function SettingsScreen() {
               onSubmitEditing={handleTtyUrlSave}
             />
             <Pressable onPress={handleTtyUrlSave} style={[styles.wsUrlSaveBtn, { borderColor: '#00D4AA44', backgroundColor: '#00D4AA18' }]}>
-              <Text style={[styles.wsUrlSaveBtnText, { color: '#00D4AA' }]}>保存</Text>
+              <Text style={[styles.wsUrlSaveBtnText, { color: '#00D4AA' }]}>Save</Text>
             </Pressable>
           </View>
           <Text style={styles.wsUrlHint}>
-            ttyd -W -p 7681 bash & で起動するttydのURL。{'\n'}
-            TTYタブでWebViewに表示されるアドレスです。
+            URL for ttyd started with: ttyd -W -p 7681 bash &.{'\n'}
+            Address shown in the TTY tab WebView.
           </Text>
         </View>
 
@@ -962,10 +964,10 @@ export default function SettingsScreen() {
             testResult === 'fail' && { color: '#F87171' },
             !testResult && { color: '#93C5FD' },
           ]}>
-            {isTesting ? '接続テスト中...' :
-             testResult === 'success' ? '接続成功' :
-             testResult === 'fail' ? '接続失敗' :
-             '接続テスト'}
+            {isTesting ? 'Testing connection...' :
+             testResult === 'success' ? 'Connected' :
+             testResult === 'fail' ? 'Connection failed' :
+             'Test connection'}
           </Text>
           {!isTesting && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
         </Pressable>
@@ -986,10 +988,10 @@ export default function SettingsScreen() {
             />
           )}
           <Text style={[styles.actionButtonText, { color: bridgeUpdateResult === 'success' ? '#4ADE80' : bridgeUpdateResult === 'fail' ? '#F87171' : '#FCD34D' }]}>
-            {isUpdatingBridge ? 'Bridge更新中...' :
-             bridgeUpdateResult === 'success' ? '更新完了 (再起動してください)' :
-             bridgeUpdateResult === 'fail' ? '更新失敗' :
-             `Bridgeを最新版に更新 (v${BRIDGE_SERVER_VERSION})`}
+            {isUpdatingBridge ? 'Updating bridge...' :
+             bridgeUpdateResult === 'success' ? 'Updated (please restart)' :
+             bridgeUpdateResult === 'fail' ? 'Update failed' :
+             `Update bridge to latest (v${BRIDGE_SERVER_VERSION})`}
           </Text>
           {!isUpdatingBridge && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
         </Pressable>
@@ -1006,15 +1008,15 @@ export default function SettingsScreen() {
             <MaterialIcons name="play-circle-filled" size={18} color="#4ADE80" />
           )}
           <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
-            {isGeneratingScript ? 'スクリプト生成中...' :
-             bridgeStatus === 'connected' ? '一括起動スクリプトを保存 (start-shelly.sh)' :
-             '一括起動スクリプトを共有'}
+            {isGeneratingScript ? 'Generating script...' :
+             bridgeStatus === 'connected' ? 'Save start script (start-shelly.sh)' :
+             'Share start script'}
           </Text>
           {!isGeneratingScript && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
         </Pressable>
         <Text style={[styles.wsUrlHint, { marginHorizontal: 16, marginTop: -4, marginBottom: 8 }]}>
-          llama-server + shelly-bridge を1コマンドで起動。マルチウィンド不要。{'\n'}
-          接続済なら自動保存、未接続なら内容を共有します。
+          Start llama-server + shelly-bridge with one command. No multi-window needed.{'\n'}
+          Auto-saves when connected, shares content when disconnected.
         </Text>
 
         {/* Open Termux button */}
@@ -1024,22 +1026,22 @@ export default function SettingsScreen() {
         >
           <MaterialIcons name="open-in-new" size={18} color="#4ADE80" />
           <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
-            Termux を開く
+            Open Termux
           </Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
         {/* ── Local LLM (Ollama) ─────────────────────────────────────────── */}
         <SectionHeader
-          title="ローカルLLM (llama-server)"
-          subtitle="実験的・上級者向け — RAM 3-4GB消費。Termux上のllama-serverをAIチャットに使用します"
+          title="Local LLM (llama-server)"
+          subtitle="Experimental & advanced — uses 3-4GB RAM. Uses llama-server on Termux for AI chat"
         />
 
         <SettingRow
-          label="ローカルLLMを使用"
+          label="Use Local LLM"
           description={settings.localLlmEnabled
-            ? '有効: 基本チャットはllama-serverで処理（Claude/Geminiのクレジット節約）'
-            : '無効: すべてのAIタスクをClaude Code / Gemini CLIに送信'}
+            ? 'Enabled: Basic chat handled by llama-server (saves Claude/Gemini credits)'
+            : 'Disabled: All AI tasks sent to Claude Code / Gemini CLI'}
         >
           <Switch
             value={settings.localLlmEnabled}
@@ -1066,18 +1068,18 @@ export default function SettingsScreen() {
               onSubmitEditing={handleLlmUrlSave}
             />
             <Pressable onPress={handleLlmUrlSave} style={[styles.wsUrlSaveBtn, { borderColor: '#A78BFA44', backgroundColor: '#A78BFA18' }]}>
-              <Text style={[styles.wsUrlSaveBtnText, { color: '#A78BFA' }]}>保存</Text>
+              <Text style={[styles.wsUrlSaveBtnText, { color: '#A78BFA' }]}>Save</Text>
             </Pressable>
           </View>
           <Text style={styles.wsUrlHint}>
-            Termux側で起動するllama-serverのURL。{`\n`}
-            同一端末の場合は http://127.0.0.1:8080 のまま使用できます。
+            llama-server URL running in Termux.{`\n`}
+            Use http://127.0.0.1:8080 for same device.
           </Text>
         </View>
 
         {/* Model name */}
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>モデル名</Text>
+          <Text style={styles.wsUrlLabel}>Model name</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#A78BFA' }]}
@@ -1091,12 +1093,12 @@ export default function SettingsScreen() {
               onSubmitEditing={handleLlmModelSave}
             />
             <Pressable onPress={handleLlmModelSave} style={[styles.wsUrlSaveBtn, { borderColor: '#A78BFA44', backgroundColor: '#A78BFA18' }]}>
-              <Text style={[styles.wsUrlSaveBtnText, { color: '#A78BFA' }]}>保存</Text>
+              <Text style={[styles.wsUrlSaveBtnText, { color: '#A78BFA' }]}>Save</Text>
             </Pressable>
           </View>
           <Text style={styles.wsUrlHint}>
-            使用するGGUFモデル名。例: gemma-3-4b-it-Q4_K_M, Qwen3-4B-Instruct-2507-Q4_K_M{`\n`}
-            ※ 下のモデルカタログからファイル名をコピーして使用してください。
+            GGUF model name. Example: gemma-3-4b-it-Q4_K_M, Qwen3-4B-Instruct-2507-Q4_K_M{`\n`}
+            Copy the filename from the model catalog below.
           </Text>
         </View>
 
@@ -1121,10 +1123,10 @@ export default function SettingsScreen() {
             llmTestResult === 'fail' && { color: '#F87171' },
             !llmTestResult && { color: '#A78BFA' },
           ]}>
-            {isTestingLlm ? 'llama-server接続テスト中...' :
-             llmTestResult === 'success' ? 'llama-server接続成功' :
-             llmTestResult === 'fail' ? 'llama-server接続失敗' :
-             'llama-server接続テスト'}
+            {isTestingLlm ? 'Testing llama-server...' :
+             llmTestResult === 'success' ? 'llama-server connected' :
+             llmTestResult === 'fail' ? 'llama-server connection failed' :
+             'Test llama-server'}
           </Text>
           {!isTestingLlm && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
         </Pressable>
@@ -1142,7 +1144,7 @@ export default function SettingsScreen() {
         {/* ── MCP Servers ─────────────────────────────────────────────────── */}
         <SectionHeader
           title="MCP Servers"
-          subtitle="Claude Codeのコンテキストを強化するサーバー群"
+          subtitle="Server plugins to enhance Claude Code context"
         />
         <McpSection
           isConnected={bridgeStatus === 'connected'}
@@ -1151,8 +1153,8 @@ export default function SettingsScreen() {
 
         {/* ── Custom Context ────────────────────────────────────────────── */}
         <SectionHeader
-          title="カスタムコンテキスト"
-          subtitle="ローカルLLMに自動注入されるMD。設計思想やルールを記述"
+          title="Custom Context"
+          subtitle="Markdown auto-injected into Local LLM. Write design principles or rules"
         />
         <View style={styles.wsUrlRow}>
           <TextInput
@@ -1177,25 +1179,25 @@ export default function SettingsScreen() {
             onPress={handleSaveCustomContext}
           >
             <Text style={styles.segmentBtnText}>
-              {customContextSaved ? '保存済み' : '保存する'}
+              {customContextSaved ? 'Saved' : 'Save'}
             </Text>
           </Pressable>
           <Text style={[styles.wsUrlHint, { marginTop: 4 }]}>
-            LLMをONにした時、ここの内容がシステムプロンプトに自動追加されます
+            When LLM is enabled, this content is auto-added to the system prompt
           </Text>
         </View>
 
         {/* ── CLI Auto-Approve ──────────────────────────────────────────── */}
         <SectionHeader
-          title="CLI自動承認"
-          subtitle="Chatタブ経由でClaude Code/Geminiを使う時の権限承認"
+          title="CLI Auto-Approve"
+          subtitle="Permission approval when using Claude Code/Gemini via Chat tab"
         />
         <View style={styles.wsUrlRow}>
           {(['none', 'safe', 'all'] as const).map((level) => {
             const labels: Record<string, { title: string; desc: string }> = {
-              none: { title: '全て手動', desc: '毎回確認する（安全）' },
-              safe: { title: '読み取りのみ自動', desc: 'ファイル読み取りは自動承認' },
-              all: { title: '全自動', desc: '全て自動承認（上級者向け）' },
+              none: { title: 'All manual', desc: 'Confirm every time (safe)' },
+              safe: { title: 'Read-only auto', desc: 'Auto-approve file reads' },
+              all: { title: 'Full auto', desc: 'Auto-approve all (advanced)' },
             };
             const isActive = autoApproveLevel === level;
             return (
@@ -1225,15 +1227,15 @@ export default function SettingsScreen() {
 
         {/* ── Default Agent ──────────────────────────────────────────────── */}
         <SectionHeader
-          title="デフォルトエージェント"
-          subtitle="ローカルLLM未使用時に優先するCLI"
+          title="Default Agent"
+          subtitle="Preferred CLI when Local LLM is not in use"
         />
         <View style={styles.wsUrlRow}>
           {(['gemini-cli', 'claude-code', 'codex'] as const).map((agent) => {
             const labels: Record<string, { title: string; desc: string }> = {
-              'gemini-cli': { title: 'Gemini CLI', desc: '無料枠あり。Googleアカウントだけで使える。初心者におすすめ' },
-              'claude-code': { title: 'Claude Code', desc: '最も賢い。複雑な開発タスクに最強。有料' },
-              'codex': { title: 'Codex CLI', desc: '高速で軽量。簡単な修正向き' },
+              'gemini-cli': { title: 'Gemini CLI', desc: 'Free tier available. Only needs Google account. Recommended for beginners' },
+              'claude-code': { title: 'Claude Code', desc: 'Most capable. Best for complex dev tasks. Paid' },
+              'codex': { title: 'Codex CLI', desc: 'Fast and lightweight. Good for simple fixes' },
             };
             const isActive = (settings.defaultAgent ?? 'gemini-cli') === agent;
             return (
@@ -1264,11 +1266,11 @@ export default function SettingsScreen() {
             {/* ── Perplexity API ─────────────────────────────────────────────── */}
         <SectionHeader
           title="Perplexity API"
-          subtitle="論文・ウェブ検索。@perplexity で呼び出す"
+          subtitle="Paper & web search. Invoke with @perplexity"
         />
 
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>APIキー</Text>
+          <Text style={styles.wsUrlLabel}>API Key</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#20B2AA' }]}
@@ -1284,14 +1286,14 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.wsUrlHint}>
             {settings.perplexityApiKey
-              ? `✓ 設定済み — @perplexity 論文検索で利用可能`
-              : `https://www.perplexity.ai/settings/api で取得`
+              ? `✓ Configured — available for @perplexity paper search`
+              : `https://www.perplexity.ai/settings/api `
             }
           </Text>
         </View>
 
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>モデル</Text>
+          <Text style={styles.wsUrlLabel}>Model</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#20B2AA' }]}
@@ -1305,17 +1307,17 @@ export default function SettingsScreen() {
             />
           </View>
           <Text style={styles.wsUrlHint}>
-            sonar-reasoning-pro (論文向き) / sonar-pro (汎用) / sonar (軽量・高速)
+            sonar-reasoning-pro (papers) / sonar-pro (general) / sonar (light & fast)
           </Text>
         </View>
 
         {/* ── Gemini API ─────────────────────────────────────────────── */}
         <SectionHeader
           title="Gemini API"
-          subtitle="Google AI。@gemini で呼び出す"
+          subtitle="Google AI. Invoke with @gemini"
         />
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>APIキー</Text>
+          <Text style={styles.wsUrlLabel}>API Key</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#A78BFA' }]}
@@ -1331,13 +1333,13 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.wsUrlHint}>
             {settings.geminiApiKey
-              ? `✓ 設定済み — @gemini で利用可能`
-              : `https://aistudio.google.com/app/apikey で取得（無料）`
+              ? `✓ Configured — available via @gemini`
+              : `https://aistudio.google.com/app/apikey (free)`
             }
           </Text>
         </View>
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>モデル</Text>
+          <Text style={styles.wsUrlLabel}>Model</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#A78BFA' }]}
@@ -1351,19 +1353,19 @@ export default function SettingsScreen() {
             />
           </View>
           <Text style={styles.wsUrlHint}>
-            gemini-2.0-flash (高速・推奨) / gemini-2.5-pro (高精度)
+            gemini-2.0-flash (fast, recommended) / gemini-2.5-pro (high accuracy)
           </Text>
         </View>
            {/* ── @team Table ────────────────────────────────────────── */}
-        <SectionHeader title="@team Table" subtitle="複数AIに同じ質問を投げてローカルLLMが結果を統合" />
+        <SectionHeader title="@team Table" subtitle="Ask multiple AIs the same question, local LLM synthesizes results" />
         <View style={styles.wsUrlRow}>
           <View style={{ gap: 12 }}>
             {([
-              { key: 'claude' as const, label: 'Claude CLI', desc: 'Claude Pro/Maxプラン必須', color: '#F59E0B' },
-              { key: 'gemini' as const, label: 'Gemini CLI', desc: 'Gemini Advanced推奨', color: '#3B82F6' },
-              { key: 'codex' as const, label: 'Codex CLI', desc: 'ChatGPT Plus/Pro必須', color: '#10B981' },
-              { key: 'perplexity' as const, label: 'Perplexity API', desc: '最新情報・ソース付き回答', color: '#20B2AA' },
-              { key: 'local' as const, label: 'Local LLM (ファシリ)', desc: '起動中の場合自動でファシリ役', color: '#8B5CF6' },
+              { key: 'claude' as const, label: 'Claude CLI', desc: 'Requires Claude Pro/Max plan', color: '#F59E0B' },
+              { key: 'gemini' as const, label: 'Gemini CLI', desc: 'Gemini Advanced recommended', color: '#3B82F6' },
+              { key: 'codex' as const, label: 'Codex CLI', desc: 'Requires ChatGPT Plus/Pro', color: '#10B981' },
+              { key: 'perplexity' as const, label: 'Perplexity API', desc: 'Latest info with source citations', color: '#20B2AA' },
+              { key: 'local' as const, label: 'Local LLM (Facilitator)', desc: 'Auto-facilitator when running', color: '#8B5CF6' },
             ]).map(({ key, label, desc, color }) => {
               const members = settings.teamMembers ?? { claude: true, gemini: true, codex: false, perplexity: true, local: true };
               const isOn = members[key] ?? false;
@@ -1385,7 +1387,7 @@ export default function SettingsScreen() {
           </View>
         </View>
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Codex CLIコマンド名</Text>
+          <Text style={styles.wsUrlLabel}>Codex CLI command name</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={styles.wsUrlInput}
@@ -1398,10 +1400,10 @@ export default function SettingsScreen() {
               returnKeyType="done"
             />
           </View>
-          <Text style={styles.wsUrlHint}>Termuxでの codex コマンド名（通常は "codex" のまま）</Text>
+          <Text style={styles.wsUrlHint}>Codex command name in Termux (usually just "codex")</Text>
         </View>
         {/* ── Obsidian ────────────────────────────────────────────── */}
-        <SectionHeader title="Obsidian" subtitle="自動収集・知識管理の設定" />
+        <SectionHeader title="Obsidian" subtitle="Auto-collection & knowledge management settings" />
         <View style={styles.wsUrlRow}>
           <Text style={styles.wsUrlLabel}>Vault Path</Text>
           <View style={styles.wsUrlInputRow}>
@@ -1417,10 +1419,10 @@ export default function SettingsScreen() {
             />
           </View>
           <Text style={styles.wsUrlHint}>
-            Obsidian Vaultのフルパス。収集した記事・論文はここに保存されます。
+            Full path to Obsidian Vault. Collected articles and papers are saved here.
           </Text>
         </View>
-        <SettingRow label="自動収集" description="毎朝指定時刻に記事・論文を自動収集">
+        <SettingRow label="Auto-collect" description="Automatically collect articles and papers at a scheduled time each morning">
           <Pressable
             style={[styles.segmentBtn, obsidianSettings.autoCollectEnabled && styles.segmentBtnActive]}
             onPress={() => saveObsidianSettings({ autoCollectEnabled: !obsidianSettings.autoCollectEnabled })}
@@ -1430,7 +1432,7 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
         </SettingRow>
-        <SettingRow label="収集時刻" description="自動収集を実行する時刻（例: 6:00）">
+        <SettingRow label="Collection time" description="Time to run auto-collection (e.g. 6:00)">
           <View style={styles.stepper}>
             <Pressable onPress={() => saveObsidianSettings({ collectTimeHour: Math.max(0, obsidianSettings.collectTimeHour - 1) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -1441,23 +1443,23 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </SettingRow>
-        <SettingRow label="1日最大件数" description="収集する記事・論文の最大件数">
+        <SettingRow label="Max items/day" description="Maximum number of articles/papers to collect per day">
           <View style={styles.stepper}>
             <Pressable onPress={() => saveObsidianSettings({ maxItemsPerDay: Math.max(3, obsidianSettings.maxItemsPerDay - 1) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
             </Pressable>
-            <Text style={styles.stepValue}>{obsidianSettings.maxItemsPerDay}件</Text>
+            <Text style={styles.stepValue}>{obsidianSettings.maxItemsPerDay}</Text>
             <Pressable onPress={() => saveObsidianSettings({ maxItemsPerDay: Math.min(30, obsidianSettings.maxItemsPerDay + 1) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>+</Text>
             </Pressable>
           </View>
         </SettingRow>
-        <SettingRow label="収集期間" description="過去N日以内の記事・論文のみ収集">
+        <SettingRow label="Collection period" description="Only collect articles/papers from the last N days">
           <View style={styles.stepper}>
             <Pressable onPress={() => saveObsidianSettings({ daysBack: Math.max(7, obsidianSettings.daysBack - 7) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
             </Pressable>
-            <Text style={styles.stepValue}>{obsidianSettings.daysBack}日</Text>
+            <Text style={styles.stepValue}>{obsidianSettings.daysBack}d</Text>
             <Pressable onPress={() => saveObsidianSettings({ daysBack: Math.min(90, obsidianSettings.daysBack + 7) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>+</Text>
             </Pressable>
@@ -1465,15 +1467,15 @@ export default function SettingsScreen() {
         </SettingRow>
         {obsidianSettings.lastCollectedAt && (
           <Text style={[styles.wsUrlHint, { paddingHorizontal: 16, paddingBottom: 8 }]}>
-            最終収集: {new Date(obsidianSettings.lastCollectedAt).toLocaleString('ja-JP')}
+            Last collected: {new Date(obsidianSettings.lastCollectedAt).toLocaleString('en-US')}
           </Text>
         )}
         {/* ── Snippets ────────────────────────────────────────────────── */}
-        <SectionHeader title="スニペット"subtitle="コマンド資産の実行方式を設定します" />
+        <SectionHeader title="Snippets" subtitle="Configure how command snippets are executed" />
 
         <SettingRow
-          label="実行方式"
-          description={settings.snippetRunMode === 'insertAndRun' ? '▶ タップで即実行' : '✎ 入力欄に挿入のみ'}
+          label="Run mode"
+          description={settings.snippetRunMode === 'insertAndRun' ? 'Tap to run immediately' : 'Insert into input only'}
         >
           <View style={styles.segmentRow}>
             {(['insertAndRun', 'insertOnly'] as const).map((mode) => (
@@ -1483,14 +1485,14 @@ export default function SettingsScreen() {
                 onPress={() => updateSettings({ snippetRunMode: mode })}
               >
                 <Text style={[styles.segmentBtnText, settings.snippetRunMode === mode && styles.segmentBtnTextActive]}>
-                  {mode === 'insertAndRun' ? '即実行' : '挿入のみ'}
+                  {mode === 'insertAndRun' ? 'Run' : 'Insert'}
                 </Text>
               </Pressable>
             ))}
           </View>
         </SettingRow>
 
-        <SettingRow label="Terminal画面に戻る" description="スニペット実行後にTerminalタブへ自動遷移">
+        <SettingRow label="Return to Terminal" description="Auto-switch to Terminal tab after running a snippet">
           <Switch
             value={settings.snippetAutoReturn}
             onValueChange={(v) => updateSettings({ snippetAutoReturn: v })}
@@ -1501,14 +1503,14 @@ export default function SettingsScreen() {
 
         {/* ── Snippets Backup ───────────────────────────────────────────── */}
         <SectionHeader
-          title="スニペットバックアップ"
-          subtitle={`${snippets.length} 件のスニペットを管理`}
+          title="Snippet Backup"
+          subtitle={`${snippets.length} snippets`}
         />
 
         <Pressable onPress={handleExportSnippets} style={styles.actionButton}>
           <MaterialIcons name="upload" size={18} color="#00D4AA" />
           <Text style={styles.actionButtonText}>
-            スニペットをエクスポート（JSON共有）
+            Export snippets (share as JSON)
           </Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
@@ -1516,21 +1518,21 @@ export default function SettingsScreen() {
         <Pressable onPress={() => setShowImportModal(true)} style={styles.actionButton}>
           <MaterialIcons name="download" size={18} color="#60A5FA" />
           <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
-            スニペットをインポート（JSONから読み込み）
+            Import snippets (from JSON)
           </Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
         {/* ── Projects Backup ──────────────────────────────────────────── */}
         <SectionHeader
-          title="プロジェクトバックアップ"
-          subtitle={`${projects.length} 件のプロジェクトを管理`}
+          title="Project Backup"
+          subtitle={`${projects.length} projects`}
         />
 
         <Pressable onPress={handleExportProjects} style={styles.actionButton}>
           <MaterialIcons name="upload" size={18} color="#00D4AA" />
           <Text style={styles.actionButtonText}>
-            プロジェクトをエクスポート（JSON共有）
+            Export projects (share as JSON)
           </Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
@@ -1538,7 +1540,7 @@ export default function SettingsScreen() {
         <Pressable onPress={() => setShowImportProjectsModal(true)} style={styles.actionButton}>
           <MaterialIcons name="download" size={18} color="#60A5FA" />
           <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
-            プロジェクトをインポート（JSONから読み込み）
+            Import projects (from JSON)
           </Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
@@ -1546,17 +1548,17 @@ export default function SettingsScreen() {
         </>)}
 
         {/* ── Data ─────────────────────────────────────────────────────────── */}
-        <SectionHeader title="データ" />
+        <SectionHeader title="Data" />
 
         <Pressable onPress={handleExportLog} style={styles.actionButton}>
           <MaterialIcons name="share" size={18} color="#00D4AA" />
-          <Text style={styles.actionButtonText}>ログをエクスポート（テキスト共有）</Text>
+          <Text style={styles.actionButtonText}>Export logs (share as text)</Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
         <Pressable onPress={handleClearAll} style={[styles.actionButton, styles.dangerButton]}>
           <MaterialIcons name="delete-sweep" size={18} color="#F87171" />
-          <Text style={[styles.actionButtonText, styles.dangerText]}>全履歴を削除</Text>
+          <Text style={[styles.actionButtonText, styles.dangerText]}>Delete all history</Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
@@ -1632,7 +1634,7 @@ export default function SettingsScreen() {
             />
           </View>
           <Text style={styles.wsUrlHint}>
-            {dotfiles.pat ? '✓ PAT設定済み' : t('dotfiles.pat_required')}
+            {dotfiles.pat ? '✓ PAT configured' : t('dotfiles.pat_required')}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 8 }}>
@@ -1672,6 +1674,19 @@ export default function SettingsScreen() {
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
+        {/* ── AI Authentication ──────────────────────────────── */}
+        <SectionHeader title={t('auth.settings_title')} subtitle={t('auth.settings_subtitle')} />
+        <Pressable
+          onPress={() => setShowAuthWizard(true)}
+          style={[styles.actionButton, { borderColor: '#60A5FA33' }]}
+        >
+          <MaterialIcons name="vpn-key" size={18} color="#60A5FA" />
+          <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
+            {t('auth.settings_button')}
+          </Text>
+          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
+        </Pressable>
+
         {/* ── Setup Reset ──────────────────────────────────── */}
         <Pressable
           onPress={() => setShowSetupWizard(true)}
@@ -1679,13 +1694,13 @@ export default function SettingsScreen() {
         >
           <MaterialIcons name="build" size={18} color="#60A5FA" />
           <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
-            {bridgeStatus === 'connected' ? 'セットアップウィザード（再設定）' : 'セットアップウィザードを開く'}
+            {bridgeStatus === 'connected' ? 'Setup Wizard (reconfigure)' : 'Open Setup Wizard'}
           </Text>
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
         {/* ── Diagnostics ──────────────────────────────────────────────────── */}
-        <SectionHeader title="環境診断" subtitle="接続状態・インストール済みツールを一括チェック" />
+        <SectionHeader title="Diagnostics" subtitle="Check connection status and installed tools at once" />
 
         <Pressable
           onPress={runDiagnostics}
@@ -1698,7 +1713,7 @@ export default function SettingsScreen() {
             <MaterialIcons name="health-and-safety" size={18} color="#00D4AA" />
           )}
           <Text style={[styles.actionButtonText, { color: '#00D4AA' }]}>
-            {isDiagRunning ? '診断中...' : '診断を実行'}
+            {isDiagRunning ? 'Running diagnostics...' : 'Run diagnostics'}
           </Text>
         </Pressable>
 
@@ -1730,22 +1745,22 @@ export default function SettingsScreen() {
               style={[styles.actionButton, { marginTop: 8, borderColor: '#60A5FA33' }]}
             >
               <MaterialIcons name="content-copy" size={16} color="#60A5FA" />
-              <Text style={[styles.actionButtonText, { color: '#60A5FA', fontSize: 12 }]}>診断結果をコピー（GitHub Issues用）</Text>
+              <Text style={[styles.actionButtonText, { color: '#60A5FA', fontSize: 12 }]}>Copy diagnostics (for GitHub Issues)</Text>
             </Pressable>
           </View>
         )}
 
         {/* ── About ────────────────────────────────────────────────────────── */}
-        <SectionHeader title="このアプリについて" />
+        <SectionHeader title="About" />
         <View style={styles.aboutCard}>
           <Text style={styles.aboutTitle}>Shelly (Unofficial)</Text>
           <Text style={styles.aboutVersion}>Version 4.2.0 — Termux Bridge + Local LLM + @team + Browser</Text>
           <Text style={styles.aboutDesc}>
-            Samsung Galaxy Z Fold6向けに設計されたターミナルアプリのプロトタイプです。
-            日本語IME対応、コマンドブロックUI、ショートカットバー、Termux WebSocket連携、4層AIルーティング（@claude / @gemini / @local / @team / @open）、LLM出力通訳、インアプリブラウザを搭載しています。
+            A terminal app prototype designed for Samsung Galaxy Z Fold6.
+            Features Japanese IME support, command block UI, shortcut bar, Termux WebSocket integration, 4-layer AI routing (@claude / @gemini / @local / @team / @open), LLM output interpreter, and in-app browser.
           </Text>
           <Text style={styles.aboutNote}>
-            ※ Termux連携にはshelly-bridgeサーバが必要です。
+            Note: Termux integration requires the shelly-bridge server.
           </Text>
         </View>
 
@@ -1778,6 +1793,11 @@ export default function SettingsScreen() {
         visible={showSetupWizard}
         onComplete={() => setShowSetupWizard(false)}
         isResetup
+      />
+      {/* Auth Wizard */}
+      <AuthWizard
+        visible={showAuthWizard}
+        onComplete={() => setShowAuthWizard(false)}
       />
     </View>
   );

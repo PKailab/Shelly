@@ -31,6 +31,7 @@ import { geminiChatStream } from '@/lib/gemini';
 import { perplexitySearchStream } from '@/lib/perplexity';
 import type { BriefingItem } from '@/lib/obsidian-collector';
 import type { DiscussionMessage } from '@/store/obsidian-store';
+import { t } from '@/lib/i18n';
 
 // ─── カラー定数 ───────────────────────────────────────────────────────────────
 
@@ -58,9 +59,9 @@ const C = {
 
 function TypeBadge({ type }: { type: BriefingItem['type'] }) {
   const config = {
-    paper: { label: '論文', color: C.purple, bg: C.purpleDim },
-    article: { label: '記事', color: C.teal, bg: C.tealDim },
-    policy: { label: '政策', color: C.amber, bg: C.amberDim },
+    paper: { label: 'Paper', color: C.purple, bg: C.purpleDim },
+    article: { label: 'Article', color: C.teal, bg: C.tealDim },
+    policy: { label: 'Policy', color: C.amber, bg: C.amberDim },
   }[type];
   return (
     <View style={[styles.badge, { backgroundColor: config.bg }]}>
@@ -100,7 +101,7 @@ function BriefingCard({
         <TypeBadge type={item.type} />
         <CredibilityDots level={item.credibility} />
         {item.citationCount !== undefined && (
-          <Text style={styles.citationText}>引用 {item.citationCount}</Text>
+          <Text style={styles.citationText}>Citations {item.citationCount}</Text>
         )}
       </View>
       <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
@@ -148,11 +149,11 @@ function BriefingListView() {
   const handleCollect = useCallback(async () => {
     if (isCollecting) return;
     if (!appSettings.geminiApiKey) {
-      Alert.alert('設定が必要', 'Settings → AI設定 → Gemini APIキーを設定してください。');
+      Alert.alert(t('obsidian.setup_required'), t('obsidian.setup_gemini'));
       return;
     }
     if (!settings.vaultPath) {
-      Alert.alert('設定が必要', 'Settings → Obsidian設定 → Vault Pathを設定してください。');
+      Alert.alert(t('obsidian.setup_required'), t('obsidian.setup_vault'));
       return;
     }
 
@@ -173,10 +174,10 @@ function BriefingListView() {
       await saveCachedItems(result.items);
 
       if (result.errors.length > 0) {
-        setCollectionError(`一部エラー: ${result.errors[0]}`);
+        setCollectionError(`Partial error: ${result.errors[0]}`);
       }
     } catch (e) {
-      setCollectionError(`収集失敗: ${e}`);
+      setCollectionError(`Collection failed: ${e}`);
     } finally {
       setCollecting(false);
     }
@@ -187,7 +188,7 @@ function BriefingListView() {
     setView('detail');
   }, []);
 
-  const today = new Date().toLocaleDateString('ja-JP', {
+  const today = new Date().toLocaleDateString('en-US', {
     year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
   });
 
@@ -208,7 +209,7 @@ function BriefingListView() {
           {isCollecting ? (
             <ActivityIndicator size="small" color={C.bg} />
           ) : (
-            <Text style={styles.collectBtnText}>収集</Text>
+            <Text style={styles.collectBtnText}>Collect</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -217,9 +218,9 @@ function BriefingListView() {
       {lastCollectionResult && (
         <View style={styles.resultBanner}>
           <Text style={styles.resultText}>
-            ✓ {lastCollectionResult.items.length}件収集
+            ✓ {lastCollectionResult.items.length} items collected
             {lastCollectionResult.duplicatesSkipped > 0
-              ? ` (重複${lastCollectionResult.duplicatesSkipped}件スキップ)`
+              ? ` (${lastCollectionResult.duplicatesSkipped} duplicates skipped)`
               : ''}
             {lastCollectionResult.tokenUsage
               ? ` | Gemini: ${lastCollectionResult.tokenUsage.geminiTokens.toLocaleString()} tokens`
@@ -240,7 +241,7 @@ function BriefingListView() {
         <View style={styles.collectingBanner}>
           <ActivityIndicator size="small" color={C.teal} style={{ marginRight: 8 }} />
           <Text style={styles.collectingText}>
-            arXiv / Semantic Scholar / Perplexity から収集中...
+            Collecting from arXiv / Semantic Scholar / Perplexity...
           </Text>
         </View>
       )}
@@ -249,12 +250,12 @@ function BriefingListView() {
       {todayItems.length === 0 && !isCollecting ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📭</Text>
-          <Text style={styles.emptyTitle}>今日のブリーフィングがありません</Text>
+          <Text style={styles.emptyTitle}>No briefing for today</Text>
           <Text style={styles.emptyDesc}>
-            「収集」ボタンをタップして{'\n'}最新のSTEAM/EdTech情報を取得してください
+            Tap "Collect" to fetch{'\n'}the latest STEAM/EdTech updates
           </Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={handleCollect}>
-            <Text style={styles.emptyBtnText}>今すぐ収集する</Text>
+            <Text style={styles.emptyBtnText}>Collect now</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -285,7 +286,7 @@ function DetailView() {
       {/* ナビゲーションバー */}
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => setView('briefing')} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← 一覧</Text>
+          <Text style={styles.backBtnText}>← List</Text>
         </TouchableOpacity>
         <TypeBadge type={item.type} />
       </View>
@@ -297,24 +298,24 @@ function DetailView() {
 
         {/* メタ情報 */}
         <View style={styles.metaGrid}>
-          <MetaRow label="ソース" value={item.source} />
+          <MetaRow label="Source" value={item.source} />
           {item.doi && <MetaRow label="DOI" value={item.doi} />}
           {item.authors && item.authors.length > 0 && (
-            <MetaRow label="著者" value={item.authors.slice(0, 3).join(', ')} />
+            <MetaRow label="Authors" value={item.authors.slice(0, 3).join(', ')} />
           )}
-          <MetaRow label="発行日" value={item.publishedAt.split('T')[0]} />
+          <MetaRow label="Published" value={item.publishedAt.split('T')[0]} />
           {item.citationCount !== undefined && (
-            <MetaRow label="引用数" value={`${item.citationCount}件`} />
+            <MetaRow label="Citations" value={`${item.citationCount}`} />
           )}
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>信頼度</Text>
+            <Text style={styles.metaLabel}>Credibility</Text>
             <CredibilityDots level={item.credibility} />
           </View>
         </View>
 
         {/* 要約 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>要約</Text>
+          <Text style={styles.sectionTitle}>Summary</Text>
           <Text style={styles.summaryText}>{item.summary}</Text>
         </View>
 
@@ -331,29 +332,29 @@ function DetailView() {
         <View style={styles.actionGrid}>
           <ActionButton
             icon="💬"
-            label="議論する"
+            label="Discuss"
             color={C.teal}
             onPress={() => setView('discuss')}
           />
           <ActionButton
             icon="✍️"
-            label="SNS執筆"
+            label="SNS Draft"
             color={C.purple}
             onPress={() => setView('sns')}
           />
           <ActionButton
             icon="📝"
-            label="論文執筆"
+            label="Research"
             color={C.amber}
             onPress={() => setView('research')}
           />
           <ActionButton
             icon="🔗"
-            label="URLコピー"
+            label="Copy URL"
             color={C.blue}
             onPress={() => {
               Clipboard.setString(item.url);
-              Alert.alert('コピーしました', item.url);
+              Alert.alert(t('obsidian.copied'), item.url);
             }}
           />
         </View>
@@ -420,13 +421,13 @@ function DiscussView() {
     setInput('');
     setDiscussing(true);
 
-    const context = `以下の${selectedItem.type === 'paper' ? '論文' : '記事'}について議論してください。
+    const context = `Please discuss the following ${selectedItem.type === 'paper' ? 'paper' : 'article'}.
 
-タイトル: ${selectedItem.title}
-ソース: ${selectedItem.source}
-要約: ${selectedItem.summary}
+Title: ${selectedItem.title}
+Source: ${selectedItem.source}
+Summary: ${selectedItem.summary}
 
-質問/議論: ${input.trim()}`;
+Question/Discussion: ${input.trim()}`;
 
     const assistantId = (Date.now() + 1).toString();
     let fullContent = '';
@@ -463,7 +464,7 @@ function DiscussView() {
           }),
         });
         const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content || '応答なし';
+        const content = data.choices?.[0]?.message?.content || t('obsidian.no_response');
         addDiscussionMessage({
           id: assistantId,
           role: 'assistant',
@@ -476,7 +477,7 @@ function DiscussView() {
         addDiscussionMessage({
           id: assistantId,
           role: 'assistant',
-          content: 'APIキーが設定されていません。Settings → AI設定を確認してください。',
+          content: t('obsidian.api_not_configured'),
           timestamp: new Date().toISOString(),
           model,
         });
@@ -486,7 +487,7 @@ function DiscussView() {
       addDiscussionMessage({
         id: assistantId,
         role: 'assistant',
-        content: `エラー: ${e}`,
+        content: `Error: ${e}`,
         timestamp: new Date().toISOString(),
         model,
       });
@@ -498,11 +499,11 @@ function DiscussView() {
     <View style={styles.flex1}>
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => setView('detail')} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← 詳細</Text>
+          <Text style={styles.backBtnText}>← Detail</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>💬 議論モード</Text>
+        <Text style={styles.navTitle}>💬 Discussion</Text>
         <TouchableOpacity onPress={clearDiscussion}>
-          <Text style={styles.clearText}>クリア</Text>
+          <Text style={styles.clearText}>Clear</Text>
         </TouchableOpacity>
       </View>
 
@@ -538,11 +539,11 @@ function DiscussView() {
         {discussionHistory.length === 0 && (
           <View style={styles.chatEmpty}>
             <Text style={styles.chatEmptyText}>
-              この記事・論文について自由に質問・議論できます。{'\n\n'}
-              例:{'\n'}
-              「この研究の限界点は？」{'\n'}
-              「日本の教育現場への応用可能性は？」{'\n'}
-              「関連する先行研究を教えて」
+              Ask questions or discuss this article/paper freely.{'\n\n'}
+              Examples:{'\n'}
+              "What are the limitations of this study?"{'\n'}
+              "How could this apply in practice?"{'\n'}
+              "What related prior research exists?"
             </Text>
           </View>
         )}
@@ -570,7 +571,7 @@ function DiscussView() {
           style={styles.chatInput}
           value={input}
           onChangeText={setInput}
-          placeholder="質問・考察を入力..."
+          placeholder="Type a question or thought..."
           placeholderTextColor={C.fgMuted}
           multiline
           returnKeyType="done"
@@ -581,7 +582,7 @@ function DiscussView() {
           onPress={handleSend}
           disabled={!input.trim() || isDiscussing}
         >
-          <Text style={styles.sendBtnText}>送信</Text>
+          <Text style={styles.sendBtnText}>Send</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -610,27 +611,27 @@ function SnsView() {
     if (isGeneratingSns || !appSettings.geminiApiKey) return;
     setGeneratingSns(true);
 
-    const basePrompt = `あなたはSTEAM教育・EdTech分野の研究者・実践者として発信しています。
-大学教員・研究者・政策立案者・業界人が読んで価値を感じる内容にしてください。
-専門家としての知見と自分なりの考察を含めてください。
+    const basePrompt = `You are posting as a STEAM education / EdTech researcher and practitioner.
+Write content that provides value to academics, researchers, policymakers, and industry professionals.
+Include expert insights and your own analysis.
 
-元記事/論文:
-タイトル: ${selectedItem.title}
-ソース: ${selectedItem.source}
-要約: ${selectedItem.summary}
-タグ: ${selectedItem.tags.join(', ')}`;
+Source article/paper:
+Title: ${selectedItem.title}
+Source: ${selectedItem.source}
+Summary: ${selectedItem.summary}
+Tags: ${selectedItem.tags.join(', ')}`;
 
     try {
-      // X用（280字以内）
+      // X post (280 chars max)
       const xPrompt = `${basePrompt}
 
-X（Twitter）用の投稿文を作成してください。
-条件:
-- 280文字以内（日本語）
-- 専門家としての知見 + 自分なりの一言考察を含む
-- ハッシュタグ3〜4個（#STEAM教育 #EdTech #教育DX など）
-- 引用元ソース名を含める
-- 本文のみ返してください（説明不要）`;
+Write an X (Twitter) post.
+Requirements:
+- 280 characters max
+- Include expert insight + brief personal analysis
+- 3-4 hashtags (#STEAMeducation #EdTech #DigitalLearning etc.)
+- Include the source name
+- Return only the post text (no explanation)`;
 
       let xContent = '';
       await geminiChatStream(appSettings.geminiApiKey, xPrompt, (text, done) => {
@@ -638,16 +639,16 @@ X（Twitter）用の投稿文を作成してください。
         if (done) setSnsDraft(selectedItem.id, { x: xContent.trim() });
       }, 'gemini-2.0-flash');
 
-      // Threads用（500字程度）
+      // Threads post (~500 chars)
       const threadsPrompt = `${basePrompt}
 
-Threads用の投稿文を作成してください。
-条件:
-- 400〜500文字（日本語）
-- 背景・内容・考察・実践への示唆の流れで書く
-- 研究者・実践者として読者に価値を提供する内容
-- ハッシュタグ3〜5個
-- 本文のみ返してください`;
+Write a Threads post.
+Requirements:
+- 400-500 characters
+- Structure: background → content → analysis → practical implications
+- Provide value to researchers and practitioners
+- 3-5 hashtags
+- Return only the post text`;
 
       let threadsContent = '';
       await geminiChatStream(appSettings.geminiApiKey, threadsPrompt, (text, done) => {
@@ -655,18 +656,18 @@ Threads用の投稿文を作成してください。
         if (done) setSnsDraft(selectedItem.id, { threads: threadsContent.trim() });
       }, 'gemini-2.0-flash');
 
-      // note用（2000〜3000字）
+      // note article (2000-3000 chars)
       const notePrompt = `${basePrompt}
 
-note記事を作成してください。
-条件:
-- 2000〜3000字（日本語）
-- 構成: タイトル / はじめに / 研究・記事の概要 / 重要なポイント（3点） / 日本の教育現場への示唆 / まとめ
-- 引用元リンクを含める: ${selectedItem.url}
-- 見出しはMarkdown（##, ###）で
-- 大学教員・研究者・教育関係者が読んで参考になる内容
-- 著者の考察・意見を積極的に含める
-- 本文のみ返してください`;
+Write a note article.
+Requirements:
+- 2000-3000 characters
+- Structure: Title / Introduction / Overview / Key Points (3) / Practical Implications / Conclusion
+- Include source link: ${selectedItem.url}
+- Use Markdown headings (##, ###)
+- Content should be useful for academics, researchers, and education professionals
+- Actively include author analysis and opinions
+- Return only the article text`;
 
       let noteContent = '';
       await geminiChatStream(appSettings.geminiApiKey, notePrompt, (text, done) => {
@@ -675,7 +676,7 @@ note記事を作成してください。
       }, 'gemini-2.0-flash');
 
     } catch (e) {
-      Alert.alert('エラー', `生成失敗: ${e}`);
+      Alert.alert(t('settings.error_label'), t('obsidian.generation_failed', { error: String(e) }));
     } finally {
       setGeneratingSns(false);
     }
@@ -692,9 +693,9 @@ note記事を作成してください。
     <View style={styles.flex1}>
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => setView('detail')} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← 詳細</Text>
+          <Text style={styles.backBtnText}>← Detail</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>✍️ SNS執筆</Text>
+        <Text style={styles.navTitle}>✍️ SNS Draft</Text>
         <TouchableOpacity
           style={[styles.generateBtn, isGeneratingSns && styles.generateBtnDisabled]}
           onPress={handleGenerate}
@@ -703,7 +704,7 @@ note記事を作成してください。
           {isGeneratingSns ? (
             <ActivityIndicator size="small" color={C.bg} />
           ) : (
-            <Text style={styles.generateBtnText}>生成</Text>
+            <Text style={styles.generateBtnText}>Generate</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -735,34 +736,34 @@ note記事を作成してください。
         {!currentContent && !isGeneratingSns ? (
           <View style={styles.snsEmpty}>
             <Text style={styles.snsEmptyText}>
-              「生成」ボタンをタップして{'\n'}
-              X・Threads・note用の下書きを一括生成します
+              Tap "Generate" to create{'\n'}
+              drafts for X, Threads, and note at once
             </Text>
           </View>
         ) : isGeneratingSns && !currentContent ? (
           <View style={styles.snsEmpty}>
             <ActivityIndicator size="large" color={C.teal} />
-            <Text style={styles.generatingText}>Gemini で執筆中...</Text>
+            <Text style={styles.generatingText}>Writing with Gemini...</Text>
           </View>
         ) : (
           <>
             <View style={styles.draftHeader}>
               <Text style={styles.charCount}>
-                {charCount}字{activeTab !== 'note' && ` / ${charLimit}字`}
+                {charCount} chars{activeTab !== 'note' && ` / ${charLimit}`}
                 {activeTab === 'x' && charCount > 280 && (
-                  <Text style={{ color: C.red }}> ⚠️ 超過</Text>
+                  <Text style={{ color: C.red }}> over limit</Text>
                 )}
               </Text>
               <TouchableOpacity
                 onPress={() => {
                   if (currentContent) {
                     Clipboard.setString(currentContent);
-                    Alert.alert('コピーしました');
+                    Alert.alert(t('obsidian.copied'));
                   }
                 }}
                 style={styles.copyBtn}
               >
-                <Text style={styles.copyBtnText}>コピー</Text>
+                <Text style={styles.copyBtnText}>Copy</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.draftText}>{currentContent}</Text>
@@ -773,7 +774,7 @@ note記事を作成してください。
   );
 }
 
-// ─── 論文執筆支援モード ───────────────────────────────────────────────────────
+// ─── Research writing mode ───────────────────────────────────────────────────────
 
 function ResearchView() {
   const { selectedItem, setView } = useObsidianStore();
@@ -785,10 +786,10 @@ function ResearchView() {
   if (!selectedItem) return null;
 
   const taskConfig = {
-    outline: { label: '論文構成案', desc: 'この研究を基にした論文の構成案を作成' },
-    related: { label: '関連研究', desc: '関連する先行研究・文献を提案' },
-    critique: { label: '批判的考察', desc: '研究の限界・課題・改善点を分析' },
-    abstract: { label: 'アブスト草案', desc: '自分の論文のアブストラクト草案を作成' },
+    outline: { label: 'Paper Outline', desc: 'Create a paper outline based on this research' },
+    related: { label: 'Related Work', desc: 'Suggest related prior research and literature' },
+    critique: { label: 'Critical Analysis', desc: 'Analyze limitations, issues, and improvements' },
+    abstract: { label: 'Abstract Draft', desc: 'Draft an abstract for your paper' },
   };
 
   const handleGenerate = async () => {
@@ -797,37 +798,37 @@ function ResearchView() {
     setOutput('');
 
     const prompts = {
-      outline: `STEAM教育・EdTech分野の研究者として、以下の論文・記事を参考にした新しい研究論文の構成案を作成してください。
-日本の教育現場・大学教員の視点を含めてください。
+      outline: `As a STEAM education / EdTech researcher, create an outline for a new research paper based on the following article/paper.
+Include perspectives from education practice and academia.
 
-参考文献:
-タイトル: ${selectedItem.title}
-ソース: ${selectedItem.source}
-要約: ${selectedItem.summary}
+Reference:
+Title: ${selectedItem.title}
+Source: ${selectedItem.source}
+Summary: ${selectedItem.summary}
 
-論文構成案（Markdown形式）:`,
+Paper outline (Markdown format):`,
 
-      related: `以下の論文・記事に関連する先行研究・文献を5〜8件提案してください。
-著者名・タイトル・発行年・なぜ関連するかを含めてください。
+      related: `Suggest 5-8 related prior research/literature for the following article/paper.
+Include author names, titles, publication year, and why they are related.
 
-対象:
-タイトル: ${selectedItem.title}
-要約: ${selectedItem.summary}`,
+Target:
+Title: ${selectedItem.title}
+Summary: ${selectedItem.summary}`,
 
-      critique: `研究者・査読者の視点から、以下の論文・記事を批判的に考察してください。
-強み・限界・方法論的課題・今後の研究課題を含めてください。
+      critique: `From a researcher/reviewer perspective, critically analyze the following article/paper.
+Include strengths, limitations, methodological issues, and future research directions.
 
-対象:
-タイトル: ${selectedItem.title}
-ソース: ${selectedItem.source}
-要約: ${selectedItem.summary}`,
+Target:
+Title: ${selectedItem.title}
+Source: ${selectedItem.source}
+Summary: ${selectedItem.summary}`,
 
-      abstract: `以下の論文・記事を参考に、STEAM教育分野の自分の研究論文のアブストラクト草案を作成してください。
-背景・目的・方法・結果・結論の構成で、200〜300字（日本語）で書いてください。
+      abstract: `Based on the following article/paper, draft an abstract for a STEAM education research paper.
+Structure: Background, Objective, Method, Results, Conclusion. 200-300 words.
 
-参考:
-タイトル: ${selectedItem.title}
-要約: ${selectedItem.summary}`,
+Reference:
+Title: ${selectedItem.title}
+Summary: ${selectedItem.summary}`,
     };
 
     try {
@@ -841,7 +842,7 @@ function ResearchView() {
         'gemini-2.0-flash',
       );
     } catch (e) {
-      setOutput(`エラー: ${e}`);
+      setOutput(`Error: ${e}`);
       setIsGenerating(false);
     }
   };
@@ -850,9 +851,9 @@ function ResearchView() {
     <View style={styles.flex1}>
       <View style={styles.navBar}>
         <TouchableOpacity onPress={() => setView('detail')} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>← 詳細</Text>
+          <Text style={styles.backBtnText}>← Detail</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>📝 論文執筆支援</Text>
+        <Text style={styles.navTitle}>📝 Research Assistant</Text>
       </View>
 
       {/* タスク選択 */}
@@ -888,7 +889,7 @@ function ResearchView() {
         {isGenerating ? (
           <ActivityIndicator size="small" color={C.bg} />
         ) : (
-          <Text style={styles.generateBtnText}>生成する</Text>
+          <Text style={styles.generateBtnText}>Generate</Text>
         )}
       </TouchableOpacity>
 
@@ -896,12 +897,12 @@ function ResearchView() {
         {output ? (
           <>
             <View style={styles.draftHeader}>
-              <Text style={styles.charCount}>{output.length}字</Text>
+              <Text style={styles.charCount}>{output.length} chars</Text>
               <TouchableOpacity
-                onPress={() => { Clipboard.setString(output); Alert.alert('コピーしました'); }}
+                onPress={() => { Clipboard.setString(output); Alert.alert(t('obsidian.copied')); }}
                 style={styles.copyBtn}
               >
-                <Text style={styles.copyBtnText}>コピー</Text>
+                <Text style={styles.copyBtnText}>Copy</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.draftText}>{output}</Text>
@@ -909,13 +910,13 @@ function ResearchView() {
         ) : !isGenerating ? (
           <View style={styles.snsEmpty}>
             <Text style={styles.snsEmptyText}>
-              タスクを選んで「生成する」をタップしてください
+              Select a task and tap "Generate"
             </Text>
           </View>
         ) : (
           <View style={styles.snsEmpty}>
             <ActivityIndicator size="large" color={C.amber} />
-            <Text style={[styles.generatingText, { color: C.amber }]}>Gemini で生成中...</Text>
+            <Text style={[styles.generatingText, { color: C.amber }]}>Generating with Gemini...</Text>
           </View>
         )}
       </ScrollView>

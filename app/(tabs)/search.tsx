@@ -13,6 +13,7 @@ import * as Haptics from 'expo-haptics';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTerminalStore } from '@/store/terminal-store';
+import { useTranslation } from '@/lib/i18n';
 import { CommandBlock } from '@/store/types';
 
 function BlockSearchItem({
@@ -27,7 +28,7 @@ function BlockSearchItem({
   onRerun: (cmd: string) => void;
 }) {
   const outputText = block.output.map((l) => l.text).join(' ').slice(0, 80);
-  const timestamp = new Date(block.timestamp).toLocaleString('ja-JP', {
+  const timestamp = new Date(block.timestamp).toLocaleString('en-US', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -77,6 +78,7 @@ function BlockSearchItem({
 }
 
 export default function SearchScreen() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const { sessions, runCommand, settings } = useTerminalStore();
   const insets = useSafeAreaInsets();
@@ -127,8 +129,8 @@ export default function SearchScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>コマンド履歴</Text>
-        <Text style={styles.headerCount}>{filteredBlocks.length} 件</Text>
+        <Text style={styles.headerTitle}>{t('search.title')}</Text>
+        <Text style={styles.headerCount}>{t('search.items', { count: filteredBlocks.length })}</Text>
       </View>
 
       {/* Search input */}
@@ -138,7 +140,7 @@ export default function SearchScreen() {
           style={styles.searchInput}
           value={query}
           onChangeText={setQuery}
-          placeholder="コマンドや出力を検索..."
+          placeholder={t('search.placeholder')}
           placeholderTextColor="#4B5563"
           autoCapitalize="none"
           autoCorrect={false}
@@ -157,8 +159,8 @@ export default function SearchScreen() {
           <MaterialIcons name="search-off" size={48} color="#2D2D2D" />
           <Text style={styles.emptyText}>
             {allBlocks.length === 0
-              ? 'まだコマンドが実行されていません'
-              : '検索結果がありません'}
+              ? t('search.no_commands')
+              : t('search.no_results')}
           </Text>
         </View>
       ) : (

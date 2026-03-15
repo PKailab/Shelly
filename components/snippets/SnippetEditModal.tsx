@@ -50,7 +50,7 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
   const handleSave = useCallback(() => {
     if (!snippet) return;
     if (!command.trim()) {
-      Alert.alert('エラー', 'コマンドは必須です');
+      Alert.alert('Error', 'Command is required');
       return;
     }
     updateSnippet(snippet.id, {
@@ -65,12 +65,12 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
   const handleDelete = useCallback(() => {
     if (!snippet) return;
     Alert.alert(
-      'スニペットを削除',
-      `"${snippet.title}" を削除しますか？`,
+      'Delete snippet',
+      `"${snippet.title}" Delete this snippet?`,
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: '削除',
+          text: 'Delete',
           style: 'destructive',
           onPress: () => {
             deleteSnippet(snippet.id);
@@ -101,7 +101,7 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
               <View style={styles.sheet}>
                 {/* Header */}
                 <View style={styles.header}>
-                  <Text style={styles.headerTitle}>スニペット編集</Text>
+                  <Text style={styles.headerTitle}>Edit Snippet</Text>
                   <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                     <Text style={styles.closeBtnText}>✕</Text>
                   </TouchableOpacity>
@@ -109,24 +109,24 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
 
                 <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
                   {/* Title */}
-                  <Text style={styles.label}>タイトル</Text>
+                  <Text style={styles.label}>Title</Text>
                   <TextInput
                     style={styles.input}
                     value={title}
                     onChangeText={setTitle}
-                    placeholder="スニペット名"
+                    placeholder="Snippet name"
                     placeholderTextColor="#4B5563"
                     returnKeyType="next"
                     autoCorrect={false}
                   />
 
                   {/* Command */}
-                  <Text style={styles.label}>コマンド <Text style={styles.required}>*</Text></Text>
+                  <Text style={styles.label}>Command <Text style={styles.required}>*</Text></Text>
                   <TextInput
                     style={[styles.input, styles.commandInput]}
                     value={command}
                     onChangeText={setCommand}
-                    placeholder="コマンドを入力"
+                    placeholder="Enter command"
                     placeholderTextColor="#4B5563"
                     multiline
                     autoCorrect={false}
@@ -135,7 +135,7 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
                   />
 
                   {/* Tags */}
-                  <Text style={styles.label}>タグ <Text style={styles.hint}>（カンマ区切り）</Text></Text>
+                  <Text style={styles.label}>Tags <Text style={styles.hint}>(comma separated)</Text></Text>
                   <TextInput
                     style={styles.input}
                     value={tagsRaw}
@@ -148,7 +148,7 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
                   />
 
                   {/* Scope */}
-                  <Text style={styles.label}>スコープ</Text>
+                  <Text style={styles.label}>Scope</Text>
                   <View style={styles.scopeRow}>
                     {(['global', 'session'] as SnippetScope[]).map((s) => (
                       <TouchableOpacity
@@ -165,13 +165,13 @@ export function SnippetEditModal({ snippet, visible, onClose }: Props) {
 
                   {/* Delete */}
                   <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-                    <Text style={styles.deleteBtnText}>🗑 スニペットを削除</Text>
+                    <Text style={styles.deleteBtnText}>🗑 Delete snippet</Text>
                   </TouchableOpacity>
                 </ScrollView>
 
                 {/* Save button */}
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                  <Text style={styles.saveBtnText}>保存</Text>
+                  <Text style={styles.saveBtnText}>Save</Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>

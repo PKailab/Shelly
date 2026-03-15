@@ -14,6 +14,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
+import { useTranslation } from '@/lib/i18n';
 import type { ChatMessage, ChatAgent } from '@/store/chat-store';
 import type { ThemeColorPalette } from '@/lib/theme';
 
@@ -62,6 +63,7 @@ type Props = {
 
 export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUser = message.role === 'user';
@@ -187,7 +189,7 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
         ) : message.isStreaming ? (
           <View style={[styles.markdownWrap, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
             <ActivityIndicator size="small" color={agentColor} />
-            <Text style={{ color: agentColor, fontSize: 12, fontFamily: 'monospace', opacity: 0.7 }}>考え中...</Text>
+            <Text style={{ color: agentColor, fontSize: 12, fontFamily: 'monospace', opacity: 0.7 }}>{t('chat.thinking')}</Text>
           </View>
         ) : null}
 
@@ -203,7 +205,7 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
         {/* Citations */}
         {message.citations && message.citations.length > 0 && (
           <View style={[styles.citationsBox, { borderTopColor: colors.surface }]}>
-            <Text style={[styles.citationsTitle, { color: colors.inactive }]}>Sources:</Text>
+            <Text style={[styles.citationsTitle, { color: colors.inactive }]}>{t('chat.sources')}</Text>
             {message.citations.map((c, i) => (
               <Text key={i} style={[styles.citationItem, { color: colors.link }]} numberOfLines={1}>
                 {i + 1}. {c.title || c.url}
@@ -305,12 +307,12 @@ const styles = StyleSheet.create({
     marginVertical: 3,
   },
   userBubble: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderTopRightRadius: 4,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    maxWidth: '85%',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    maxWidth: '80%',
   },
 
   // Assistant bubble (left-aligned)
@@ -339,7 +341,7 @@ const styles = StyleSheet.create({
   assistantBubble: {
     flex: 1,
     maxWidth: '88%',
-    borderRadius: 16,
+    borderRadius: 12,
     borderTopLeftRadius: 4,
     borderWidth: 1,
     overflow: 'hidden',
@@ -374,8 +376,8 @@ const styles = StyleSheet.create({
 
   // Markdown wrapper
   markdownWrap: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   // Shared
   messageText: {

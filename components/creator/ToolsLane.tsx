@@ -153,7 +153,7 @@ export function ToolsLane({
     setLocalLlmStatus('thinking');
     setOrchestrationResult(null);
     clearLogs();
-    addLog('system', `タスク分類中: "${input.slice(0, 50)}${input.length > 50 ? '…' : ''}"`);
+    addLog('system', `Classifying task: "${input.slice(0, 50)}${input.length > 50 ? '…' : ''}"`);
 
     try {
       const result = await orchestrateTask(input, config, conversationHistory);
@@ -179,17 +179,17 @@ export function ToolsLane({
         if (result.handledBy === 'termux') {
           // Termux直接実行
           onSendToTerminal(result.delegatedCommand);
-          addLog('system', `Terminalに送信: ${result.delegatedCommand}`);
+          addLog('system', `Sent to Terminal: ${result.delegatedCommand}`);
           setStatus('done');
         } else {
           // Claude/GeminiはTermux経由で実行
           if (!termuxConnected) {
-            addLog('stderr', `${getHandlerLabel(result.handledBy)}を実行するにはTermux Bridgeが必要です。`);
+            addLog('stderr', `${getHandlerLabel(result.handledBy)} requires Termux Bridge connection.`);
             setStatus('error');
             return;
           }
           setStatus('running');
-          addLog('system', `実行中: ${result.delegatedCommand}`);
+          addLog('system', `Running: ${result.delegatedCommand}`);
           const execResult = await onRunCommand(result.delegatedCommand);
           if (execResult.stdout) addLog('stdout', execResult.stdout);
           if (execResult.stderr) addLog('stderr', execResult.stderr);
@@ -199,7 +199,7 @@ export function ToolsLane({
     } catch (e) {
       setLocalLlmStatus('error');
       setStatus('error');
-      addLog('stderr', `オーケストレーションエラー: ${e}`);
+      addLog('stderr', `Orchestration error: ${e}`);
     }
   }, [userInput, localLlmConfig, conversationHistory, termuxConnected, onRunCommand, onSendToTerminal, clearLogs, addLog]);
 
@@ -208,8 +208,8 @@ export function ToolsLane({
   const handleCheck = useCallback(async () => {
     if (!termuxConnected) {
       Alert.alert(
-        'Termux未接続',
-        'CLI Runnerを使うにはTermux bridgeに接続する必要があるよ。\nSettingsでWebSocket URLを設定してね。',
+        'Termux not connected',
+        'Connect to Termux bridge first.\nSet WebSocket URL in Settings.',
       );
       return;
     }
@@ -222,7 +222,7 @@ export function ToolsLane({
 
     setStatus('checking');
     clearLogs();
-    addLog('system', `${config.label}が使えるか確認しているよ…`);
+    addLog('system', `${config.label}Checking availability...`);
 
     try {
       const result = await onRunCommand(config.checkCommand);
@@ -241,7 +241,7 @@ export function ToolsLane({
       }
     } catch (e) {
       setStatus('check_failed');
-      addLog('stderr', `確認中にエラーが発生したよ: ${e}`);
+      addLog('stderr', `Error during check: ${e}`);
     }
   }, [termuxConnected, selectedTool, onRunCommand, clearLogs, addLog]);
 
@@ -250,7 +250,7 @@ export function ToolsLane({
   const handleRun = useCallback(async () => {
     if (!userInput.trim() && selectedTool !== 'custom') return;
     if (!termuxConnected) {
-      Alert.alert('Termux未接続', 'Termux bridgeに接続してから実行してね。');
+      Alert.alert('Termux not connected', 'Connect to Termux bridge first.');
       return;
     }
 
@@ -270,11 +270,11 @@ export function ToolsLane({
     if (plan.requiresConfirmation) {
       const confirmed = await new Promise<boolean>((resolve) => {
         Alert.alert(
-          '確認',
-          plan.confirmationMessage ?? 'この操作を実行してもいい？',
+          'Confirm',
+          plan.confirmationMessage ?? 'Execute this operation?',
           [
-            { text: 'キャンセル', style: 'cancel', onPress: () => resolve(false) },
-            { text: '実行する', style: 'destructive', onPress: () => resolve(true) },
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Execute', style: 'destructive', onPress: () => resolve(true) },
           ],
         );
       });
@@ -285,13 +285,13 @@ export function ToolsLane({
     if (plan.isInteractiveFallback) {
       const proceed = await new Promise<boolean>((resolve) => {
         Alert.alert(
-          '対話型モードが必要かも',
-          plan.fallbackSuggestion ?? 'この操作は対話型モードが必要かもしれないよ。続ける？',
+          'Interactive mode may be needed',
+          plan.fallbackSuggestion ?? 'This operation may require interactive mode. Continue?',
           [
-            { text: 'やめる', style: 'cancel', onPress: () => resolve(false) },
-            { text: '試してみる', onPress: () => resolve(true) },
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Try anyway', onPress: () => resolve(true) },
             {
-              text: 'Terminalで開く',
+              text: 'Open in Terminal',
               onPress: () => {
                 onSendToTerminal(plan.command);
                 resolve(false);
@@ -308,7 +308,7 @@ export function ToolsLane({
     setStatus('running');
     clearLogs();
     addLog('info', plan.naturalDescription);
-    addLog('system', `実行中: ${plan.command}`);
+    addLog('system', `Running: ${plan.command}`);
 
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -319,7 +319,7 @@ export function ToolsLane({
 
       if (cancelledRef.current) {
         setStatus('cancelled');
-        addLog('system', 'キャンセルしたよ。');
+        addLog('system', 'Cancelled.');
         return;
       }
 
@@ -347,10 +347,10 @@ export function ToolsLane({
     } catch (e) {
       if (cancelledRef.current) {
         setStatus('cancelled');
-        addLog('system', 'キャンセルしたよ。');
+        addLog('system', 'Cancelled.');
       } else {
         setStatus('error');
-        addLog('stderr', `実行エラー: ${e}`);
+        addLog('stderr', `Execution error: ${e}`);
       }
     }
   }, [
@@ -362,7 +362,7 @@ export function ToolsLane({
     cancelledRef.current = true;
     onCancel();
     setStatus('cancelled');
-    addLog('system', 'キャンセルしているよ…');
+    addLog('system', 'Cancelling...');
   }, [onCancel, addLog]);
 
   const handleReset = useCallback(() => {
@@ -386,15 +386,15 @@ export function ToolsLane({
           <View style={[styles.llmDot, localLlmStatus === 'thinking' ? styles.llmDotThinking : styles.llmDotReady]} />
           <Text style={styles.llmBannerText}>
             {localLlmStatus === 'thinking'
-              ? `ローカルLLM (${localLlmConfig?.model}) が考え中…`
-              : `ローカルLLM (${localLlmConfig?.model}) 待機中`}
+              ? `Local LLM (${localLlmConfig?.model}) thinking...`
+              : `Local LLM (${localLlmConfig?.model}) ready`}
           </Text>
           {conversationHistory.length > 0 && (
             <Pressable
               onPress={() => setConversationHistory([])}
               style={styles.llmClearBtn}
             >
-              <Text style={styles.llmClearBtnText}>履歴クリア</Text>
+              <Text style={styles.llmClearBtnText}>Clear history</Text>
             </Pressable>
           )}
         </View>
@@ -402,7 +402,7 @@ export function ToolsLane({
 
       {/* Tool Selector */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>▸ CLIツールを選ぶ</Text>
+        <Text style={styles.sectionLabel}>▸ Select CLI tool</Text>
         <View style={styles.toolRow}>
           {(['claude', 'gemini', 'custom'] as CliTool[]).map((tool) => (
             <Pressable
@@ -425,7 +425,7 @@ export function ToolsLane({
 
       {/* Target Project */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>▸ 対象フォルダ</Text>
+        <Text style={styles.sectionLabel}>▸ Target folder</Text>
         <Pressable
           style={styles.targetBtn}
           onPress={() => setShowProjectPicker(!showProjectPicker)}
@@ -433,7 +433,7 @@ export function ToolsLane({
           <Text style={styles.targetBtnText}>
             {targetProject
               ? `~/Projects/${targetProject.path}`
-              : '~/Projects（フォルダ未選択）'}
+              : '~/Projects (no folder selected)'}
           </Text>
           <Text style={styles.targetBtnChevron}>{showProjectPicker ? '▲' : '▼'}</Text>
         </Pressable>
@@ -447,7 +447,7 @@ export function ToolsLane({
                 setShowProjectPicker(false);
               }}
             >
-              <Text style={styles.projectPickerItemText}>~/Projects（フォルダ未選択）</Text>
+              <Text style={styles.projectPickerItemText}>~/Projects (no folder selected)</Text>
             </Pressable>
             {projects.slice(0, 20).map((p) => (
               <Pressable
@@ -475,14 +475,14 @@ export function ToolsLane({
       {/* Input */}
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>
-          {selectedTool === 'custom' ? '▸ コマンドを入力' : '▸ やりたいことを入力（自然言語でOK）'}
+          {selectedTool === 'custom' ? '▸ Enter command' : '▸ Describe what you want (natural language OK)'}
         </Text>
         {selectedTool === 'custom' ? (
           <TextInput
             style={styles.input}
             value={customCommand}
             onChangeText={setCustomCommand}
-            placeholder="例: ls -la / cat README.md"
+            placeholder="e.g. ls -la / cat README.md"
             placeholderTextColor="#374151"
             multiline
             numberOfLines={2}
@@ -496,8 +496,8 @@ export function ToolsLane({
             onChangeText={setUserInput}
             placeholder={
               selectedTool === 'claude'
-                ? '例: このフォルダのREADMEを書いて'
-                : '例: このコードのバグを直して'
+                ? 'e.g. Write a README for this folder'
+                : 'e.g. Fix bugs in this code'
             }
             placeholderTextColor="#374151"
             multiline
@@ -516,7 +516,7 @@ export function ToolsLane({
             onPress={handleCheck}
           >
             <Text style={styles.actionBtnText}>
-              {selectedTool === 'custom' ? '▶ 実行' : '◎ 確認して実行'}
+              {selectedTool === 'custom' ? '▶ Run' : '◎ Check & Run'}
             </Text>
           </Pressable>
         )}
@@ -527,13 +527,13 @@ export function ToolsLane({
               style={[styles.actionBtn, styles.runBtn]}
               onPress={handleRun}
             >
-              <Text style={styles.actionBtnText}>▶ 実行</Text>
+              <Text style={styles.actionBtnText}>▶ Run</Text>
             </Pressable>
             <Pressable
               style={[styles.actionBtn, styles.resetBtn]}
               onPress={() => setStatus('idle')}
             >
-              <Text style={styles.resetBtnText}>✕ リセット</Text>
+              <Text style={styles.resetBtnText}>✕ Reset</Text>
             </Pressable>
           </>
         )}
@@ -548,7 +548,7 @@ export function ToolsLane({
                 }}
               >
                 <Text style={styles.actionBtnText}>
-                  ↗ Terminalでセットアップ
+                  ↗ Setup in Terminal
                 </Text>
               </Pressable>
             )}
@@ -556,7 +556,7 @@ export function ToolsLane({
               style={[styles.actionBtn, styles.resetBtn]}
               onPress={() => setStatus('idle')}
             >
-              <Text style={styles.resetBtnText}>← 戻る</Text>
+              <Text style={styles.resetBtnText}>← Back</Text>
             </Pressable>
           </>
         )}
@@ -566,7 +566,7 @@ export function ToolsLane({
             style={[styles.actionBtn, styles.cancelBtn]}
             onPress={handleCancel}
           >
-            <Text style={styles.actionBtnText}>■ キャンセル</Text>
+            <Text style={styles.actionBtnText}>■ Cancel</Text>
           </Pressable>
         )}
 
@@ -575,7 +575,7 @@ export function ToolsLane({
             style={[styles.actionBtn, styles.resetBtn]}
             onPress={handleReset}
           >
-            <Text style={styles.resetBtnText}>↺ 新しい操作</Text>
+            <Text style={styles.resetBtnText}>↺ New operation</Text>
           </Pressable>
         )}
       </View>
@@ -584,21 +584,21 @@ export function ToolsLane({
       {status === 'checking' && (
         <View style={styles.statusRow}>
           <ActivityIndicator size="small" color="#00D4AA" />
-          <Text style={styles.statusText}>確認中…</Text>
+          <Text style={styles.statusText}>Checking...</Text>
         </View>
       )}
 
       {status === 'running' && (
         <View style={styles.statusRow}>
           <ActivityIndicator size="small" color="#F59E0B" />
-          <Text style={styles.statusText}>実行中…</Text>
+          <Text style={styles.statusText}>Running...</Text>
         </View>
       )}
 
       {/* Logs */}
       {logs.length > 0 && (
         <View style={styles.logContainer}>
-          <Text style={styles.logHeader}>▸ ログ</Text>
+          <Text style={styles.logHeader}>▸ Logs</Text>
           <ScrollView style={styles.logScroll} nestedScrollEnabled>
             {logs.map((entry) => (
               <Text
@@ -621,13 +621,13 @@ export function ToolsLane({
       {runResult && (status === 'done' || status === 'error') && (
         <View style={[styles.resultContainer, !runResult.success && styles.resultContainerError]}>
           <Text style={styles.resultTitle}>
-            {runResult.success ? '✓ 完了' : '✕ エラー'}
+            {runResult.success ? '✓ Done' : '✕ Error'}
           </Text>
           <Text style={styles.resultSummary}>{runResult.naturalSummary}</Text>
 
           {runResult.changedFiles.length > 0 && (
             <View style={styles.resultFiles}>
-              <Text style={styles.resultFilesLabel}>変更したファイル:</Text>
+              <Text style={styles.resultFilesLabel}>Changed files:</Text>
               {runResult.changedFiles.map((f, i) => (
                 <Text key={i} style={styles.resultFileItem}>  • {f}</Text>
               ))}
@@ -636,7 +636,7 @@ export function ToolsLane({
 
           {runResult.nextActions.length > 0 && (
             <View style={styles.resultNext}>
-              <Text style={styles.resultNextLabel}>次にできること:</Text>
+              <Text style={styles.resultNextLabel}>Next steps:</Text>
               {runResult.nextActions.map((action, i) => (
                 <Text key={i} style={styles.resultNextItem}>  {i + 1}. {action}</Text>
               ))}
@@ -649,7 +649,7 @@ export function ToolsLane({
               style={styles.terminalBtn}
               onPress={() => onSendToTerminal(currentPlan.command)}
             >
-              <Text style={styles.terminalBtnText}>↗ Terminalで確認</Text>
+              <Text style={styles.terminalBtnText}>↗ View in Terminal</Text>
             </Pressable>
           )}
         </View>
@@ -660,7 +660,7 @@ export function ToolsLane({
         <View style={styles.connectionBannerLeft}>
           <View style={[styles.connectionDot, termuxConnected ? styles.connectionDotOk : styles.connectionDotOff]} />
           <Text style={[styles.connectionBannerText, termuxConnected ? styles.connectionBannerTextOk : styles.connectionBannerTextOff]}>
-            {termuxConnected ? 'Termux Bridge 接続中' : 'Termux Bridge 未接続'}
+            {termuxConnected ? 'Termux Bridge connected' : 'Termux Bridge disconnected'}
           </Text>
         </View>
         {!termuxConnected && onTestConnection && (
@@ -670,10 +670,10 @@ export function ToolsLane({
             disabled={bridgeCheckStatus === 'checking'}
           >
             <Text style={styles.bridgeCheckBtnText}>
-              {bridgeCheckStatus === 'checking' ? '確認中…' :
+              {bridgeCheckStatus === 'checking' ? 'Checking...' :
                bridgeCheckStatus === 'ok' ? '✓ OK' :
-               bridgeCheckStatus === 'fail' ? '✕ 未起動' :
-               '接続確認'}
+               bridgeCheckStatus === 'fail' ? '✕ Not running' :
+               'Check connection'}
             </Text>
           </Pressable>
         )}
@@ -682,20 +682,20 @@ export function ToolsLane({
       {/* Bridge Setup Guide (shown when disconnected) */}
       {!termuxConnected && (
         <View style={styles.setupGuide}>
-          <Text style={styles.setupGuideTitle}>📱 Termuxで以下を実行してください</Text>
-          <Text style={styles.setupGuideStep}>1. Termuxを開く</Text>
+          <Text style={styles.setupGuideTitle}>📱 Run the following in Termux</Text>
+          <Text style={styles.setupGuideStep}>1. Open Termux</Text>
           <View style={styles.setupGuideCmd}>
             <Text style={styles.setupGuideCmdText}>cd ~/shelly-bridge && node server.js</Text>
           </View>
           <Text style={styles.setupGuideNote}>
-            初回はまずセットアップが必要です：
+            First-time setup required:
           </Text>
           <View style={styles.setupGuideCmd}>
             <Text style={styles.setupGuideCmdText}>{'pkg install nodejs && mkdir -p ~/shelly-bridge && cp -r /sdcard/shelly-bridge/* ~/shelly-bridge/ && cd ~/shelly-bridge && npm install'}</Text>
           </View>
           <Text style={styles.setupGuideNote}>
-            起動後、Settings → Termux Bridge URL で
-            ws://127.0.0.1:8765 を設定して「接続確認」をタップ。
+            After starting, go to Settings → Termux Bridge URL,
+            set ws://127.0.0.1:8765 and tap 'Check connection'.
           </Text>
         </View>
       )}

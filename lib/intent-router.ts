@@ -1,42 +1,38 @@
 /**
- * lib/intent-router.ts — v1.0
+ * lib/intent-router.ts — v1.1
  *
- * LLMベースのインテントルーター。
+ * LLM-based intent router.
  *
- * ユーザーの自然言語入力をローカルLLMが解析し、最適なツールを選択する。
- * キーワードマッチではなく、LLMの文脈理解でルーティングする。
+ * Analyzes user input via local LLM and selects the optimal tool.
+ * Uses LLM contextual understanding rather than keyword matching.
  *
- * フロー:
- * 1. ユーザー入力 + 利用可能ツール状態をLLMに送信
- * 2. LLMがJSON形式で {tool, reason, setupRequired} を返す
- * 3. setupRequired=true の場合、env-manager経由で自動セットアップを提案
- * 4. フォールバック: LLM未接続時はキーワードベースの classifyTask() を使用
+ * Flow:
+ * 1. Send user input + available tool status to LLM
+ * 2. LLM returns JSON: {tool, reason, setupRequired}
+ * 3. If setupRequired=true, suggest auto-setup via env-manager
+ * 4. Fallback: keyword-based classifyTask() when LLM unavailable
+ *
+ * Priority order (when LLM unavailable):
+ *   local-llm > claude-code > codex > gemini-cli
  */
 
 import type { ToolStatus } from './shelly-system-prompt';
 import type { LocalLlmConfig, OllamaMessage, TaskCategory } from './local-llm';
 import { ollamaChat, classifyTask } from './local-llm';
 import type { ToolId } from './env-manager';
-import { TOOL_CATALOG, getToolById } from './env-manager';
+import { getToolById } from './env-manager';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type RoutingTool = 'claude-code' | 'gemini-cli' | 'codex' | 'local-llm' | 'termux';
 
 export interface RoutingDecision {
-  /** 選択されたツール */
   tool: RoutingTool;
-  /** LLMの判断理由（ユーザーに表示） */
   reason: string;
-  /** ツールが未インストールでセットアップが必要か */
   setupRequired: boolean;
-  /** セットアップが必要なツールのID */
   setupToolId?: ToolId;
-  /** セットアップの誘導メッセージ */
   setupMessage?: string;
-  /** ユーザーに送るプロンプト（ツールに渡すテキスト） */
   prompt: string;
-  /** フォールバックで判定されたか */
   usedFallback: boolean;
 }
 
@@ -47,68 +43,65 @@ function buildRoutingPrompt(toolStatuses: ToolStatus[]): string {
     {
       id: 'claude-code',
       name: 'Claude Code',
-      strengths: 'コード生成、ファイル編集、プロジェクト作成、バグ修正、リファクタリング、git操作。自律的にファイルを読み書きしながら開発を進められる。最も賢く、複雑なタスクに強い。',
+      strengths: 'Code generation, file editing, project creation, bug fixing, refactoring, git operations. Can autonomously read/write files. Most capable for complex tasks.',
     },
     {
       id: 'gemini-cli',
       name: 'Gemini CLI',
-      strengths: 'ウェブ検索、最新情報の調査、ドキュメント調査、コード生成。Google検索と連携した情報収集が得意。無料枠あり。',
+      strengths: 'Web search, latest info research, documentation lookup, code generation. Good at information gathering via Google Search. Free tier available.',
     },
     {
       id: 'codex',
       name: 'Codex CLI',
-      strengths: '高速で軽量なコード修正、簡単なファイル編集、シンプルなタスク。Claude Codeより軽く、素早い修正に向いている。',
+      strengths: 'Fast, lightweight code fixes, simple file edits, quick tasks. Lighter than Claude Code, suited for quick modifications.',
     },
     {
       id: 'local-llm',
-      name: 'ローカルLLM',
-      strengths: '一般的な質問・会話、簡単な相談、概念の説明。オフラインで動作し、プライバシーを保てる。ただしコード生成や実行はできない。',
+      name: 'Local LLM',
+      strengths: 'General questions, conversations, simple consultations, concept explanations. Works offline with privacy. Cannot generate or execute code.',
     },
     {
       id: 'termux',
-      name: 'Termuxコマンド',
-      strengths: '単純なファイル操作（ls, mkdir, cp, mv, rm）、パッケージ管理、シェルスクリプト実行。AIが不要な直接的なコマンド実行。',
+      name: 'Termux Command',
+      strengths: 'Simple file operations (ls, mkdir, cp, mv, rm), package management, shell script execution. Direct command execution without AI.',
     },
   ];
 
   const statusLines = toolDescriptions.map((t) => {
     const status = toolStatuses.find((s) => s.id === t.id);
-    const available = status?.installed ? '利用可能' : '未インストール';
-    return `- ${t.name} (${t.id}): ${t.strengths}\n  状態: ${available}`;
+    const available = status?.installed ? 'Available' : 'Not installed';
+    return `- ${t.name} (${t.id}): ${t.strengths}\n  Status: ${available}`;
   }).join('\n');
 
-  return `あなたはShellyアプリのインテントルーターです。
-ユーザーの入力を分析し、最適なツールを1つ選んでください。
+  return `You are the intent router for the Shelly app.
+Analyze the user's input and select the single most appropriate tool.
 
-# 利用可能なツール
+# Available Tools
 ${statusLines}
 
-# ルール
-1. ユーザーの意図を正確に理解し、最も適切なツールを選ぶ
-2. 複合タスク（調査+実装）の場合は、主要な作業に最適なツールを選ぶ
-3. 未インストールのツールでも、最適であれば選んでよい（セットアップを案内する）
-4. 簡単な会話・質問はlocal-llmで処理する（外部ツール不要）
-5. 単純なファイル操作（ls, mkdir等）はtermuxで直接実行する
+# Rules
+1. Accurately understand user intent and choose the most appropriate tool
+2. For compound tasks (research+implementation), choose the tool best for the primary work
+3. Even uninstalled tools can be selected if optimal (setup will be offered)
+4. Simple conversation/questions should use local-llm (no external tool needed)
+5. Simple file operations (ls, mkdir etc.) should use termux directly
+6. Prefer installed tools over uninstalled ones when capabilities are similar
 
-# 出力形式（必ずこのJSON形式で返してください）
-{"tool":"ツールID","reason":"選択理由（日本語、1-2文）"}
+# Output format (always return this exact JSON format)
+{"tool":"toolID","reason":"selection reason (1-2 sentences)"}
 
-JSONのみを返してください。説明やマークダウンは不要です。`;
+Return only JSON. No explanation or markdown.`;
 }
 
 // ─── LLM-based Router ────────────────────────────────────────────────────────
 
-/**
- * ローカルLLMでユーザー入力を解析し、最適なツールを選択する。
- * LLM未接続時はキーワードベースにフォールバック。
- */
 export async function routeIntent(
   userInput: string,
   config: LocalLlmConfig,
   toolStatuses: ToolStatus[] = [],
   defaultAgent?: 'gemini-cli' | 'claude-code' | 'codex',
 ): Promise<RoutingDecision> {
-  // LLM無効時はフォールバック
+  // LLM disabled → fallback
   if (!config.enabled) {
     return fallbackRoute(userInput, toolStatuses, defaultAgent);
   }
@@ -121,28 +114,22 @@ export async function routeIntent(
   const result = await ollamaChat(config, messages, 15000);
 
   if (!result.success || !result.content) {
-    return fallbackRoute(userInput, toolStatuses);
+    return fallbackRoute(userInput, toolStatuses, defaultAgent);
   }
 
-  // LLMの出力からJSONをパース
   try {
     const parsed = parseRoutingResponse(result.content);
     if (parsed) {
       return buildDecision(parsed.tool, parsed.reason, userInput, toolStatuses, false);
     }
   } catch {
-    // パース失敗 → フォールバック
+    // parse failure → fallback
   }
 
   return fallbackRoute(userInput, toolStatuses, defaultAgent);
 }
 
-/**
- * LLMレスポンスからJSONを抽出する。
- * LLMが余計なテキストを付けることがあるので、JSON部分だけ取り出す。
- */
 function parseRoutingResponse(content: string): { tool: RoutingTool; reason: string } | null {
-  // JSON部分を探す
   const jsonMatch = content.match(/\{[^{}]*"tool"\s*:\s*"[^"]+?"[^{}]*\}/);
   if (!jsonMatch) return null;
 
@@ -176,7 +163,6 @@ function buildDecision(
     usedFallback,
   };
 
-  // ツールのインストール状態をチェック
   const toolIdMap: Partial<Record<RoutingTool, ToolId>> = {
     'claude-code': 'claude-code',
     'gemini-cli': 'gemini-cli',
@@ -190,8 +176,8 @@ function buildDecision(
       decision.setupRequired = true;
       decision.setupToolId = toolId;
       decision.setupMessage = toolDef
-        ? `${toolDef.name}がまだインストールされていません。${toolDef.userFriendlyDescription}\n\nセットアップを開始しますか？`
-        : `${toolId}のセットアップが必要です。インストールを開始しますか？`;
+        ? `${toolDef.name} is not installed yet. ${toolDef.userFriendlyDescription}\n\nStart setup?`
+        : `${toolId} needs to be set up. Start installation?`;
     }
   }
 
@@ -201,67 +187,63 @@ function buildDecision(
 // ─── Fallback (Keyword-based) ─────────────────────────────────────────────────
 
 /**
- * LLM無効時のフォールバックルーティング。
+ * Fallback routing when LLM is unavailable.
  *
- * ペルソナB（ローカルLLM無し）のデフォルト:
- * - chatカテゴリ → Gemini CLI（無料枠あり、セットアップ簡単、自然言語対応）
- * - code → インストール済みのCLIを優先、なければGemini CLI
- * - research → Gemini CLI
- * - file_ops → Termux直接実行
- * - unknown → Gemini CLI
+ * Priority order (based on installed tools):
+ *   claude-code (if installed) > codex (if installed) > gemini-cli
  *
- * ローカルLLMが無い = フォールバック = 初心者の可能性が高い。
- * Geminiをデフォルトにすることで、コスト・ハードル・汎用性のバランスを取る。
+ * - chat → local-llm (should not reach here if local LLM works, but as fallback use best installed CLI)
+ * - code → claude-code > codex > gemini-cli
+ * - research → gemini-cli (best for search)
+ * - file_ops → termux
+ * - unknown → best installed CLI
  */
 function fallbackRoute(
   userInput: string,
   toolStatuses: ToolStatus[],
-  defaultAgent: RoutingTool = 'gemini-cli',
+  explicitDefault?: RoutingTool,
 ): RoutingDecision {
   const input = userInput.toLowerCase();
   const category = classifyTask(userInput);
 
-  // 明示的にツール名を指定している場合、そのツールにルーティング
-  const mentionsClaude = ['claude', 'クロード', 'クロードコード'].some((k) => input.includes(k));
-  const mentionsGemini = ['gemini', 'ジェミニ'].some((k) => input.includes(k));
+  // Explicit tool name mentions
+  const mentionsClaude = ['claude'].some((k) => input.includes(k));
+  const mentionsGemini = ['gemini'].some((k) => input.includes(k));
   if (mentionsClaude && !mentionsGemini) {
-    return buildDecision('claude-code', 'Claude Codeで実行します', userInput, toolStatuses, true);
+    return buildDecision('claude-code', 'Routing to Claude Code', userInput, toolStatuses, true);
   }
   if (mentionsGemini && !mentionsClaude) {
-    return buildDecision('gemini-cli', 'Gemini CLIで実行します', userInput, toolStatuses, true);
+    return buildDecision('gemini-cli', 'Routing to Gemini CLI', userInput, toolStatuses, true);
   }
 
-  // インストール済みのCLIを確認
-  const hasClaudeCode = toolStatuses.some((s) => s.id === 'claude-code' && s.installed);
+  // Determine best available CLI based on installed tools
+  const hasClaude = toolStatuses.some((s) => s.id === 'claude-code' && s.installed);
+  const hasCodex = toolStatuses.some((s) => s.id === 'codex' && s.installed);
 
-  // ツール名の日本語ラベル
-  const agentLabels: Record<string, string> = {
-    'gemini-cli': 'Gemini CLI',
-    'claude-code': 'Claude Code',
-    'codex': 'Codex CLI',
-  };
-  const defaultLabel = agentLabels[defaultAgent] || defaultAgent;
+  // Default agent priority: explicit > claude-code > codex > gemini-cli
+  const defaultAgent: RoutingTool = explicitDefault
+    ?? (hasClaude ? 'claude-code' : hasCodex ? 'codex' : 'gemini-cli');
 
-  // codeカテゴリ: Claude Codeがあればそちら、なければデフォルトエージェント
-  const codeTool: RoutingTool = hasClaudeCode ? 'claude-code' : defaultAgent;
-  const codeReason = hasClaudeCode
-    ? 'コード関連のタスクのため、Claude Codeに委譲します'
-    : `コード関連のタスクです。${defaultLabel}で対応します`;
+  const defaultLabel = defaultAgent === 'claude-code' ? 'Claude Code'
+    : defaultAgent === 'codex' ? 'Codex CLI' : 'Gemini CLI';
+
+  // Code tasks: prefer claude-code if available
+  const codeTool: RoutingTool = hasClaude ? 'claude-code' : defaultAgent;
 
   const categoryToTool: Record<TaskCategory, RoutingTool> = {
     chat: defaultAgent,
     code: codeTool,
-    research: 'gemini-cli',  // 調査は常にGemini（検索連携が強い）
+    research: 'gemini-cli',
     file_ops: 'termux',
     unknown: defaultAgent,
   };
 
   const categoryReasons: Record<TaskCategory, string> = {
-    chat: `${defaultLabel}で回答します`,
-    code: codeReason,
-    research: '調査・検索タスクのため、Gemini CLIに委譲します',
-    file_ops: 'ファイル操作のため、直接実行します',
-    unknown: `${defaultLabel}で対応します`,
+    chat: `Responding via ${defaultLabel}`,
+    code: hasClaude ? 'Code task — delegating to Claude Code' : `Code task — using ${defaultLabel}`,
+    research: 'Research task — delegating to Gemini CLI',
+    file_ops: 'File operation — executing directly',
+    unknown: `Using ${defaultLabel}`,
   };
 
   const tool = categoryToTool[category];
@@ -272,17 +254,13 @@ function fallbackRoute(
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
-/**
- * ルーティング結果をユーザー向けメッセージに変換する。
- * Chatタブで表示する。
- */
 export function formatRoutingMessage(decision: RoutingDecision): string {
   const toolLabels: Record<RoutingTool, string> = {
     'claude-code': 'Claude Code',
     'gemini-cli': 'Gemini CLI',
     'codex': 'Codex CLI',
-    'local-llm': 'ローカルLLM',
-    'termux': 'ターミナル',
+    'local-llm': 'Local LLM',
+    'termux': 'Terminal',
   };
 
   const label = toolLabels[decision.tool];
@@ -291,5 +269,5 @@ export function formatRoutingMessage(decision: RoutingDecision): string {
     return decision.setupMessage;
   }
 
-  return `${label}で処理します。\n理由: ${decision.reason}`;
+  return `Delegated to ${label}.\nReason: ${decision.reason}`; // Caller should use t('intent.delegated') if displaying to user
 }

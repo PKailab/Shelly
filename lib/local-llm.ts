@@ -300,7 +300,7 @@ export async function ollamaChat(
     if (apiType === 'openai') {
       const openAiData = data as OpenAIChatResponse;
       const content = openAiData.choices?.[0]?.message?.content ?? '';
-      if (!content) return { success: false, content: '', error: 'レスポンスが空です' };
+      if (!content) return { success: false, content: '', error: 'Empty response' };
       return { success: true, content };
     } else {
       const ollamaData = data as OllamaChatResponse;
@@ -312,7 +312,7 @@ export async function ollamaChat(
     return {
       success: false,
       content: '',
-      error: isTimeout ? 'タイムアウト（60秒）。モデルが重すぎる可能性があります。' : message,
+      error: isTimeout ? 'Timeout (60s). The model may be too large.' : message, // Keep English for debugging (not user-facing)
     };
   }
 }
@@ -444,7 +444,7 @@ export async function ollamaChatStream(
     const isTimeout = message.includes('abort') || message.includes('timeout');
     return {
       success: false,
-      error: isTimeout ? 'タイムアウト。モデルが重すぎる可能性があります。' : message,
+      error: isTimeout ? 'Timeout. The model may be too large.' : message,
     };
   }
 }
@@ -479,7 +479,7 @@ export async function orchestrateTask(
       category: 'unknown',
       handledBy: 'local_llm',
       response: routing.setupMessage,
-      reasoning: `${routing.tool}が未インストール。セットアップを提案。`,
+      reasoning: `${routing.tool} not installed. Suggesting setup.`,
       setupRequired: true,
       setupMessage: routing.setupMessage,
       setupToolId: routing.setupToolId,
@@ -519,7 +519,7 @@ export async function orchestrateTask(
           category: 'chat',
           handledBy: 'claude',
           delegatedCommand: buildClaudeCommand(userInput),
-          reasoning: `Local LLMエラー（${result.error}）のため、Claude Codeにフォールバック`,
+          reasoning: `Local LLM error (${result.error}), falling back to Claude Code`,
           routingDecision: routing,
         };
       }
@@ -593,7 +593,32 @@ export async function orchestrateChatStream(
   toolStatuses?: ToolStatus[],
   defaultAgent?: 'gemini-cli' | 'claude-code' | 'codex',
   externalSignal?: AbortSignal,
+  forceLocal?: boolean,
 ): Promise<OrchestrationResult> {
+  // @localで明示指定された場合はルーティングをスキップ
+  if (forceLocal) {
+    const systemContent = buildSystemPrompt({ toolStatuses, projectContext, userProfileSummary, customContext });
+    const messages: OllamaMessage[] = [
+      { role: 'system', content: systemContent },
+      ...conversationHistory,
+      { role: 'user', content: userInput },
+    ];
+    const isReactNative = typeof navigator !== 'undefined' && navigator.product === 'ReactNative';
+    if (!isReactNative) {
+      const result = await ollamaChatStream(config, messages, onChunk, 120000, externalSignal);
+      if (result.success) {
+        return { category: 'chat', handledBy: 'local_llm', response: '', reasoning: 'Direct @local mention' };
+      }
+    }
+    const result = await ollamaChat(config, messages, 120000);
+    if (result.success && result.content) {
+      onChunk(result.content, true);
+      return { category: 'chat', handledBy: 'local_llm', response: result.content, reasoning: 'Direct @local mention' };
+    }
+    onChunk('Could not connect to local LLM. Make sure llama-server is running.', true); // Streamed to UI — caller should use t() if needed
+    return { category: 'chat', handledBy: 'local_llm', response: '', reasoning: 'Connection failed' };
+  }
+
   // LLMベースのインテントルーティング
   const routing = await routeIntent(userInput, config, toolStatuses ?? [], defaultAgent);
 
@@ -643,7 +668,7 @@ export async function orchestrateChatStream(
       return {
         category: 'chat',
         handledBy: 'local_llm',
-        reasoning: `Local LLM (${config.model}) ストリーミング回答`,
+        reasoning: `Local LLM (${config.model}) streaming response`,
       };
     }
   }
@@ -655,7 +680,7 @@ export async function orchestrateChatStream(
     return {
       category: 'chat',
       handledBy: 'local_llm',
-      reasoning: `Local LLM (${config.model}) 回答`,
+      reasoning: `Local LLM (${config.model}) response`,
     };
   }
 
@@ -663,7 +688,7 @@ export async function orchestrateChatStream(
     category: 'chat',
     handledBy: 'claude',
     delegatedCommand: buildClaudeCommand(userInput),
-    reasoning: `Local LLMエラー（${fallback.error}）のため、Claude Codeにフォールバック`,
+    reasoning: `Local LLM error (${fallback.error}), falling back to Claude Code`,
   };
 }
 
@@ -691,11 +716,11 @@ function buildCodexCommand(userInput: string): string {
  */
 export function getCategoryLabel(category: TaskCategory): string {
   const labels: Record<TaskCategory, string> = {
-    chat: '基本チャット',
-    code: 'コード生成',
-    research: '調査・検索',
-    file_ops: 'ファイル操作',
-    unknown: '不明',
+    chat: 'Chat',
+    code: 'Code Generation',
+    research: 'Research',
+    file_ops: 'File Operations',
+    unknown: 'Unknown',
   };
   return labels[category];
 }
@@ -705,7 +730,7 @@ export function getCategoryLabel(category: TaskCategory): string {
  */
 export function getHandlerLabel(handler: OrchestrationResult['handledBy']): string {
   const labels: Record<OrchestrationResult['handledBy'], string> = {
-    local_llm: 'ローカルLLM',
+    local_llm: 'Local LLM',
     claude: 'Claude Code',
     gemini: 'Gemini CLI',
     codex: 'Codex CLI',

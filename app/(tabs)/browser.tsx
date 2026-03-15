@@ -36,6 +36,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useBookmarkStore, type Bookmark } from '@/store/bookmark-store';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useRouter } from 'expo-router';
+import { useTranslation } from '@/lib/i18n';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,7 @@ function BookmarkRow({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BrowserScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
 
@@ -184,11 +186,11 @@ export default function BrowserScreen() {
       const bm = useBookmarkStore.getState().getBookmarkByUrl(currentUrl);
       if (bm) {
         await removeBookmark(bm.id);
-        Alert.alert('ブックマーク削除', `「${pageTitle || getDomain(currentUrl)}」を削除しました`);
+        Alert.alert(t('browser.bookmark_removed'), t('browser.bookmark_removed_msg', { title: pageTitle || getDomain(currentUrl) }));
       }
     } else {
       await addBookmark(currentUrl, pageTitle || getDomain(currentUrl));
-      Alert.alert('ブックマーク追加', `「${pageTitle || getDomain(currentUrl)}」を保存しました`);
+      Alert.alert(t('browser.bookmark_added'), t('browser.bookmark_added_msg', { title: pageTitle || getDomain(currentUrl) }));
     }
   };
 
@@ -210,7 +212,7 @@ export default function BrowserScreen() {
 
   const handleCopyUrl = async () => {
     await Clipboard.setStringAsync(currentUrl);
-    Alert.alert('コピー完了', 'URLをクリップボードにコピーしました');
+    Alert.alert(t('browser.copied'), t('browser.copied_url'));
   };
 
   // ── AI Assist ───────────────────────────────────────────────────────────────
@@ -221,7 +223,7 @@ export default function BrowserScreen() {
     setAiError('');
     setIsAiLoading(true);
 
-    const prompt = `以下のURLのページを要約してください。URLのドメインとタイトルから内容を推測して、日本語で簡潔に説明してください。\n\nURL: ${currentUrl}\nページタイトル: ${pageTitle || '不明'}`;
+    const prompt = `Summarize the following page. Infer the content from the URL domain and title, and provide a concise summary.\n\nURL: ${currentUrl}\nPage title: ${pageTitle || 'Unknown'}`;
 
     try {
       // 優先順位: Perplexity → Gemini → Local LLM
@@ -232,11 +234,11 @@ export default function BrowserScreen() {
       } else if (settings.localLlmEnabled) {
         await summarizeWithLocalLlm(prompt, settings.localLlmUrl);
       } else {
-        setAiError('AIを使用するには、設定でPerplexity / Gemini APIキーまたはLocal LLMを有効にしてください。');
+        setAiError(t('browser.ai_no_provider'));
         setIsAiLoading(false);
       }
     } catch (err) {
-      setAiError(`エラー: ${err instanceof Error ? err.message : String(err)}`);
+      setAiError(`Error: ${err instanceof Error ? err.message : String(err)}`);
       setIsAiLoading(false);
     }
   };
@@ -257,7 +259,7 @@ export default function BrowserScreen() {
       model ?? 'gemini-2.0-flash',
     );
     if (!result.success && !result.content) {
-      throw new Error(result.error ?? 'Gemini APIエラー');
+      throw new Error(result.error ?? 'Gemini API error');
     }
   };
 
@@ -280,11 +282,11 @@ export default function BrowserScreen() {
     });
 
     if (!response.ok) {
-      throw new Error(`Perplexity API エラー: ${response.status}`);
+      throw new Error(`Perplexity API error: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error('レスポンスの読み取りに失敗しました');
+    if (!reader) throw new Error('Failed to read response');
 
     const decoder = new TextDecoder();
     let accumulated = '';
@@ -323,7 +325,7 @@ export default function BrowserScreen() {
         messages: [
           {
             role: 'system',
-            content: '必ず日本語で返答してください。簡潔にまとめてください。',
+            content: 'Provide a concise summary.',
           },
           { role: 'user', content: prompt },
         ],
@@ -333,11 +335,11 @@ export default function BrowserScreen() {
     });
 
     if (!response.ok) {
-      throw new Error(`Local LLM エラー: ${response.status}`);
+      throw new Error(`Local LLM error: ${response.status}`);
     }
 
     const reader = response.body?.getReader();
-    if (!reader) throw new Error('レスポンスの読み取りに失敗しました');
+    if (!reader) throw new Error('Failed to read response');
 
     const decoder = new TextDecoder();
     let accumulated = '';
@@ -411,7 +413,7 @@ export default function BrowserScreen() {
             }}
             onBlur={() => setIsAddressBarFocused(false)}
             onSubmitEditing={handleAddressSubmit}
-            placeholder="URLまたは検索ワードを入力"
+            placeholder={t('browser.enter_url')}
             placeholderTextColor={COLORS.muted}
             autoCapitalize="none"
             autoCorrect={false}
@@ -472,7 +474,7 @@ export default function BrowserScreen() {
         {/* Home */}
         <Pressable onPress={() => navigate(HOME_URL)} style={styles.toolBtn}>
           <MaterialIcons name="home" size={22} color={COLORS.muted} />
-          <Text style={styles.toolLabel}>Home</Text>
+          <Text style={styles.toolLabel}>{t('browser.home')}</Text>
         </Pressable>
 
         {/* Bookmark */}
@@ -483,26 +485,26 @@ export default function BrowserScreen() {
             color={bookmarked ? COLORS.accent : COLORS.muted}
           />
           <Text style={[styles.toolLabel, bookmarked && { color: COLORS.accent }]}>
-            {bookmarked ? 'Saved' : 'Save'}
+            {bookmarked ? t('browser.saved') : t('browser.save')}
           </Text>
         </Pressable>
 
         {/* Bookmark List */}
         <Pressable onPress={() => setShowBookmarks(true)} style={styles.toolBtn}>
           <MaterialIcons name="list" size={22} color={COLORS.muted} />
-          <Text style={styles.toolLabel}>List</Text>
+          <Text style={styles.toolLabel}>{t('browser.list')}</Text>
         </Pressable>
 
         {/* Share */}
         <Pressable onPress={handleShare} style={styles.toolBtn}>
           <MaterialIcons name="share" size={22} color={COLORS.muted} />
-          <Text style={styles.toolLabel}>Share</Text>
+          <Text style={styles.toolLabel}>{t('browser.share')}</Text>
         </Pressable>
 
         {/* Copy URL */}
         <Pressable onPress={handleCopyUrl} style={styles.toolBtn}>
           <MaterialIcons name="content-copy" size={22} color={COLORS.muted} />
-          <Text style={styles.toolLabel}>Copy</Text>
+          <Text style={styles.toolLabel}>{t('browser.copy')}</Text>
         </Pressable>
 
         {/* AI Summarize */}
@@ -528,7 +530,7 @@ export default function BrowserScreen() {
         <Pressable style={styles.modalOverlay} onPress={() => setShowBookmarks(false)}>
           <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>ブックマーク</Text>
+              <Text style={styles.modalTitle}>{t('browser.bookmarks')}</Text>
               <Pressable onPress={() => setShowBookmarks(false)}>
                 <MaterialIcons name="close" size={20} color={COLORS.muted} />
               </Pressable>
@@ -536,8 +538,8 @@ export default function BrowserScreen() {
             {bookmarks.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialIcons name="bookmark-border" size={40} color={COLORS.muted} />
-                <Text style={styles.emptyText}>ブックマークはありません</Text>
-                <Text style={styles.emptySubText}>ツールバーの「Save」でブックマーク追加</Text>
+                <Text style={styles.emptyText}>{t('browser.no_bookmarks')}</Text>
+                <Text style={styles.emptySubText}>{t('browser.no_bookmarks_hint')}</Text>
               </View>
             ) : (
               <FlatList
@@ -572,7 +574,7 @@ export default function BrowserScreen() {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MaterialIcons name="auto-awesome" size={18} color={COLORS.ai} />
-                <Text style={[styles.modalTitle, { color: COLORS.ai }]}>AI 要約</Text>
+                <Text style={[styles.modalTitle, { color: COLORS.ai }]}>{t('browser.ai_summary')}</Text>
               </View>
               <Pressable onPress={() => setShowAiPanel(false)}>
                 <MaterialIcons name="close" size={20} color={COLORS.muted} />
@@ -591,10 +593,10 @@ export default function BrowserScreen() {
                 <ActivityIndicator color={COLORS.ai} />
                 <Text style={styles.aiLoadingText}>
                   {settings.perplexityApiKey
-                    ? 'Perplexity で検索中...'
+                    ? t('browser.ai_searching')
                     : settings.geminiApiKey
-                    ? 'Gemini で要約中...'
-                    : 'Local LLM で要約中...'}
+                    ? t('browser.ai_gemini')
+                    : t('browser.ai_local')}
                 </Text>
               </View>
             ) : aiError ? (
@@ -613,11 +615,11 @@ export default function BrowserScreen() {
                     style={styles.aiCopyBtn}
                     onPress={async () => {
                       await Clipboard.setStringAsync(aiSummary);
-                      Alert.alert('コピー完了', '要約をクリップボードにコピーしました');
+                      Alert.alert(t('browser.copied'), t('browser.summary_copied'));
                     }}
                   >
                     <MaterialIcons name="content-copy" size={14} color={COLORS.ai} />
-                    <Text style={styles.aiCopyBtnText}>要約をコピー</Text>
+                    <Text style={styles.aiCopyBtnText}>{t('browser.copy_summary')}</Text>
                   </Pressable>
                 ) : null}
               </View>

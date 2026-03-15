@@ -165,15 +165,15 @@ function TagEditModal({
         style={tagModalStyles.overlay}
       >
         <View style={tagModalStyles.sheet}>
-          <Text style={tagModalStyles.title}>タグを編集</Text>
+          <Text style={tagModalStyles.title}>Edit Tags</Text>
           <Text style={tagModalStyles.hint}>
-            カンマ区切りで入力（例：school, website, timer）
+            Comma separated (e.g. school, website, timer)
           </Text>
           <TextInput
             style={tagModalStyles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="タグを入力..."
+            placeholder="Enter tag..."
             placeholderTextColor="#374151"
             autoFocus
             returnKeyType="done"
@@ -184,13 +184,13 @@ function TagEditModal({
               style={({ pressed }) => [tagModalStyles.cancelBtn, pressed && { opacity: 0.7 }]}
               onPress={onClose}
             >
-              <Text style={tagModalStyles.cancelText}>キャンセル</Text>
+              <Text style={tagModalStyles.cancelText}>Cancel</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [tagModalStyles.saveBtn, pressed && { opacity: 0.7 }]}
               onPress={handleSave}
             >
-              <Text style={tagModalStyles.saveText}>保存</Text>
+              <Text style={tagModalStyles.saveText}>Save</Text>
             </Pressable>
           </View>
         </View>
@@ -295,11 +295,11 @@ function ProjectCard({
 
   const handleDelete = useCallback(() => {
     Alert.alert(
-      '削除する？',
-      `「${project.name}」を履歴から削除するよ。`,
+      'Delete?',
+      `「${project.name}」 will be removed from history.`,
       [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '削除', style: 'destructive', onPress: () => onDelete(project) },
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(project) },
       ]
     );
   }, [project, onDelete]);
@@ -307,13 +307,13 @@ function ProjectCard({
   const handleMenu = useCallback(() => {
     Alert.alert(
       project.name,
-      '操作を選んでね',
+      'Choose an action',
       [
-        { text: 'タグを編集', onPress: () => onEditTags(project) },
-        { text: '複製して作り直す', onPress: () => onClone(project) },
-        { text: '改善する', onPress: () => onImprove(project) },
-        { text: '削除', style: 'destructive', onPress: handleDelete },
-        { text: 'キャンセル', style: 'cancel' },
+        { text: 'Edit tags', onPress: () => onEditTags(project) },
+        { text: 'Clone', onPress: () => onClone(project) },
+        { text: 'Improve', onPress: () => onImprove(project) },
+        { text: 'Delete', style: 'destructive', onPress: handleDelete },
+        { text: 'Cancel', style: 'cancel' },
       ]
     );
   }, [project, onEditTags, onClone, onImprove, handleDelete]);
@@ -330,7 +330,7 @@ function ProjectCard({
           <Text style={cardStyles.date}>{formatDate(project.createdAt)}</Text>
         </View>
         <View style={[cardStyles.statusBadge, project.status === 'done' ? cardStyles.statusDone : cardStyles.statusError]}>
-          <Text style={cardStyles.statusText}>{project.status === 'done' ? '完成' : 'エラー'}</Text>
+          <Text style={cardStyles.statusText}>{project.status === 'done' ? 'Done' : 'Error'}</Text>
         </View>
         <Pressable
           style={({ pressed }) => [cardStyles.menuBtn, pressed && { opacity: 0.6 }]}
@@ -367,21 +367,21 @@ function ProjectCard({
           style={({ pressed }) => [cardStyles.actionBtn, cardStyles.actionOpen, pressed && { opacity: 0.7 }]}
           onPress={() => onOpen(project)}
         >
-          <Text style={cardStyles.actionOpenText}>📂 開く</Text>
+          <Text style={cardStyles.actionOpenText}>📂 Open</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [cardStyles.actionBtn, cardStyles.actionClone, pressed && { opacity: 0.7 }]}
           onPress={() => onClone(project)}
         >
-          <Text style={cardStyles.actionCloneText}>⧉ 複製</Text>
+          <Text style={cardStyles.actionCloneText}>⧉ Clone</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [cardStyles.actionBtn, cardStyles.actionImprove, pressed && { opacity: 0.7 }]}
           onPress={() => onImprove(project)}
         >
-          <Text style={cardStyles.actionImproveText}>✦ 改善</Text>
+          <Text style={cardStyles.actionImproveText}>✦ Improve</Text>
         </Pressable>
       </View>
     </View>
@@ -507,10 +507,10 @@ const cardStyles = StyleSheet.create({
 // ─── SortSelector ─────────────────────────────────────────────────────────────
 
 const SORT_OPTIONS: { value: ProjectSortOrder; label: string }[] = [
-  { value: 'createdAt', label: '新しい順' },
-  { value: 'lastOpenedAt', label: '最近開いた順' },
-  { value: 'name', label: '名前順' },
-  { value: 'tags', label: 'タグ順' },
+  { value: 'createdAt', label: 'Newest' },
+  { value: 'lastOpenedAt', label: 'Recently opened' },
+  { value: 'name', label: 'By name' },
+  { value: 'tags', label: 'By tags' },
 ];
 
 function SortSelector({
@@ -589,13 +589,13 @@ function TagChipFilter({
       style={tagFilterStyles.scroll}
       contentContainerStyle={tagFilterStyles.content}
     >
-      {/* "すべて" chip */}
+      {/* "All" chip */}
       <Pressable
         style={[tagFilterStyles.chip, activeTags.length === 0 && tagFilterStyles.chipActive]}
         onPress={onClear}
       >
         <Text style={[tagFilterStyles.chipText, activeTags.length === 0 && tagFilterStyles.chipTextActive]}>
-          すべて
+          All
         </Text>
       </Pressable>
 
@@ -690,12 +690,12 @@ export function ProjectHistoryLane({
 
   const handleGlobalMenu = useCallback(() => {
     Alert.alert(
-      'プロジェクト一覧',
-      '操作を選んでね',
+      'Project list',
+      'Choose an action',
       [
-        { text: 'エクスポート', onPress: onExport },
-        { text: 'インポート', onPress: onImport },
-        { text: 'キャンセル', style: 'cancel' },
+        { text: 'Export', onPress: onExport },
+        { text: 'Import', onPress: onImport },
+        { text: 'Cancel', style: 'cancel' },
       ]
     );
   }, [onExport, onImport]);
@@ -704,7 +704,7 @@ export function ProjectHistoryLane({
     <View style={styles.container}>
       {/* Header with menu */}
       <View style={styles.historyHeader}>
-        <Text style={styles.historyTitle}>📂 プロジェクト履歴</Text>
+        <Text style={styles.historyTitle}>📂 Project History</Text>
         <Pressable
           style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.6 }]}
           onPress={handleGlobalMenu}
@@ -721,7 +721,7 @@ export function ProjectHistoryLane({
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
-            placeholder="名前・日付・タグで検索..."
+            placeholder="Search by name, date, tag..."
             placeholderTextColor="#374151"
             returnKeyType="search"
             clearButtonMode="while-editing"
@@ -748,8 +748,8 @@ export function ProjectHistoryLane({
       {/* Result count */}
       <View style={styles.resultRow}>
         <Text style={styles.resultCount}>
-          {displayProjects.length} 件
-          {(query || activeTags.length > 0) ? ` / 全${projects.length}件` : ''}
+          {displayProjects.length} items
+          {(query || activeTags.length > 0) ? ` / total ${projects.length}items` : ''}
         </Text>
       </View>
 
@@ -761,13 +761,13 @@ export function ProjectHistoryLane({
           </Text>
           <Text style={styles.emptyText}>
             {projects.length === 0
-              ? 'まだプロジェクトがないよ'
-              : '見つからなかったよ'}
+              ? 'No projects yet'
+              : 'No results found'}
           </Text>
           <Text style={styles.emptyHint}>
             {projects.length === 0
-              ? 'Creatorで何か作ってみよう'
-              : '別の言葉で探してみて'}
+              ? 'Create something with Creator'
+              : 'Try different keywords'}
           </Text>
         </View>
       ) : (

@@ -1,10 +1,11 @@
 /**
- * SetupWizard.tsx — v2: Fully automated Termux setup
+ * SetupWizard.tsx — v2.1: Fully automated Termux setup + Auth
  *
- * 3-step wizard:
+ * 4-step wizard:
  * 1. Install apps (Termux + Termux:Tasker + Termux:Boot)
  * 2. Auto-setup (animated progress + feature slideshow)
- * 3. Complete (summary)
+ * 3. Complete (summary + auth prompt)
+ * 4. Auth (optional — AuthWizard modal for API keys)
  *
  * Design philosophy: Non-engineers should complete setup
  * by tapping "Next" a few times. No copy-paste. No Termux interaction.
@@ -39,6 +40,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from '@/lib/i18n';
 import { runAutoSetup, type SetupStep, type SetupProgress } from '@/lib/auto-setup';
 import { getStoreUrl, checkTermuxPackages } from '@/lib/termux-intent';
+import { AuthWizard } from '@/components/AuthWizard';
 
 const SETUP_WIZARD_KEY = '@shelly/setup_wizard_complete';
 
@@ -110,6 +112,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
   const [completedSteps, setCompletedSteps] = useState<Set<SetupStep>>(new Set());
   const [setupResult, setSetupResult] = useState<{ llmDetected: boolean } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showAuthWizard, setShowAuthWizard] = useState(false);
   const slideTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Detect installed apps via native module
@@ -466,8 +469,17 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
         />
       </View>
 
+      {/* Auth setup button */}
       <Pressable
-        style={[styles.primaryBtn, { backgroundColor: '#4ADE80' }]}
+        style={[styles.primaryBtn, { backgroundColor: '#60A5FA' }]}
+        onPress={() => setShowAuthWizard(true)}
+      >
+        <MaterialIcons name="vpn-key" size={18} color="#000" />
+        <Text style={styles.primaryBtnText}>{t('auth.settings_button')}</Text>
+      </Pressable>
+
+      <Pressable
+        style={[styles.primaryBtn, { backgroundColor: '#4ADE80', marginTop: 8 }]}
         onPress={handleDone}
       >
         <Text style={styles.primaryBtnText}>{t('setup2.get_started')}</Text>
@@ -514,6 +526,11 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
           {wizardStep === 'error' && renderErrorStep()}
         </View>
       </View>
+      {/* Auth Wizard (launched from complete step) */}
+      <AuthWizard
+        visible={showAuthWizard}
+        onComplete={() => setShowAuthWizard(false)}
+      />
     </Modal>
   );
 }

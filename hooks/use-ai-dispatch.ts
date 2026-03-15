@@ -22,6 +22,7 @@ import type { GeminiMessage } from '@/lib/gemini';
 import type { OllamaMessage } from '@/lib/local-llm';
 
 import { generateId } from '@/lib/id';
+import { t } from '@/lib/i18n';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -102,7 +103,7 @@ function toTextContext(messages: ChatMessage[], maxPairs = 4): string {
     const sanitized = m.content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').slice(0, CONTEXT_MSG_MAX_CHARS);
     return `${role}: ${sanitized}`;
   });
-  return `\n\n[会話コンテキスト]\n${lines.join('\n')}\n`;
+  return `\n\n[Conversation Context]\n${lines.join('\n')}\n`;
 }
 
 /** Convert chat messages to Perplexity messages format */
@@ -209,7 +210,7 @@ export function useAIDispatch() {
       const msg = session?.messages.find(m => m.id === msgId);
       const partialContent = msg?.streamingText || msg?.content || '';
       rawUpdateMessage(sessionId, msgId, {
-        content: partialContent ? partialContent + '\n\n*[生成中断]*' : '',
+        content: partialContent ? partialContent + '\n\n*[Cancelled]*' : '',
         isStreaming: false,
         streamingText: undefined,
       });
@@ -221,7 +222,7 @@ export function useAIDispatch() {
   const dispatch = useCallback(async (params: DispatchParams): Promise<DispatchResult> => {
     const { target, prompt, chatSessionId, messages, images, files } = params;
     const fileContext = files?.length ? buildFileContext(files) : '';
-    const promptWithFiles = fileContext ? `${prompt}\n\n[添付ファイル]\n${fileContext}` : prompt;
+    const promptWithFiles = fileContext ? `${prompt}\n\n[Attached Files]\n${fileContext}` : prompt;
 
     // Abort any previous in-flight request before starting a new one
     abortRef.current?.abort();
@@ -235,9 +236,9 @@ export function useAIDispatch() {
       const apiKey = settings.geminiApiKey ?? '';
       if (!apiKey) {
         updateMessage(chatSessionId, msgId, {
-          content: 'Gemini APIキーが設定されていません。\nhttps://aistudio.google.com/app/apikey で無料取得できます。',
+          content: t('dispatch.gemini_no_key'),
           isStreaming: false,
-          error: 'APIキー未設定',
+          error: t('dispatch.api_key_not_set'),
         });
         return { handled: true };
       }
@@ -275,14 +276,14 @@ export function useAIDispatch() {
         if (!result.success && !accumulated) {
           updateMessage(chatSessionId, msgId, {
             content: '',
-            error: `Geminiエラー: ${result.error ?? '不明なエラー'}`,
+            error: `Gemini error: ${result.error ?? 'Unknown error'}`,
             isStreaming: false,
           });
         }
       } catch (err) {
         if (!signal.aborted) {
           updateMessage(chatSessionId, msgId, {
-            content: '', error: `Geminiエラー: ${err instanceof Error ? err.message : String(err)}`,
+            content: '', error: `Gemini error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }
@@ -346,10 +347,11 @@ export function useAIDispatch() {
         projectCtx || undefined,
         userProfile || undefined,
         // Combine custom context + decision log into single context string
-        [customCtx, decisionLog ? `\n# 過去の設計判断\n${decisionLog}` : ''].filter(Boolean).join('\n') || undefined,
+        [customCtx, decisionLog ? `\n# Past Design Decisions\n${decisionLog}` : ''].filter(Boolean).join('\n') || undefined,
         undefined, // toolStatuses
         undefined, // defaultAgent
         signal,
+        true, // forceLocal — @local mention skips routing
       );
 
       if (result.handledBy !== 'local_llm') {
@@ -357,7 +359,7 @@ export function useAIDispatch() {
         if (result.delegatedCommand) {
           const toolLabel = result.handledBy === 'gemini' ? 'Gemini CLI' : result.handledBy === 'codex' ? 'Codex CLI' : 'Claude Code';
           updateMessage(chatSessionId, msgId, {
-            content: `${toolLabel}に委譲しました。\n理由: ${result.reasoning || ''}`,
+            content: t('dispatch.delegated_to', { tool: toolLabel, reason: result.reasoning || '' }),
             agent: mapTargetToAgent(result.handledBy ?? '') ?? 'local',
             isStreaming: false,
           });
@@ -371,7 +373,7 @@ export function useAIDispatch() {
         } else {
           updateMessage(chatSessionId, msgId, {
             content: '',
-            error: 'Local LLMに接続できませんでした。Settingsで接続を確認してください。',
+            error: t('dispatch.local_llm_error'),
             isStreaming: false,
           });
         }
@@ -386,8 +388,8 @@ export function useAIDispatch() {
       const apiKey = settings.perplexityApiKey ?? '';
       if (!apiKey) {
         updateMessage(chatSessionId, msgId, {
-          content: 'Perplexity APIキーが設定されていません。\nhttps://www.perplexity.ai/settings/api で取得できます。',
-          isStreaming: false, error: 'APIキー未設定',
+          content: t('dispatch.perplexity_no_key'),
+          isStreaming: false, error: t('dispatch.api_key_not_set'),
         });
         return { handled: true };
       }
@@ -421,7 +423,7 @@ export function useAIDispatch() {
         if (!signal.aborted) {
           updateMessage(chatSessionId, msgId, {
             content: accumulated || '',
-            error: `Perplexityエラー: ${err instanceof Error ? err.message : String(err)}`,
+            error: `Perplexity error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }
@@ -436,8 +438,8 @@ export function useAIDispatch() {
       const apiKey = settings.geminiApiKey ?? '';
       if (!apiKey) {
         updateMessage(chatSessionId, msgId, {
-          content: 'Gemini APIキーが設定されていません。\nhttps://aistudio.google.com/app/apikey で無料取得できます。',
-          isStreaming: false, error: 'APIキー未設定',
+          content: t('dispatch.gemini_no_key'),
+          isStreaming: false, error: t('dispatch.api_key_not_set'),
         });
         return { handled: true };
       }
@@ -467,14 +469,14 @@ export function useAIDispatch() {
         }, settings.geminiModel ?? 'gemini-2.0-flash', geminiHistory, signal);
         if (!result.success && !accumulated) {
           updateMessage(chatSessionId, msgId, {
-            content: '', error: `Geminiエラー: ${result.error ?? '不明なエラー'}`,
+            content: '', error: `Gemini error: ${result.error ?? 'Unknown error'}`,
             isStreaming: false,
           });
         }
       } catch (err) {
         if (!signal.aborted) {
           updateMessage(chatSessionId, msgId, {
-            content: '', error: `Geminiエラー: ${err instanceof Error ? err.message : String(err)}`,
+            content: '', error: `Gemini error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }
@@ -502,13 +504,13 @@ export function useAIDispatch() {
       const enabledCount = [teamSettingsObj.claudeEnabled, teamSettingsObj.geminiEnabled, teamSettingsObj.codexEnabled, teamSettingsObj.perplexityEnabled, teamSettingsObj.localEnabled].filter(Boolean).length;
       if (enabledCount === 0) {
         updateMessage(chatSessionId, msgId, {
-          content: '@team に参加できるエージェントがいません。\n設定画面でエージェントを有効化してください。',
+          content: t('dispatch.team_no_agents'),
           isStreaming: false,
         });
         return { handled: true };
       }
 
-      let teamAccumulated = `${enabledCount}名のエージェントに質問中...\n\n`;
+      let teamAccumulated = `${t('dispatch.team_asking', { count: enabledCount })}\n\n`;
       updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: teamAccumulated, streamingStartTime: Date.now() });
 
       try {
@@ -516,7 +518,7 @@ export function useAIDispatch() {
           runCommand: (cmd: string) => new Promise((resolve) => {
             if (connectionMode === 'termux') {
               sendCommand(cmd);
-              setTimeout(() => resolve('(CLI実行中)'), 3000);
+              setTimeout(() => resolve('(CLI running)'), 3000);
             } else {
               resolve(`[Disconnected] ${cmd}`);
             }
@@ -536,12 +538,12 @@ export function useAIDispatch() {
             updateMessage(chatSessionId, msgId, { streamingText: teamAccumulated });
           },
         });
-        const facilitatorLabel = teamResult.facilitator?.label ?? 'ファシリ';
+        const facilitatorLabel = teamResult.facilitator?.label ?? 'Facilitator';
         const memberDetails = teamResult.members.filter(m => !m.isFacilitator).map(m => `\n--- ${m.label} ---\n${m.response}`).join('\n');
-        const finalText = `=== まとめ (${facilitatorLabel}) ===\n${teamResult.facilitatorSummary}\n\n──── 各エージェントの回答 ────${memberDetails}`;
+        const finalText = `=== Summary (${facilitatorLabel}) ===\n${teamResult.facilitatorSummary}\n\n──── Agent Responses ────${memberDetails}`;
         updateMessage(chatSessionId, msgId, { content: finalText, streamingText: undefined, isStreaming: false, tokenCount: estimateTokens(finalText) });
       } catch (err) {
-        updateMessage(chatSessionId, msgId, { content: '', error: `@teamエラー: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false });
+        updateMessage(chatSessionId, msgId, { content: '', error: `@team error: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false });
       }
       return { handled: true };
     }
@@ -552,7 +554,7 @@ export function useAIDispatch() {
       streamingMsgRef.current = { sessionId: chatSessionId, msgId };
       if (connectionMode !== 'termux') {
         updateMessage(chatSessionId, msgId, {
-          content: 'Termuxに接続してください。Claude Codeの実行にはTermuxブリッジが必要です。',
+          content: t('dispatch.claude_connect'),
           isStreaming: false,
         });
         return { handled: true };
@@ -586,7 +588,7 @@ export function useAIDispatch() {
       } catch (err) {
         if (!signal.aborted) {
           updateMessage(chatSessionId, msgId, {
-            content: '', error: `Claude Code実行エラー: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false,
+            content: '', error: `Claude Code error: ${err instanceof Error ? err.message : String(err)}`, isStreaming: false,
           });
         }
       }
@@ -600,23 +602,23 @@ export function useAIDispatch() {
       const apiKey = settings.geminiApiKey ?? '';
       if (!apiKey) {
         updateMessage(chatSessionId, msgId, {
-          content: 'Gemini APIキーが設定されていません。\n@agent はGemini APIのfunction callingを使用します。\nhttps://aistudio.google.com/app/apikey で無料取得できます。',
+          content: t('dispatch.agent_no_key'),
           isStreaming: false,
-          error: 'APIキー未設定',
+          error: t('dispatch.api_key_not_set'),
         });
         return { handled: true };
       }
 
       if (connectionMode !== 'termux') {
         updateMessage(chatSessionId, msgId, {
-          content: '@agent はTermuxブリッジ接続が必要です。Settingsで接続を確認してください。',
+          content: t('dispatch.agent_no_termux'),
           isStreaming: false,
-          error: 'Termux未接続',
+          error: t('dispatch.termux_not_connected'),
         });
         return { handled: true };
       }
 
-      let accumulated = '🤖 エージェントモード起動\n';
+      let accumulated = `🤖 ${t('dispatch.agent_started')}\n`;
       updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: accumulated, streamingStartTime: Date.now() });
 
       try {
@@ -660,7 +662,7 @@ export function useAIDispatch() {
         if (!signal.aborted) {
           updateMessage(chatSessionId, msgId, {
             content: accumulated || '',
-            error: `エージェントエラー: ${err instanceof Error ? err.message : String(err)}`,
+            error: `Agent error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }

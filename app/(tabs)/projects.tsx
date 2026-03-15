@@ -27,6 +27,7 @@ import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
+import { useTranslation } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ interface ProjectEntry {
 export default function ProjectsScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<Tab>('chats');
@@ -137,11 +139,11 @@ export default function ProjectsScreen() {
 
   const handleDeleteChat = useCallback((session: ChatSession) => {
     Alert.alert(
-      'チャットを削除',
-      `「${session.title}」を削除しますか？`,
+      t('projects.delete_title'),
+      t('projects.delete_confirm', { title: session.title }),
       [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '削除', style: 'destructive', onPress: () => deleteSession(session.id) },
+        { text: t('projects.cancel'), style: 'cancel' },
+        { text: t('projects.delete'), style: 'destructive', onPress: () => deleteSession(session.id) },
       ],
     );
   }, [deleteSession]);
@@ -158,7 +160,7 @@ export default function ProjectsScreen() {
   const renderChatItem = useCallback(({ item }: { item: ChatSession }) => {
     const isActive = item.id === activeSessionId;
     const lastMsg = item.messages[item.messages.length - 1];
-    const preview = lastMsg?.content?.slice(0, 60) || 'No messages';
+    const preview = lastMsg?.content?.slice(0, 60) || t('projects.no_messages');
     const timeAgo = formatTimeAgo(item.updatedAt);
 
     return (
@@ -183,7 +185,7 @@ export default function ProjectsScreen() {
           </Text>
           <View style={styles.chatMeta}>
             <Text style={[styles.chatMsgCount, { color: c.inactive }]}>
-              {item.messages.length} messages
+              {t('projects.messages_count', { count: item.messages.length })}
             </Text>
             {item.projectPath && (
               <View style={[styles.projectBadge, { backgroundColor: withAlpha(c.accent, 0.1) }]}>
@@ -203,10 +205,10 @@ export default function ProjectsScreen() {
     <View style={[styles.container, { backgroundColor: c.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: c.border }]}>
-        <Text style={[styles.headerTitle, { color: c.foreground }]}>Projects</Text>
+        <Text style={[styles.headerTitle, { color: c.foreground }]}>{t('projects.title')}</Text>
         <TouchableOpacity onPress={handleNewChat} style={[styles.newBtn, { backgroundColor: withAlpha(c.accent, 0.1) }]}>
           <MaterialIcons name="add" size={18} color={c.accent} />
-          <Text style={[styles.newBtnText, { color: c.accent }]}>New Chat</Text>
+          <Text style={[styles.newBtnText, { color: c.accent }]}>{t('projects.new_chat')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -218,7 +220,7 @@ export default function ProjectsScreen() {
         >
           <MaterialIcons name="chat" size={16} color={activeTab === 'chats' ? c.accent : c.inactive} />
           <Text style={[styles.tabText, { color: activeTab === 'chats' ? c.accent : c.inactive }]}>
-            Chats ({sessions.length})
+            {t('projects.chats', { count: sessions.length })}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -227,7 +229,7 @@ export default function ProjectsScreen() {
         >
           <MaterialIcons name="folder" size={16} color={activeTab === 'projects' ? c.accent : c.inactive} />
           <Text style={[styles.tabText, { color: activeTab === 'projects' ? c.accent : c.inactive }]}>
-            Folders {projectDirs.length > 0 ? `(${projectDirs.length})` : ''}
+            {projectDirs.length > 0 ? t('projects.folders_count', { count: projectDirs.length }) : t('projects.folders')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -238,7 +240,7 @@ export default function ProjectsScreen() {
           <MaterialIcons name="search" size={18} color={c.inactive} />
           <TextInput
             style={[styles.searchInput, { color: c.foreground }]}
-            placeholder="Search chats..."
+            placeholder={t('projects.search_chats')}
             placeholderTextColor={c.inactive}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -265,7 +267,7 @@ export default function ProjectsScreen() {
             <View style={styles.emptyBox}>
               <MaterialIcons name="chat-bubble-outline" size={40} color={c.inactive} />
               <Text style={[styles.emptyText, { color: c.muted }]}>
-                {searchQuery ? 'No matching chats' : 'No chats yet.\nTap + New Chat to start.'}
+                {searchQuery ? t('projects.no_matching') : t('projects.no_chats')}
               </Text>
             </View>
           }
@@ -285,7 +287,7 @@ export default function ProjectsScreen() {
             <View style={styles.emptyBox}>
               <MaterialIcons name="link-off" size={40} color={c.inactive} />
               <Text style={[styles.emptyText, { color: c.muted }]}>
-                Termuxに接続するとプロジェクトフォルダが表示されます
+                {t('projects.connect_termux')}
               </Text>
             </View>
           )}
@@ -293,7 +295,7 @@ export default function ProjectsScreen() {
           {isConnected && isLoadingProjects && (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="small" color={c.accent} />
-              <Text style={[styles.loadingText, { color: c.muted }]}>Scanning...</Text>
+              <Text style={[styles.loadingText, { color: c.muted }]}>{t('projects.scanning')}</Text>
             </View>
           )}
 
@@ -337,7 +339,7 @@ export default function ProjectsScreen() {
             <View style={styles.emptyBox}>
               <MaterialIcons name="create-new-folder" size={40} color={c.inactive} />
               <Text style={[styles.emptyText, { color: c.muted }]}>
-                {'~/dev/ や ~/projects/ に\nフォルダがありません'}
+                {t('projects.no_folders')}
               </Text>
             </View>
           )}

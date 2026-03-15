@@ -22,6 +22,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTtydConnection } from '@/hooks/use-ttyd-connection';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
+import { useTranslation, t } from '@/lib/i18n';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ type ConnectionState = 'connecting' | 'connected' | 'error';
 export default function TerminalScreen() {
   const insets = useSafeAreaInsets();
   const { colors: c } = useTheme();
+  const { t } = useTranslation();
   const webViewRef = useRef<WebView>(null);
   const inputRef = useRef<TextInput>(null);
   const {
@@ -152,10 +154,10 @@ export default function TerminalScreen() {
       {status === 'connecting' && (
         <View style={styles.connectingContainer}>
           <ActivityIndicator size="large" color={c.accent} />
-          <Text style={[styles.connectingText, { color: c.foreground }]}>ttyd に接続中...</Text>
+          <Text style={[styles.connectingText, { color: c.foreground }]}>{t('terminal.connecting_ttyd')}</Text>
           {retryCount > 0 && (
             <Text style={[styles.connectingRetry, { color: c.muted }]}>
-              リトライ {retryCount} / 5
+              {t('terminal.retry_count', { count: retryCount })}
             </Text>
           )}
         </View>
@@ -183,7 +185,7 @@ export default function TerminalScreen() {
             style={[styles.jpInputField, { backgroundColor: c.backgroundDeep, color: c.foreground, borderColor: c.borderLight }]}
             value={jpInput}
             onChangeText={setJpInput}
-            placeholder="日本語入力..."
+            placeholder={t('terminal.jp_placeholder')}
             placeholderTextColor={c.inactive}
             autoCapitalize="none"
             autoCorrect={false}
@@ -197,7 +199,7 @@ export default function TerminalScreen() {
             style={[styles.jpSendBtn, { backgroundColor: withAlpha(c.accent, 0.15) }]}
             activeOpacity={0.7}
           >
-            <Text style={[styles.jpSendText, { color: c.accent }]}>Paste</Text>
+            <Text style={[styles.jpSendText, { color: c.accent }]}>{t('terminal.paste')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleJpSendNewline}
@@ -219,9 +221,9 @@ export default function TerminalScreen() {
 
 function StatusBadge({ state, retryCount, colors: c }: { state: ConnectionState; retryCount: number; colors: any }) {
   const label =
-    state === 'connected' ? 'Connected' :
-    state === 'connecting' ? `Connecting${retryCount > 0 ? ` (${retryCount})` : '...'}` :
-    'Disconnected';
+    state === 'connected' ? t('terminal.connected') :
+    state === 'connecting' ? (retryCount > 0 ? t('terminal.connecting_retry', { count: retryCount }) : t('terminal.connecting')) :
+    t('terminal.disconnected');
 
   const color =
     state === 'connected' ? '#4ADE80' :
@@ -269,10 +271,9 @@ function SetupGuide({ url, onRetry, colors: c }: { url: string; onRetry: () => v
   return (
     <ScrollView style={styles.guideContainer} contentContainerStyle={styles.guideContent}>
       <MaterialIcons name="terminal" size={48} color={c.accent} />
-      <Text style={[styles.guideTitle, { color: c.accent }]}>ttyd に接続できません</Text>
+      <Text style={[styles.guideTitle, { color: c.accent }]}>{t('terminal.cannot_connect')}</Text>
       <Text style={[styles.guideSubtitle, { color: c.muted }]}>
-        {url} に接続できませんでした。{'\n'}
-        以下の手順でセットアップしてください。
+        {t('terminal.cannot_connect_desc', { url })}
       </Text>
 
       {/* One-tap setup button */}
@@ -285,21 +286,21 @@ function SetupGuide({ url, onRetry, colors: c }: { url: string; onRetry: () => v
         <MaterialIcons name={oneTapCopied ? 'check' : 'flash-on'} size={22} color="#0A0A0A" />
         <View>
           <Text style={styles.oneTapBtnTitle}>
-            {oneTapCopied ? 'コピーしました! Termuxで貼り付けてください' : 'ワンタップセットアップ'}
+            {oneTapCopied ? t('terminal.one_tap_copied') : t('terminal.one_tap_setup')}
           </Text>
-          <Text style={styles.oneTapBtnDesc}>コマンドをコピー → Termuxで貼り付け → 完了</Text>
+          <Text style={styles.oneTapBtnDesc}>{t('terminal.one_tap_desc')}</Text>
         </View>
       </Pressable>
 
-      <Text style={[styles.orDivider, { color: c.muted }]}>— または手動で —</Text>
+      <Text style={[styles.orDivider, { color: c.muted }]}>{t('terminal.or_manually')}</Text>
 
       <View style={[styles.stepsCard, { backgroundColor: c.surfaceHigh, borderColor: c.border }]}>
-        <Text style={[styles.stepHeader, { color: c.accent }]}>手動セットアップ</Text>
+        <Text style={[styles.stepHeader, { color: c.accent }]}>{t('terminal.manual_setup')}</Text>
 
         <View style={styles.step}>
           <Text style={[styles.stepNumber, { color: c.accent }]}>1</Text>
           <View style={styles.stepBody}>
-            <Text style={[styles.stepLabel, { color: c.foreground }]}>ttyd をインストール</Text>
+            <Text style={[styles.stepLabel, { color: c.foreground }]}>{t('terminal.install_ttyd')}</Text>
             <View style={[styles.codeBlock, { borderColor: c.border }]}>
               <Text style={[styles.codeText, { color: c.accent }]}>pkg install ttyd</Text>
             </View>
@@ -309,14 +310,14 @@ function SetupGuide({ url, onRetry, colors: c }: { url: string; onRetry: () => v
         <View style={styles.step}>
           <Text style={[styles.stepNumber, { color: c.accent }]}>2</Text>
           <View style={styles.stepBody}>
-            <Text style={[styles.stepLabel, { color: c.foreground }]}>.bashrc に自動起動を追加</Text>
+            <Text style={[styles.stepLabel, { color: c.foreground }]}>{t('terminal.add_autostart')}</Text>
             <View style={[styles.codeBlock, { borderColor: c.border }]}>
               <Text style={[styles.codeText, { color: c.accent }]}>{BASHRC_SCRIPT}</Text>
             </View>
             <Pressable onPress={handleCopy} style={[styles.copyBtn, { borderColor: c.border }]}>
               <MaterialIcons name={copied ? 'check' : 'content-copy'} size={16} color={copied ? '#4ADE80' : c.accent} />
               <Text style={[styles.copyBtnText, { color: copied ? '#4ADE80' : c.accent }]}>
-                {copied ? 'コピーしました' : 'コピー'}
+                {copied ? t('ai.copied') : t('ai.copy')}
               </Text>
             </Pressable>
           </View>
@@ -325,10 +326,10 @@ function SetupGuide({ url, onRetry, colors: c }: { url: string; onRetry: () => v
         <View style={styles.step}>
           <Text style={[styles.stepNumber, { color: c.accent }]}>3</Text>
           <View style={styles.stepBody}>
-            <Text style={[styles.stepLabel, { color: c.foreground }]}>Termux を開く</Text>
+            <Text style={[styles.stepLabel, { color: c.foreground }]}>{t('terminal.open_termux')}</Text>
             <Pressable onPress={handleOpenTermux} style={styles.termuxBtn}>
               <MaterialIcons name="open-in-new" size={16} color="#0A0A0A" />
-              <Text style={styles.termuxBtnText}>Termux を開く</Text>
+              <Text style={styles.termuxBtnText}>{t('terminal.open_termux')}</Text>
             </Pressable>
           </View>
         </View>
@@ -336,14 +337,14 @@ function SetupGuide({ url, onRetry, colors: c }: { url: string; onRetry: () => v
         <View style={styles.step}>
           <Text style={[styles.stepNumber, { color: c.accent }]}>4</Text>
           <View style={styles.stepBody}>
-            <Text style={[styles.stepLabel, { color: c.foreground }]}>このタブをリロード</Text>
+            <Text style={[styles.stepLabel, { color: c.foreground }]}>{t('terminal.reload_tab')}</Text>
           </View>
         </View>
       </View>
 
       <Pressable style={[styles.retryBtn, { backgroundColor: c.accent }]} onPress={onRetry}>
         <MaterialIcons name="refresh" size={20} color="#0A0A0A" />
-        <Text style={styles.retryBtnText}>リロード</Text>
+        <Text style={styles.retryBtnText}>{t('terminal.reload')}</Text>
       </Pressable>
     </ScrollView>
   );

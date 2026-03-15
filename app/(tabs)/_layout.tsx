@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Platform, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -27,6 +27,7 @@ export default function TabLayout() {
   const theme = useTheme();
   const c = theme.colors;
   const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const setupCheckedRef = useRef(false);
 
   // Initialize global stores on mount
   useEffect(() => {
@@ -34,9 +35,12 @@ export default function TabLayout() {
     useThemeStore.getState().loadTheme();
     useA11yStore.getState().loadConfig();
     usePluginStore.getState().loadPlugins();
-    isSetupWizardComplete().then((done) => {
-      if (!done) setShowSetupWizard(true);
-    });
+    if (!setupCheckedRef.current) {
+      setupCheckedRef.current = true;
+      isSetupWizardComplete().then((done) => {
+        if (!done) setShowSetupWizard(true);
+      });
+    }
   }, []);
 
   // ── Global keybinding handler (physical keyboard) ────────────────────────
@@ -91,10 +95,10 @@ export default function TabLayout() {
     }
   }, [layout.isWide]);
 
-  // Adjust maxPanes on rotation: landscape=3, portrait=2
+  // Adjust maxPanes on rotation: landscape=4, portrait=2
   useEffect(() => {
     if (layout.isWide) {
-      setMaxPanes(layout.isLandscape ? 3 : 2);
+      setMaxPanes(layout.isLandscape ? 4 : 2);
     }
   }, [layout.isWide, layout.isLandscape]);
 

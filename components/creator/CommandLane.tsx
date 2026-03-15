@@ -20,21 +20,21 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 // ─── Example prompts ──────────────────────────────────────────────────────────
 
 const EXAMPLES = [
-  '写真整理ツール作りたい',
-  'ポートフォリオサイト作って',
-  'タイマーアプリ',
-  'CSVを可視化したい',
-  '自己紹介ページ作りたい',
-  'Pythonで画像リサイズスクリプト',
+  'Photo organizer',
+  'Build a portfolio site',
+  'Timer app',
+  'Visualize CSV data',
+  'Build a self-intro page',
+  'Python image resize script',
 ];
 
 // ─── Task templates (1-tap project creation) ──────────────────────────────────
 
 const TEMPLATES = [
-  { label: 'Node API', prompt: 'ExpressでREST APIサーバーを作って。CORS対応、ヘルスチェックエンドポイント付き', icon: 'dns' as const, color: '#4ADE80' },
-  { label: '静的サイト', prompt: 'HTMLとCSSでシンプルなランディングページを作って。レスポンシブ対応', icon: 'web' as const, color: '#60A5FA' },
-  { label: 'CLIツール', prompt: 'Node.jsでCLIツールを作って。引数パース、ヘルプ表示、カラー出力付き', icon: 'terminal' as const, color: '#FBBF24' },
-  { label: 'Python Script', prompt: 'Pythonで便利なファイル操作スクリプトを作って。一括リネーム機能付き', icon: 'code' as const, color: '#8B5CF6' },
+  { label: 'Node API', prompt: 'Create an Express REST API server with CORS and health check endpoint', icon: 'dns' as const, color: '#4ADE80' },
+  { label: 'Static Site', prompt: 'Create a simple responsive landing page with HTML and CSS', icon: 'web' as const, color: '#60A5FA' },
+  { label: 'CLI Tool', prompt: 'Create a Node.js CLI tool with argument parsing, help display, and colored output', icon: 'terminal' as const, color: '#FBBF24' },
+  { label: 'Python Script', prompt: 'Create a Python file utility script with batch rename support', icon: 'code' as const, color: '#8B5CF6' },
 ];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ export function CommandLane({ onSubmit, isDisabled = false }: Props) {
           style={[styles.input, isDisabled && styles.inputDisabled]}
           value={input}
           onChangeText={setInput}
-          placeholder="何を作りたい？"
+          placeholder="What do you want to create?"
           placeholderTextColor="#4B5563"
           multiline={false}
           returnKeyType="send"
@@ -99,14 +99,14 @@ export function CommandLane({ onSubmit, isDisabled = false }: Props) {
             pressed && styles.sendBtnPressed,
           ]}
         >
-          <Text style={styles.sendBtnText}>実行</Text>
+          <Text style={styles.sendBtnText}>Run</Text>
         </Pressable>
       </View>
 
       {/* Example chips */}
       {!isDisabled && (
         <View style={styles.examples}>
-          <Text style={styles.examplesLabel}>例:</Text>
+          <Text style={styles.examplesLabel}>e.g.:</Text>
           <View style={styles.chips}>
             {EXAMPLES.slice(0, 3).map((ex) => (
               <Pressable
@@ -127,7 +127,7 @@ export function CommandLane({ onSubmit, isDisabled = false }: Props) {
       {/* Task templates (1-tap) */}
       {!isDisabled && (
         <View style={styles.templates}>
-          <Text style={styles.examplesLabel}>テンプレート:</Text>
+          <Text style={styles.examplesLabel}>Templates:</Text>
           <View style={styles.templateGrid}>
             {TEMPLATES.map((tmpl) => (
               <Pressable
