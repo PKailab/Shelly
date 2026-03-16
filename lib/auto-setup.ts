@@ -213,7 +213,8 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
     await runTermuxCommand({
       command: 'pkill -f "shelly-bridge/server.js" 2>/dev/null; sleep 0.5; node ~/shelly-bridge/server.js &',
     });
-    await new Promise((r) => setTimeout(r, 2000));
+    // Node.js startup can take 3-8 seconds on some devices
+    await new Promise((r) => setTimeout(r, 5000));
 
     // ── Step 6: Verify bridge connection ──────────────────────────────
     onProgress({ step: 'connecting_bridge', percent: calcPercent('connecting_bridge') });
@@ -221,8 +222,8 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
     const bridgeOk = await retry(
       () => testBridgeConnection(wsUrl),
       (ok) => ok,
-      10,
-      3000,
+      15,     // more retries
+      2000,   // every 2 seconds (total: 30s)
     );
 
     if (!bridgeOk) {
