@@ -295,85 +295,95 @@ export function useAIDispatch() {
     if (target === 'local') {
       const msgId = addAssistantMessage(chatSessionId, 'local');
       streamingMsgRef.current = { sessionId: chatSessionId, msgId };
-      const config = {
-        baseUrl: settings.localLlmUrl,
-        model: settings.localLlmModel,
-        enabled: settings.localLlmEnabled,
-      };
 
-      let accumulatedText = '';
-      updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '', tokenCount: 0, streamingStartTime: Date.now() });
+      try {
+        const config = {
+          baseUrl: settings.localLlmUrl,
+          model: settings.localLlmModel,
+          enabled: settings.localLlmEnabled,
+        };
 
-      // Load all context layers in parallel
-      const ollamaHistory = toOllamaHistory(messages);
-      const activeSession = useTerminalStore.getState().sessions.find(
-        (s) => s.id === useTerminalStore.getState().activeSessionId,
-      );
-      const cwd = activeSession?.currentDir || '';
-      const [projectCtx, userProfile, customCtx, decisionLog] = await Promise.all([
-        cwd ? loadProjectContext(cwd, (cmd: string) =>
-          bridgeRunCommand(cmd, {}).then((r) => r.stdout ?? '').catch(() => ''),
-        ).catch(() => '') : Promise.resolve(''),
-        loadUserProfile().then((p) => p ? formatProfileForPrompt(p) : '').catch(() => ''),
-        loadCustomContext().catch(() => ''),
-        getDecisionLogForPrompt().catch(() => ''),
-      ]);
+        let accumulatedText = '';
+        updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '', tokenCount: 0, streamingStartTime: Date.now() });
 
-      const result = await orchestrateChatStream(
-        promptWithFiles, config,
-        (chunk, done) => {
-          if (signal.aborted) return;
-          if (chunk) {
-            accumulatedText += chunk;
+        // Load all context layers in parallel
+        const ollamaHistory = toOllamaHistory(messages);
+        const activeSession = useTerminalStore.getState().sessions.find(
+          (s) => s.id === useTerminalStore.getState().activeSessionId,
+        );
+        const cwd = activeSession?.currentDir || '';
+        const [projectCtx, userProfile, customCtx, decisionLog] = await Promise.all([
+          cwd ? loadProjectContext(cwd, (cmd: string) =>
+            bridgeRunCommand(cmd, {}).then((r) => r.stdout ?? '').catch(() => ''),
+          ).catch(() => '') : Promise.resolve(''),
+          loadUserProfile().then((p) => p ? formatProfileForPrompt(p) : '').catch(() => ''),
+          loadCustomContext().catch(() => ''),
+          getDecisionLogForPrompt().catch(() => ''),
+        ]);
+
+        const result = await orchestrateChatStream(
+          promptWithFiles, config,
+          (chunk, done) => {
+            if (signal.aborted) return;
+            if (chunk) {
+              accumulatedText += chunk;
+              updateMessage(chatSessionId, msgId, {
+                streamingText: accumulatedText,
+                tokenCount: estimateTokens(accumulatedText),
+                isStreaming: !done,
+              });
+            }
+            if (done) {
+              updateMessage(chatSessionId, msgId, {
+                content: accumulatedText,
+                streamingText: undefined,
+                isStreaming: false,
+                tokenCount: estimateTokens(accumulatedText),
+                llmModelLabel: getActiveLlmLabel(),
+              });
+              // Auto-log important decisions from AI response
+              autoLogFromResponse(accumulatedText).catch(() => {});
+            }
+          },
+          ollamaHistory,
+          projectCtx || undefined,
+          userProfile || undefined,
+          [customCtx, decisionLog ? `\n# Past Design Decisions\n${decisionLog}` : ''].filter(Boolean).join('\n') || undefined,
+          undefined, // toolStatuses
+          undefined, // defaultAgent
+          signal,
+          true, // forceLocal — @local mention skips routing
+        );
+
+        if (result.handledBy !== 'local_llm') {
+          updateMessage(chatSessionId, msgId, { isStreaming: false, streamingText: undefined });
+          if (result.delegatedCommand) {
+            const toolLabel = result.handledBy === 'gemini' ? 'Gemini CLI' : result.handledBy === 'codex' ? 'Codex CLI' : 'Claude Code';
             updateMessage(chatSessionId, msgId, {
-              streamingText: accumulatedText,
-              tokenCount: estimateTokens(accumulatedText),
-              isStreaming: !done,
-            });
-          }
-          if (done) {
-            updateMessage(chatSessionId, msgId, {
-              content: accumulatedText,
-              streamingText: undefined,
+              content: t('dispatch.delegated_to', { tool: toolLabel, reason: result.reasoning || '' }),
+              agent: mapTargetToAgent(result.handledBy ?? '') ?? 'local',
               isStreaming: false,
-              tokenCount: estimateTokens(accumulatedText),
-              llmModelLabel: getActiveLlmLabel(),
             });
-            // Auto-log important decisions from AI response
-            autoLogFromResponse(accumulatedText).catch(() => {});
-          }
-        },
-        ollamaHistory,
-        projectCtx || undefined,
-        userProfile || undefined,
-        // Combine custom context + decision log into single context string
-        [customCtx, decisionLog ? `\n# Past Design Decisions\n${decisionLog}` : ''].filter(Boolean).join('\n') || undefined,
-        undefined, // toolStatuses
-        undefined, // defaultAgent
-        signal,
-        true, // forceLocal — @local mention skips routing
-      );
-
-      if (result.handledBy !== 'local_llm') {
-        updateMessage(chatSessionId, msgId, { isStreaming: false, streamingText: undefined });
-        if (result.delegatedCommand) {
-          const toolLabel = result.handledBy === 'gemini' ? 'Gemini CLI' : result.handledBy === 'codex' ? 'Codex CLI' : 'Claude Code';
-          updateMessage(chatSessionId, msgId, {
-            content: t('dispatch.delegated_to', { tool: toolLabel, reason: result.reasoning || '' }),
-            agent: mapTargetToAgent(result.handledBy ?? '') ?? 'local',
-            isStreaming: false,
-          });
-          if (connectionMode === 'termux') {
-            sendCommand(result.delegatedCommand);
+            if (connectionMode === 'termux') {
+              sendCommand(result.delegatedCommand);
+            } else {
+              terminalRunCommand(result.delegatedCommand);
+            }
+          } else if (result.response) {
+            updateMessage(chatSessionId, msgId, { content: result.response, isStreaming: false });
           } else {
-            terminalRunCommand(result.delegatedCommand);
+            updateMessage(chatSessionId, msgId, {
+              content: '',
+              error: t('dispatch.local_llm_error'),
+              isStreaming: false,
+            });
           }
-        } else if (result.response) {
-          updateMessage(chatSessionId, msgId, { content: result.response, isStreaming: false });
-        } else {
+        }
+      } catch (err) {
+        if (!signal.aborted) {
           updateMessage(chatSessionId, msgId, {
             content: '',
-            error: t('dispatch.local_llm_error'),
+            error: `Local LLM error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }

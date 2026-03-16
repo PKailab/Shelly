@@ -266,7 +266,15 @@ export default function ChatScreen() {
   const handleSend = useCallback(async (input: string, images?: ImageAttachment[], files?: FileAttachment[]) => {
     if (!chatSessionId) return;
     Keyboard.dismiss();
-    const parsed = parseInput(input);
+    let parsed: ReturnType<typeof parseInput>;
+    try {
+      parsed = parseInput(input);
+    } catch (err) {
+      console.error('[handleSend] parseInput error:', err);
+      return;
+    }
+
+    try {
 
     // Auto-learn (background)
     if (parsed.layer === 'command') {
@@ -454,6 +462,18 @@ export default function ChatScreen() {
         content: t('chat.unsupported_agent', { target }),
         isStreaming: false,
       });
+    }
+    } catch (err) {
+      console.error('[handleSend] Uncaught error:', err);
+      // Show error in chat instead of crashing
+      try {
+        const msgId = addAssistantMessage(undefined);
+        updateMessage(chatSessionId, msgId, {
+          content: '',
+          error: `Error: ${err instanceof Error ? err.message : String(err)}`,
+          isStreaming: false,
+        });
+      } catch {} // Last resort: swallow to prevent white screen
     }
   }, [chatSessionId, connectionMode, sendCommand, activeSession.id, activeSession.currentDir, settings, addMessage, updateMessage, setLastInputMode, router, addUserMessage, addAssistantMessage, bridgeRunCommand, execForContext, aiDispatch, isBridgeConnected]);
 
