@@ -1215,22 +1215,22 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   setTheme: (id) => {
     set({ currentThemeId: id });
-    AsyncStorage.setItem(STORAGE_KEY, id);
+    AsyncStorage.setItem(STORAGE_KEY, id).catch((e) => console.warn('[Theme] save failed:', e));
   },
 
   addCustomTheme: (theme) => {
     const updated = [...get().customThemes.filter((t) => t.id !== theme.id), theme];
     set({ customThemes: updated });
-    AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updated));
+    AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updated)).catch((e) => console.warn('[Theme] save failed:', e));
   },
 
   removeCustomTheme: (id) => {
     const updated = get().customThemes.filter((t) => t.id !== id);
     set({ customThemes: updated });
-    AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updated));
+    AsyncStorage.setItem(CUSTOM_THEMES_KEY, JSON.stringify(updated)).catch((e) => console.warn('[Theme] save failed:', e));
     if (get().currentThemeId === id) {
       set({ currentThemeId: 'shelly-default' });
-      AsyncStorage.setItem(STORAGE_KEY, 'shelly-default');
+      AsyncStorage.setItem(STORAGE_KEY, 'shelly-default').catch((e) => console.warn('[Theme] save failed:', e));
     }
   },
 

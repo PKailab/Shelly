@@ -125,6 +125,8 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
         tasker: result.taskerInstalled,
         boot: result.bootInstalled,
       });
+    }).catch((e) => {
+      console.warn('[SetupWizard] checkTermuxPackages failed:', e);
     });
   }, [visible, wizardStep]);
 

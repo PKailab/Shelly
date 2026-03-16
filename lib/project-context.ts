@@ -16,6 +16,11 @@
 
 export type CommandRunner = (cmd: string) => Promise<string>;
 
+/** Escape a string for safe use inside single quotes in shell commands */
+function shellEscape(s: string): string {
+  return s.replace(/'/g, "'\\''");
+}
+
 // キャッシュ: projectPath -> { content, loadedAt }
 const cache = new Map<string, { content: string; loadedAt: number }>();
 
@@ -36,8 +41,8 @@ export async function loadProjectContext(
   }
 
   try {
-    const contextPath = `${projectPath}/.shelly/context.md`;
-    const raw = await runCmd(`cat "${contextPath}" 2>/dev/null || echo ""`);
+    const escaped = shellEscape(projectPath);
+    const raw = await runCmd(`cat '${escaped}/.shelly/context.md' 2>/dev/null || echo ""`);
     const content = raw.trim().slice(0, MAX_CONTEXT_CHARS);
 
     cache.set(projectPath, { content, loadedAt: Date.now() });
@@ -93,7 +98,8 @@ export async function generateProjectContext(
   const lines: string[] = [];
 
   // ── 1. package.json（Node.js系プロジェクト）──────────────────────────────
-  const pkgRaw = await runCmd(`cat "${projectPath}/package.json" 2>/dev/null || echo ""`);
+  const escaped = shellEscape(projectPath);
+  const pkgRaw = await runCmd(`cat '${escaped}/package.json' 2>/dev/null || echo ""`);
   let projectName = projectPath.split('/').pop() ?? 'Unknown';
   let version = '';
   let deps: string[] = [];
@@ -116,7 +122,7 @@ export async function generateProjectContext(
 
   // ── 3. ディレクトリ構成 ─────────────────────────────────────────────────
   const tree = await runCmd(
-    `cd "${projectPath}" && find . -maxdepth 2 -type d ` +
+    `cd '${escaped}' && find . -maxdepth 2 -type d ` +
     `-not -path '*/node_modules/*' -not -path '*/.git/*' ` +
     `-not -path '*/.expo/*' -not -path '*/dist/*' ` +
     `-not -path '*/__pycache__/*' -not -path '*/.next/*' ` +
@@ -126,7 +132,7 @@ export async function generateProjectContext(
 
   // ── 4. 主要ソースファイル ──────────────────────────────────────────────
   const sourceFiles = await runCmd(
-    `cd "${projectPath}" && find . -maxdepth 3 -type f ` +
+    `cd '${escaped}' && find . -maxdepth 3 -type f ` +
     `\\( -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.jsx" ` +
     `-o -name "*.py" -o -name "*.go" -o -name "*.rs" -o -name "*.rb" ` +
     `-o -name "*.java" -o -name "*.kt" -o -name "*.swift" \\) ` +
@@ -138,7 +144,7 @@ export async function generateProjectContext(
 
   // ── 5. 設定ファイル検出 ────────────────────────────────────────────────
   const configFiles = await runCmd(
-    `cd "${projectPath}" && ls -1 ` +
+    `cd '${escaped}' && ls -1 ` +
     `tsconfig.json app.config.ts app.config.js next.config.* ` +
     `vite.config.* webpack.config.* Cargo.toml go.mod pyproject.toml ` +
     `setup.py requirements.txt Gemfile Makefile Dockerfile ` +
@@ -148,21 +154,21 @@ export async function generateProjectContext(
 
   // ── 6. README / PRESENTATION / CLAUDE.md 冒頭（あれば）────────────────
   const readmeSnippet = await runCmd(
-    `head -20 "${projectPath}/README.md" 2>/dev/null || echo ""`,
+    `head -20 '${escaped}/README.md' 2>/dev/null || echo ""`,
   );
   const presentationSnippet = await runCmd(
-    `head -30 "${projectPath}/PRESENTATION.md" 2>/dev/null || echo ""`,
+    `head -30 '${escaped}/PRESENTATION.md' 2>/dev/null || echo ""`,
   );
   const claudeMd = await runCmd(
-    `head -30 "${projectPath}/CLAUDE.md" 2>/dev/null || echo ""`,
+    `head -30 '${escaped}/CLAUDE.md' 2>/dev/null || echo ""`,
   );
 
   // ── 7. git情報 ────────────────────────────────────────────────────────
   const gitRemote = await runCmd(
-    `cd "${projectPath}" && git remote get-url origin 2>/dev/null || echo ""`,
+    `cd '${escaped}' && git remote get-url origin 2>/dev/null || echo ""`,
   );
   const gitBranch = await runCmd(
-    `cd "${projectPath}" && git branch --show-current 2>/dev/null || echo ""`,
+    `cd '${escaped}' && git branch --show-current 2>/dev/null || echo ""`,
   );
 
   // ── Markdown生成 ──────────────────────────────────────────────────────
@@ -246,10 +252,10 @@ export async function generateProjectContext(
   const context = lines.join('\n').slice(0, MAX_CONTEXT_CHARS);
 
   // ファイルに書き出し
-  await runCmd(`mkdir -p "${projectPath}/.shelly"`);
+  await runCmd(`mkdir -p '${escaped}/.shelly'`);
   // ヒアドキュメントだとエスケープが面倒なのでbase64経由で書く
   const b64 = btoa(unescape(encodeURIComponent(context)));
-  await runCmd(`echo "${b64}" | base64 -d > "${projectPath}/.shelly/context.md"`);
+  await runCmd(`echo '${shellEscape(b64)}' | base64 -d > '${escaped}/.shelly/context.md'`);
 
   // キャッシュ更新
   clearProjectContextCache(projectPath);

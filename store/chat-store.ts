@@ -129,8 +129,8 @@ export const useChatStore = create<ChatStore>((set, get) => ({
         sessions: trimmed,
         activeSessionId,
       }));
-    } catch {
-      // Silently fail
+    } catch (e) {
+      console.warn('[ChatStore] save failed:', e);
     }
   },
 

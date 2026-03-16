@@ -81,7 +81,7 @@ function DiffViewerInner({ output, aiSummary }: Props) {
                 {file.lines.map((line, li) => {
                   const colors = LINE_COLORS[line.type];
                   return (
-                    <View key={li} style={[styles.diffLine, { backgroundColor: colors.bg }]}>
+                    <View key={`${li}-${line.type}`} style={[styles.diffLine, { backgroundColor: colors.bg }]}>
                       <Text style={styles.lineMarker}>
                         {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}
                       </Text>

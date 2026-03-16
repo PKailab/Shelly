@@ -157,21 +157,26 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!isBridgeConnected || !settings.localLlmEnabled) return;
     const cwd = activeSession.currentDir;
+    let cancelled = false;
     loadProjectContext(cwd, execForContext).then(async (ctx) => {
+      if (cancelled) return;
       if (ctx) {
         projectContextRef.current = ctx;
       } else {
         const hasProject = await execForContext(
           `test -f "${cwd}/package.json" -o -f "${cwd}/Cargo.toml" -o -f "${cwd}/go.mod" -o -f "${cwd}/pyproject.toml" -o -f "${cwd}/Makefile" && echo "yes" || echo "no"`,
         );
+        if (cancelled) return;
         if (hasProject.trim() === 'yes') {
           const generated = await generateProjectContext(cwd, execForContext);
+          if (cancelled) return;
           projectContextRef.current = generated;
           const projName = cwd.split('/').pop() ?? cwd;
           learnFromProject(cwd, projName).catch(() => {});
         }
       }
     });
+    return () => { cancelled = true; };
   }, [isBridgeConnected, settings.localLlmEnabled, activeSession.currentDir]);
 
   // ── Safety dialog state ──
@@ -319,6 +324,8 @@ export default function ChatScreen() {
           ?? t('chat.demo_welcome');
 
       // Simulate streaming for demo feel (with cleanup ref)
+      // Clear any existing demo timer to prevent stacking
+      if (demoTimerRef.current) { clearTimeout(demoTimerRef.current); demoTimerRef.current = null; }
       let i = 0;
       const streamDemo = () => {
         if (i < demoText.length) {

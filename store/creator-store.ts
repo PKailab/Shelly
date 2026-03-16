@@ -105,9 +105,10 @@ export const useCreatorStore = create<CreatorState>((set, get) => ({
           sessionStatus: 'confirming',
         });
       } catch (e) {
+        console.warn('[CreatorStore] startPlanning failed:', e);
         set({
           sessionStatus: 'error',
-          errorMessage: 'プランの生成に失敗しました。もう一度試してみてね。',
+          errorMessage: `プランの生成に失敗しました: ${e instanceof Error ? e.message : 'もう一度試してみてね。'}`,
         });
       }
     }, 600);

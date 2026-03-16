@@ -13,9 +13,8 @@ expo-env.d.ts
 
 # Build
 build/
-android/
-!modules/*/android/
-ios/
+/android/
+/ios/
 
 # Logs
 *.log

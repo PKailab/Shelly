@@ -108,15 +108,17 @@ function removeLeaf(root: PaneNode, leafId: string): PaneNode | null {
   // Check if either child is the target leaf
   if (root.children[0].id === leafId) return cloneTree(root.children[1]);
   if (root.children[1].id === leafId) return cloneTree(root.children[0]);
-  // Recurse
+  // Recurse into children
   const newLeft = removeLeaf(root.children[0], leafId);
-  if (newLeft !== root.children[0]) {
-    return { ...root, children: [newLeft ?? root.children[0], cloneTree(root.children[1])] };
+  if (newLeft !== root.children[0] && newLeft !== null) {
+    return { ...root, children: [newLeft, cloneTree(root.children[1])] };
   }
+  if (newLeft === null) return cloneTree(root.children[1]); // Left subtree collapsed entirely
   const newRight = removeLeaf(root.children[1], leafId);
-  if (newRight !== root.children[1]) {
-    return { ...root, children: [cloneTree(root.children[0]), newRight ?? root.children[1]] };
+  if (newRight !== root.children[1] && newRight !== null) {
+    return { ...root, children: [cloneTree(root.children[0]), newRight] };
   }
+  if (newRight === null) return cloneTree(root.children[0]); // Right subtree collapsed entirely
   return root;
 }
 

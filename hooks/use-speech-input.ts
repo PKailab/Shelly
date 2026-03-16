@@ -6,7 +6,7 @@
  * - 書き起こしテキストを返す
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTerminalStore } from '@/store/terminal-store';
 import { GEMINI_API_BASE } from '@/lib/gemini';
 
@@ -46,52 +46,12 @@ export function useSpeechInput() {
       recordingRef.current = recording;
       setState({ status: 'recording', transcribedText: '' });
     } catch (err) {
-      // Fallback: try expo-audio's simpler API
-      try {
-        const ExpoAudio = await import('expo-audio');
-        const status = await ExpoAudio.AudioModule.requestRecordingPermissionsAsync();
-        if (!status.granted) {
-          setState((s) => ({ ...s, error: 'マイクの権限が必要です' }));
-          return;
-        }
-
-        await ExpoAudio.AudioModule.setAudioModeAsync({
-          allowsRecording: true,
-          playsInSilentMode: true,
-        });
-
-        // Use the Recording class if available
-        const recording = new (ExpoAudio as any).Recording();
-        await recording.prepareToRecordAsync(
-          (ExpoAudio as any).RecordingPresets?.HIGH_QUALITY ?? {
-            android: {
-              extension: '.m4a',
-              outputFormat: 'mpeg4',
-              audioEncoder: 'aac',
-              sampleRate: 44100,
-              numberOfChannels: 1,
-              bitRate: 128000,
-            },
-            ios: {
-              extension: '.m4a',
-              audioQuality: 'high',
-              sampleRate: 44100,
-              numberOfChannels: 1,
-              bitRate: 128000,
-            },
-            web: { mimeType: 'audio/webm', bitsPerSecond: 128000 },
-          },
-        );
-        await recording.startAsync();
-        recordingRef.current = recording;
-        setState({ status: 'recording', transcribedText: '' });
-      } catch (innerErr) {
-        setState({
-          status: 'idle',
-          transcribedText: '',
-          error: `録音エラー: ${innerErr instanceof Error ? innerErr.message : String(innerErr)}`,
-        });
-      }
+      console.warn('[SpeechInput] Recording failed:', err);
+      setState({
+        status: 'idle',
+        transcribedText: '',
+        error: `録音エラー: ${err instanceof Error ? err.message : String(err)}`,
+      });
     }
   }, []);
 
@@ -193,6 +153,20 @@ export function useSpeechInput() {
         error: `文字起こしエラー: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
+  }, []);
+
+  // Cleanup: stop recording on unmount to prevent background audio leak
+  useEffect(() => {
+    return () => {
+      const recording = recordingRef.current;
+      if (recording) {
+        try {
+          if (typeof recording.stop === 'function') recording.stop();
+          else if (typeof recording.stopAndUnloadAsync === 'function') recording.stopAndUnloadAsync();
+        } catch { /* best effort */ }
+        recordingRef.current = null;
+      }
+    };
   }, []);
 
   return { state, startRecording, stopRecording };
