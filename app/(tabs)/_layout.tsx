@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Platform, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -18,6 +18,9 @@ import { useA11yStore } from "@/lib/accessibility";
 import { usePluginStore } from "@/lib/plugin-api";
 import { useToolDiscovery } from "@/hooks/use-tool-discovery";
 
+// Module-level flag: survives component remounts (prevents wizard running twice)
+let _setupChecked = false;
+
 export default function TabLayout() {
   // CLI + LLM自動検出ポーリング
   useToolDiscovery();
@@ -27,7 +30,6 @@ export default function TabLayout() {
   const theme = useTheme();
   const c = theme.colors;
   const [showSetupWizard, setShowSetupWizard] = useState(false);
-  const setupCheckedRef = useRef(false);
 
   // Initialize global stores on mount
   useEffect(() => {
@@ -35,8 +37,8 @@ export default function TabLayout() {
     useThemeStore.getState().loadTheme();
     useA11yStore.getState().loadConfig();
     usePluginStore.getState().loadPlugins();
-    if (!setupCheckedRef.current) {
-      setupCheckedRef.current = true;
+    if (!_setupChecked) {
+      _setupChecked = true;
       isSetupWizardComplete().then((done) => {
         if (!done) setShowSetupWizard(true);
       });

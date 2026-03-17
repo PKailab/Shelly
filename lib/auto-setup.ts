@@ -87,9 +87,9 @@ sleep 3
 ttyd -p 7681 bash &
 node ~/shelly-bridge/server.js &
 # Auto-start llama-server if model exists
-MODEL=$((find ~/models ~/llama.cpp/models -maxdepth 2 -name "gemma*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk '!seen[$0]++' | head -1)
+MODEL=$((find ~/models ~/llama.cpp/models -maxdepth 2 -name "qwen*.gguf" -o -name "Qwen*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk '!seen[$0]++' | head -1)
 if [ -n "$MODEL" ] && which llama-server >/dev/null 2>&1; then
-  llama-server -m "$MODEL" --host 0.0.0.0 --port 8080 -ngl 0 -c 2048 &
+  llama-server -m "$MODEL" --host 127.0.0.1 --port 8080 -ngl 0 -c 2048 -t 6 &
 fi
 `;
 }
@@ -158,7 +158,7 @@ async function retry<T>(
 
 // ── Main orchestrator ──────────────────────────────────────────────────────────
 
-export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ success: boolean; llmDetected: boolean; error?: string }> {
+export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ success: boolean; llmDetected: boolean; ttyConnected: boolean; error?: string }> {
   const { termuxSettings, settings } = useTerminalStore.getState();
   const wsUrl = termuxSettings.wsUrl;
   const ttyUrl = termuxSettings.ttyUrl || 'http://localhost:7681';
@@ -173,7 +173,7 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
     });
     if (!installResult.success) {
       onProgress({ step: 'error', percent: 0, error: installResult.error });
-      return { success: false, llmDetected: false, error: installResult.error };
+      return { success: false, llmDetected: false, ttyConnected: false, error: installResult.error };
     }
 
     // RUN_COMMAND is fire-and-forget; poll progress with delays
@@ -213,8 +213,8 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
     await runTermuxCommand({
       command: 'pkill -f "shelly-bridge/server.js" 2>/dev/null; sleep 0.5; node ~/shelly-bridge/server.js &',
     });
-    // Node.js startup can take 3-8 seconds on some devices
-    await new Promise((r) => setTimeout(r, 5000));
+    // Node.js startup can take 3-10 seconds on some devices
+    await new Promise((r) => setTimeout(r, 8000));
 
     // ── Step 6: Verify bridge connection ──────────────────────────────
     onProgress({ step: 'connecting_bridge', percent: calcPercent('connecting_bridge') });
@@ -228,7 +228,7 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
 
     if (!bridgeOk) {
       onProgress({ step: 'error', percent: calcPercent('connecting_bridge'), error: 'BRIDGE_CONNECTION_FAILED' });
-      return { success: false, llmDetected: false, error: 'BRIDGE_CONNECTION_FAILED' };
+      return { success: false, llmDetected: false, ttyConnected: false, error: 'BRIDGE_CONNECTION_FAILED' };
     }
 
     useTerminalStore.getState().setConnectionMode('termux');
@@ -236,12 +236,14 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
     // ── Step 7: Verify TTY connection ─────────────────────────────────
     onProgress({ step: 'connecting_tty', percent: calcPercent('connecting_tty') });
 
-    await retry(
+    const ttyOk = await retry(
       () => testTtyConnection(ttyUrl),
       (ok) => ok,
-      5,
+      10,     // more retries (was 5)
       2000,
     );
+    // TTY failure is non-fatal (user can start ttyd manually later)
+    // but we log it for the complete screen to show accurate status
 
     // ── Step 8: Detect & Start LLM ─────────────────────────────────────
     onProgress({ step: 'detecting_llm', percent: calcPercent('detecting_llm') });
@@ -266,7 +268,7 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
       if (detectResult.success) {
         // GGUFモデルを検索（gemma優先、~/models/, ~/llama.cpp/models/, ~/Downloads/）
         const modelResult = await runTermuxCommand({
-          command: '(find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "gemma*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk "!seen[$0]++" | head -1',
+          command: '(find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 \\( -name "qwen*.gguf" -o -name "Qwen*.gguf" \\) -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk "!seen[$0]++" | head -1',
         });
 
         // llama-serverが存在すればモデルを指定して起動
@@ -274,9 +276,9 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
           await runTermuxCommand({
             command: [
               'pkill -f "llama-server" 2>/dev/null; sleep 0.5;',
-              'MODEL=$((find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "gemma*.gguf" -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk "!seen[\\$0]++" | head -1);',
+              'MODEL=$((find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 \\( -name "qwen*.gguf" -o -name "Qwen*.gguf" \\) -size +100M 2>/dev/null; find ~/models ~/llama.cpp/models ~/storage/shared/Download -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | awk "!seen[\\$0]++" | head -1);',
               'if [ -n "$MODEL" ] && which llama-server >/dev/null 2>&1; then',
-              '  nohup llama-server -m "$MODEL" --host 0.0.0.0 --port 8080 -ngl 0 -c 2048 > /dev/null 2>&1 &',
+              '  nohup llama-server -m "$MODEL" --host 127.0.0.1 --port 8080 -ngl 0 -c 2048 -t 6 > /dev/null 2>&1 &',
               '  echo "STARTED";',
               'fi',
             ].join(' '),
@@ -307,11 +309,11 @@ export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ succ
 
     // ── Complete ──────────────────────────────────────────────────────
     onProgress({ step: 'complete', percent: 100 });
-    return { success: true, llmDetected };
+    return { success: true, llmDetected, ttyConnected: ttyOk };
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     onProgress({ step: 'error', percent: 0, error: message });
-    return { success: false, llmDetected: false, error: message };
+    return { success: false, llmDetected: false, ttyConnected: false, error: message };
   }
 }

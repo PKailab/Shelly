@@ -110,7 +110,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [progress, setProgress] = useState<SetupProgress>({ step: 'installing_packages', percent: 0 });
   const [completedSteps, setCompletedSteps] = useState<Set<SetupStep>>(new Set());
-  const [setupResult, setSetupResult] = useState<{ llmDetected: boolean } | null>(null);
+  const [setupResult, setSetupResult] = useState<{ llmDetected: boolean; ttyConnected: boolean } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [showAuthWizard, setShowAuthWizard] = useState(false);
   const slideTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -200,7 +200,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
     const result = await runAutoSetup(handleProgress);
 
     if (result.success) {
-      setSetupResult({ llmDetected: result.llmDetected });
+      setSetupResult({ llmDetected: result.llmDetected, ttyConnected: result.ttyConnected });
       setWizardStep('complete');
       progressAnim.value = withTiming(100, { duration: 300 });
     } else {
@@ -454,8 +454,8 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
         <ResultRow
           icon="terminal"
           label={t('setup2.result_tty')}
-          value={t('setup2.result_connected')}
-          color="#4ADE80"
+          value={setupResult?.ttyConnected ? t('setup2.result_connected') : t('setup2.result_not_found')}
+          color={setupResult?.ttyConnected ? '#4ADE80' : '#FBBF24'}
         />
         <ResultRow
           icon="smart-toy"

@@ -73,7 +73,6 @@ export const MODEL_CATALOG: LlamaCppModel[] = [
     filename: 'gemma-3-4b-it-Q4_K_M.gguf',
     downloadUrl:
       'https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/resolve/main/google_gemma-3-4b-it-Q4_K_M.gguf',
-    recommended: true,
   },
   {
     id: 'qwen3-8b-q3',
@@ -93,7 +92,7 @@ export const MODEL_CATALOG: LlamaCppModel[] = [
   {
     id: 'qwen2.5-3b-q4',
     name: 'Qwen 2.5 3B',
-    description: '超軽量・高速。日本語対応。発熱を抑えたい場合に。',
+    description: '軽量・高速・日本語対応。Z Fold6で快適動作。チャット応答が速い。推奨モデル。',
     sizeGb: 2.0,
     ramRequiredGb: 4.4,
     language: 'ja',
@@ -103,7 +102,7 @@ export const MODEL_CATALOG: LlamaCppModel[] = [
     filename: 'qwen2.5-3b-instruct-q4_k_m.gguf',
     downloadUrl:
       'https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf',
-    badge: '軽量',
+    recommended: true,
   },
   {
     id: 'qwen3-4b-q4',

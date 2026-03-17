@@ -1,19 +1,23 @@
 /**
  * useTtydConnection — TTYタブ用の接続管理フック
  *
- * ttydへのfetch HEAD接続チェックを行い、3秒間隔で最大5回リトライ。
- * リトライ上限後にセットアップガイドを表示する。
+ * ttydへのfetch HEAD接続チェックを行い、失敗時はTermuxBridge経由で
+ * ttydを自動起動してからリトライする。手動接続は不要。
  * AppState連携でフォアグラウンド復帰時にリトライカウンターをリセットして再接続。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useTerminalStore } from '@/store/terminal-store';
+import { runTermuxCommand } from '@/lib/termux-intent';
 
 type TtydStatus = 'connecting' | 'connected' | 'error';
 
 const RETRY_INTERVAL = 3000;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 10;
+
+// Module-level flag to avoid launching ttyd multiple times
+let _ttydLaunchAttempted = false;
 
 export function useTtydConnection() {
   const { termuxSettings } = useTerminalStore();
@@ -49,6 +53,21 @@ export function useTtydConnection() {
     }
   }, [ttyUrl]);
 
+  // Auto-launch ttyd via TermuxBridge if not running
+  const autoLaunchTtyd = useCallback(async () => {
+    if (_ttydLaunchAttempted) return;
+    _ttydLaunchAttempted = true;
+    try {
+      await runTermuxCommand({
+        command: 'pkill -f "ttyd" 2>/dev/null; sleep 0.5; ttyd -W -p 7681 bash &',
+      });
+    } catch {
+      // Best-effort: native module may not be available
+    }
+    // Reset flag after 30s so we can retry if needed
+    setTimeout(() => { _ttydLaunchAttempted = false; }, 30000);
+  }, []);
+
   const startRetryLoop = useCallback(() => {
     clearTimer();
     retryCountRef.current = 0;
@@ -72,6 +91,11 @@ export function useTtydConnection() {
         return;
       }
 
+      // After 2 failed attempts, try to auto-launch ttyd
+      if (retryCountRef.current === 2) {
+        autoLaunchTtyd();
+      }
+
       retryCountRef.current += 1;
       setRetryCount(retryCountRef.current);
 
@@ -84,10 +108,11 @@ export function useTtydConnection() {
     };
 
     tick();
-  }, [checkConnection, clearTimer]);
+  }, [checkConnection, clearTimer, autoLaunchTtyd]);
 
   // Manual retry — reset counters and restart
   const retry = useCallback(() => {
+    _ttydLaunchAttempted = false; // Allow re-launch on manual retry
     startRetryLoop();
   }, [startRetryLoop]);
 
@@ -122,6 +147,7 @@ export function useTtydConnection() {
 
       if (nextState === 'active' && prev !== 'active') {
         // Foreground resume — reset and reconnect
+        _ttydLaunchAttempted = false;
         startRetryLoop();
       }
     });

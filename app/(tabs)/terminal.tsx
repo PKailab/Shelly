@@ -163,19 +163,17 @@ export default function TerminalScreen() {
         </View>
       )}
 
-      {/* WebView (ttyd) */}
-      {status === 'connected' && (
-        <WebView
-          ref={webViewRef}
-          source={{ uri: ttyUrl }}
-          style={styles.webView}
-          javaScriptEnabled
-          domStorageEnabled
-          onLoadEnd={onWebViewLoad}
-          onError={onWebViewError}
-          onHttpError={onWebViewError}
-        />
-      )}
+      {/* WebView (ttyd) — always mounted to prevent reload on tab switch */}
+      <WebView
+        ref={webViewRef}
+        source={{ uri: ttyUrl }}
+        style={[styles.webView, status !== 'connected' && { height: 0, opacity: 0 }]}
+        javaScriptEnabled
+        domStorageEnabled
+        onLoadEnd={onWebViewLoad}
+        onError={onWebViewError}
+        onHttpError={onWebViewError}
+      />
 
       {/* Japanese Input Proxy */}
       {status === 'connected' && showJpInput && (

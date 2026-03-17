@@ -8,7 +8,7 @@
  * - llama-serverの起動/停止
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -60,6 +60,15 @@ export function LlamaCppSection({
   const [isSettingUp, setIsSettingUp] = useState(false);
   const [setupLog, setSetupLog] = useState<string[]>([]);
   const [showSetupLog, setShowSetupLog] = useState(false);
+
+  // ── Auto-check server status on mount ──────────────────────────────────────
+  useEffect(() => {
+    if (!isConnected) return;
+    const cmd = buildStatusCommand();
+    onRunCommand(cmd, 'Server status check').then((result) => {
+      setServerStatus(result.success ? 'running' : 'stopped');
+    });
+  }, [isConnected]);
 
   // ── llama.cpp セットアップ ────────────────────────────────────────────────
 
