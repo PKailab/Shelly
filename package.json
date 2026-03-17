@@ -4,10 +4,27 @@
   "description": "AI-powered terminal IDE for Android",
   "license": "MIT",
   "author": "RYO ITABASHI",
+  "homepage": "https://github.com/RYOITABASHI/Shelly#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/RYOITABASHI/Shelly"
   },
+  "bugs": {
+    "url": "https://github.com/RYOITABASHI/Shelly/issues"
+  },
+  "keywords": [
+    "terminal",
+    "ide",
+    "android",
+    "ai",
+    "termux",
+    "react-native",
+    "expo",
+    "mobile-development",
+    "chat-ui",
+    "claude",
+    "llm"
+  ],
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
