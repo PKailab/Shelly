@@ -38,6 +38,7 @@ import { SetupWizard } from '@/components/SetupWizard';
 import { PackageManager as PackageManagerModal } from '@/components/PackageManager';
 import { saveCustomContext, loadCustomContext, DEFAULT_CUSTOM_CONTEXT } from '@/lib/shelly-system-prompt';
 import { AuthWizard } from '@/components/AuthWizard';
+import { isPro } from '@/lib/pro';
 
 const THEME_OPTIONS: { value: ThemeVariant; label: string; bg: string }[] = [
   { value: 'black', label: 'Black', bg: '#0D0D0D' },
@@ -58,6 +59,26 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {subtitle && <Text style={styles.sectionSubtitle}>{subtitle}</Text>}
+    </View>
+  );
+}
+
+/** Wraps Pro-only sections: grayed out with lock icon when Free */
+function ProGate({ children }: { children: React.ReactNode }) {
+  const pro = isPro();
+  return (
+    <View style={{ opacity: pro ? 1 : 0.35 }} pointerEvents={pro ? 'auto' : 'none'}>
+      {!pro && (
+        <Pressable
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10,
+            justifyContent: 'center', alignItems: 'center',
+          }}
+          pointerEvents="box-only"
+          onPress={() => Alert.alert('Pro Feature', 'Sponsor Shelly on GitHub to unlock.\nhttps://github.com/sponsors/RYOITABASHI')}
+        />
+      )}
+      {children}
     </View>
   );
 }
@@ -1031,6 +1052,8 @@ export default function SettingsScreen() {
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
+        {/* ── Pro Features Block 1: Local LLM + LlamaCpp + MCP + System Prompt ── */}
+        <ProGate>
         {/* ── Local LLM (Ollama) ─────────────────────────────────────────── */}
         <SectionHeader
           title="Local LLM (llama-server)"
@@ -1187,6 +1210,8 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
+        </ProGate>
+
         {/* ── CLI Auto-Approve ──────────────────────────────────────────── */}
         <SectionHeader
           title="CLI Auto-Approve"
@@ -1263,6 +1288,8 @@ export default function SettingsScreen() {
           })}
         </View>
 
+        {/* ── Pro Features Block 2: API integrations + @team + Obsidian ─── */}
+        <ProGate>
             {/* ── Groq API ──────────────────────────────────────────────────── */}
         <SectionHeader
           title="Groq API"
@@ -1518,6 +1545,8 @@ export default function SettingsScreen() {
             Last collected: {new Date(obsidianSettings.lastCollectedAt).toLocaleString('en-US')}
           </Text>
         )}
+        </ProGate>
+
         {/* ── Snippets ────────────────────────────────────────────────── */}
         <SectionHeader title="Snippets" subtitle="Configure how command snippets are executed" />
 

@@ -25,6 +25,8 @@ export interface GroqResult {
   success: boolean;
   content?: string;
   error?: string;
+  /** True when failure was due to network (offline/timeout) — caller can fallback to local LLM */
+  networkError?: boolean;
 }
 
 interface GroqStreamDelta {
@@ -36,10 +38,16 @@ interface GroqStreamDelta {
 
 // ─── Error Handling ──────────────────────────────────────────────────────────
 
+function isNetworkError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes('abort') || message.includes('timeout') ||
+    message.includes('Network request failed') || message.includes('Failed to fetch') ||
+    message.includes('ERR_INTERNET_DISCONNECTED');
+}
+
 function formatGroqError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
-  const isTimeout = message.includes('abort') || message.includes('timeout');
-  return isTimeout ? 'タイムアウト。ネットワーク接続を確認してください。' : message;
+  return isNetworkError(err) ? 'オフラインです。ネットワーク接続を確認してください。' : message;
 }
 
 async function handleGroqHttpError(res: Response): Promise<GroqResult> {
@@ -138,7 +146,7 @@ export async function groqChatStream(
     const { fullContent } = await readGroqSSE(reader, onChunk);
     return { success: true, content: fullContent };
   } catch (err) {
-    return { success: false, error: formatGroqError(err) };
+    return { success: false, error: formatGroqError(err), networkError: isNetworkError(err) };
   }
 }
 
@@ -259,7 +267,7 @@ export async function groqTranscribe(
     const text = await res.text();
     return { success: true, content: text.trim() };
   } catch (err) {
-    return { success: false, error: formatGroqError(err) };
+    return { success: false, error: formatGroqError(err), networkError: isNetworkError(err) };
   }
 }
 

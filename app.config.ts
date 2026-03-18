@@ -124,6 +124,7 @@ const config: ExpoConfig = {
     eas: {
       projectId: "e0d124cb-e18f-46c4-aca2-e19e48ba04fc",
     },
+    shellyPro: process.env.SHELLY_PRO === 'true',
   },
   experiments: {
     typedRoutes: true,
