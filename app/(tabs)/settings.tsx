@@ -663,7 +663,7 @@ export default function SettingsScreen() {
         </View>
         {/* 背景透明度 */}
         <SettingRow
-          label="Background opacity"
+          label={t('settings.bg_opacity_label')}
           description={`Terminal background opacity: ${Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%`}
         >
           <View style={styles.stepper}>
@@ -684,7 +684,7 @@ export default function SettingsScreen() {
         </SettingRow>
         {/* ブラー強度 */}
         <SettingRow
-          label="Blur intensity"
+          label={t('settings.blur_label')}
           description={`Wallpaper blur amount: ${settings.blurIntensity ?? 0}`}
         >
           <View style={styles.stepper}>
@@ -775,7 +775,7 @@ export default function SettingsScreen() {
         </SettingRow>
 
         <SettingRow
-          label="High contrast output"
+          label={t('settings.high_contrast_label')}
           description={settings.highContrastOutput
             ? 'stdout #E8E8E8 / stderr #FF7878 — OLED optimized'
             : 'Theme-dependent colors (may be hard to read on dark screens)'}
@@ -789,7 +789,7 @@ export default function SettingsScreen() {
         </SettingRow>
 
         <SettingRow
-          label="Experience mode"
+          label={t('settings.experience_label')}
           description={
             (settings.experienceMode ?? 'learning') === 'learning'
               ? 'Learning mode: More safety prompts with AI command explanations'
@@ -821,7 +821,7 @@ export default function SettingsScreen() {
           />
         </SettingRow>
 
-        <SettingRow label="Volume" description={`${Math.round((settings.soundVolume ?? 0.6) * 100)}%`}>
+        <SettingRow label={t('settings.volume_label')} description={`${Math.round((settings.soundVolume ?? 0.6) * 100)}%`}>
           <View style={styles.stepper}>
             <Pressable
               onPress={() => updateSettings({ soundVolume: Math.max(0, (settings.soundVolume ?? 0.6) - 0.1) })}
@@ -916,7 +916,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* Auto-reconnect */}
-        <SettingRow label="Auto-reconnect" description="Auto-reconnect on disconnect (max 5 times)">
+        <SettingRow label={t('settings.auto_reconnect_label')} description={t('settings.auto_reconnect_desc')}>
           <Switch
             value={termuxSettings.autoReconnect}
             onValueChange={(v) => updateTermuxSettings({ autoReconnect: v })}
@@ -926,7 +926,7 @@ export default function SettingsScreen() {
         </SettingRow>
 
         {/* Timeout */}
-        <SettingRow label="Timeout" description={`Command timeout: ${termuxSettings.timeoutSeconds}s`}>
+        <SettingRow label={t('settings.timeout_label')} description={t('settings.timeout_desc', { seconds: termuxSettings.timeoutSeconds })}>
           <View style={styles.stepper}>
             <Pressable onPress={() => handleTimeoutChange(-5)} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -1061,7 +1061,7 @@ export default function SettingsScreen() {
         />
 
         <SettingRow
-          label="Use Local LLM"
+          label={t('settings.use_local_llm')}
           description={settings.localLlmEnabled
             ? 'Enabled: Basic chat handled by llama-server (saves Claude/Gemini credits)'
             : 'Disabled: All AI tasks sent to Claude Code / Gemini CLI'}
@@ -1177,7 +1177,7 @@ export default function SettingsScreen() {
         {/* ── Custom Context ────────────────────────────────────────────── */}
         <SectionHeader
           title={t('settings.custom_context_title')}
-          subtitle="Markdown auto-injected into Local LLM. Write design principles or rules"
+          subtitle={t('settings.custom_context_subtitle')}
         />
         <View style={styles.wsUrlRow}>
           <TextInput
@@ -1220,9 +1220,9 @@ export default function SettingsScreen() {
         <View style={styles.wsUrlRow}>
           {(['none', 'safe', 'all'] as const).map((level) => {
             const labels: Record<string, { title: string; desc: string }> = {
-              none: { title: 'All manual', desc: 'Confirm every time (safe)' },
-              safe: { title: 'Read-only auto', desc: 'Auto-approve file reads' },
-              all: { title: 'Full auto', desc: 'Auto-approve all (advanced)' },
+              none: { title: t('settings.approve_none'), desc: t('settings.approve_none_desc') },
+              safe: { title: t('settings.approve_safe'), desc: t('settings.approve_safe_desc') },
+              all: { title: t('settings.approve_all'), desc: t('settings.approve_all_desc') },
             };
             const isActive = autoApproveLevel === level;
             return (
@@ -1297,7 +1297,7 @@ export default function SettingsScreen() {
         />
 
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>API Key</Text>
+          <Text style={styles.wsUrlLabel}>{t('settings.api_key')}</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#F97316' }]}
@@ -1313,14 +1313,14 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.wsUrlHint}>
             {settings.groqApiKey
-              ? `✓ Configured — default for chat & voice transcription`
-              : `https://console.groq.com — free, no credit card required`
+              ? t('settings.groq_configured')
+              : t('settings.groq_hint')
             }
           </Text>
         </View>
 
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Model</Text>
+          <Text style={styles.wsUrlLabel}>{t('settings.model')}</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#F97316' }]}
@@ -1345,7 +1345,7 @@ export default function SettingsScreen() {
         />
 
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>API Key</Text>
+          <Text style={styles.wsUrlLabel}>{t('settings.api_key')}</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#20B2AA' }]}
@@ -1361,14 +1361,14 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.wsUrlHint}>
             {settings.perplexityApiKey
-              ? `✓ Configured — available for @perplexity paper search`
-              : `https://www.perplexity.ai/settings/api `
+              ? t('settings.perplexity_configured')
+              : t('settings.perplexity_hint')
             }
           </Text>
         </View>
 
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Model</Text>
+          <Text style={styles.wsUrlLabel}>{t('settings.model')}</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#20B2AA' }]}
@@ -1392,7 +1392,7 @@ export default function SettingsScreen() {
           subtitle={t('settings.gemini_api_subtitle')}
         />
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>API Key</Text>
+          <Text style={styles.wsUrlLabel}>{t('settings.api_key')}</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#A78BFA' }]}
@@ -1408,13 +1408,13 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.wsUrlHint}>
             {settings.geminiApiKey
-              ? `✓ Configured — available via @gemini`
-              : `https://aistudio.google.com/app/apikey (free)`
+              ? t('settings.gemini_configured')
+              : t('settings.gemini_hint')
             }
           </Text>
         </View>
         <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Model</Text>
+          <Text style={styles.wsUrlLabel}>{t('settings.model')}</Text>
           <View style={styles.wsUrlInputRow}>
             <TextInput
               style={[styles.wsUrlInput, { color: '#A78BFA' }]}
@@ -1497,7 +1497,7 @@ export default function SettingsScreen() {
             Full path to Obsidian Vault. Collected articles and papers are saved here.
           </Text>
         </View>
-        <SettingRow label="Auto-collect" description="Automatically collect articles and papers at a scheduled time each morning">
+        <SettingRow label={t('settings.auto_collect_label')} description={t('settings.auto_collect_desc')}>
           <Pressable
             style={[styles.segmentBtn, obsidianSettings.autoCollectEnabled && styles.segmentBtnActive]}
             onPress={() => saveObsidianSettings({ autoCollectEnabled: !obsidianSettings.autoCollectEnabled })}
@@ -1507,7 +1507,7 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
         </SettingRow>
-        <SettingRow label="Collection time" description="Time to run auto-collection (e.g. 6:00)">
+        <SettingRow label={t('settings.collect_time_label')} description={t('settings.collect_time_desc')}>
           <View style={styles.stepper}>
             <Pressable onPress={() => saveObsidianSettings({ collectTimeHour: Math.max(0, obsidianSettings.collectTimeHour - 1) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -1518,7 +1518,7 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </SettingRow>
-        <SettingRow label="Max items/day" description="Maximum number of articles/papers to collect per day">
+        <SettingRow label={t('settings.max_items_label')} description={t('settings.max_items_desc')}>
           <View style={styles.stepper}>
             <Pressable onPress={() => saveObsidianSettings({ maxItemsPerDay: Math.max(3, obsidianSettings.maxItemsPerDay - 1) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -1529,7 +1529,7 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </SettingRow>
-        <SettingRow label="Collection period" description="Only collect articles/papers from the last N days">
+        <SettingRow label={t('settings.collect_period_label')} description={t('settings.collect_period_desc')}>
           <View style={styles.stepper}>
             <Pressable onPress={() => saveObsidianSettings({ daysBack: Math.max(7, obsidianSettings.daysBack - 7) })} style={styles.stepBtn}>
               <Text style={styles.stepBtnText}>−</Text>
@@ -1551,7 +1551,7 @@ export default function SettingsScreen() {
         <SectionHeader title={t('settings.snippets_title')} subtitle={t('settings.snippets_subtitle')} />
 
         <SettingRow
-          label="Run mode"
+          label={t('settings.run_mode_label')}
           description={settings.snippetRunMode === 'insertAndRun' ? 'Tap to run immediately' : 'Insert into input only'}
         >
           <View style={styles.segmentRow}>
@@ -1569,7 +1569,7 @@ export default function SettingsScreen() {
           </View>
         </SettingRow>
 
-        <SettingRow label="Return to Terminal" description="Auto-switch to Terminal tab after running a snippet">
+        <SettingRow label={t('settings.return_terminal_label')} description={t('settings.return_terminal_desc')}>
           <Switch
             value={settings.snippetAutoReturn}
             onValueChange={(v) => updateSettings({ snippetAutoReturn: v })}
@@ -1580,7 +1580,7 @@ export default function SettingsScreen() {
 
         {/* ── Snippets Backup ───────────────────────────────────────────── */}
         <SectionHeader
-          title="Snippet Backup"
+          title={t('settings.snippet_backup_title')}
           subtitle={`${snippets.length} snippets`}
         />
 
@@ -1602,7 +1602,7 @@ export default function SettingsScreen() {
 
         {/* ── Projects Backup ──────────────────────────────────────────── */}
         <SectionHeader
-          title="Project Backup"
+          title={t('settings.project_backup_title')}
           subtitle={`${projects.length} projects`}
         />
 
