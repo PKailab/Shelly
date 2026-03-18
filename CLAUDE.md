@@ -22,17 +22,17 @@ Shelly上のTermuxからClaude Codeを起動した際にも自動で読み込ま
 
 ---
 
-## タブ構成（v5.0 新設計）
+## タブ構成（v5.1）
 
 | 順 | タブ | 役割 |
 |----|------|------|
-| 1 | **Projects** | プロジェクト一覧 + チャット履歴。GPT/Claudeの左パネルと同じ概念をタブで実現 |
-| 2 | **Chat** | メイン画面。右:ユーザーバブル、左:AIバブル。裏でCLI実行、結果をチャット風に描画 |
-| 3 | **Terminal** | TTY生ターミナル。日本語入力対応（Termux単体では不可能） |
-| 4 | **Settings** | 設定 + スニペット管理 + Obsidian RAG + バックアップ |
+| 1 | **Projects** | プロジェクト一覧 + チャット履歴 |
+| 2 | **Chat** | メイン画面。AI/CLI実行をチャット風に描画 |
+| 3 | **Terminal** | TTY生ターミナル（日本語入力対応） |
+| 4 | **Settings** | 設定 + スニペット + Obsidian + バックアップ |
 
-旧8タブ（Chat/TTY/Snippets/Creator/Browser/Obsidian/Search/Settings）から4タブに集約。
-Creator → Chatから「アプリ作って」で実行。Snippets → Settings内。Browser → 廃止。Obsidian → Settings内。Search → Projects内。
+※ Browser タブは廃止済み（2026-03-19）。URLはシステムブラウザで開く。
+※ Workflow Editor/Runner は廃止済み（Snippetsで代替）。
 
 ## ディレクトリ構成
 
@@ -70,22 +70,25 @@ Shelly/
 │   └── SetupWizard.tsx        # Termuxセットアップウィザード（2択分岐 + 5ステップ）
 ├── lib/
 │   ├── input-router.ts        # 4層+4.5層入力ルーティング（軽量タスク直送）
-│   ├── local-llm.ts           # ローカルLLMオーケストレーション
+│   ├── intent-router.ts       # LLMベースインテント分類（ローカルLLM経由）
+│   ├── local-llm.ts           # ローカルLLMオーケストレーション（Pro機能）
+│   ├── groq.ts                # Groq API統合（チャット + Whisper文字起こし）（Pro機能）
+│   ├── gemini.ts              # Gemini API統合（Pro機能）
+│   ├── perplexity.ts          # Perplexity API統合（Pro機能）
+│   ├── pro.ts                 # Pro/Free機能フラグ（ビルドタイム + ランタイム）
+│   ├── secure-store.ts        # APIキー暗号化保存（expo-secure-store）
 │   ├── llm-interpreter.ts     # コマンド出力のAI解釈
-│   ├── project-context.ts     # プロジェクトコンテキスト自動生成（.shelly/context.md）
+│   ├── cli-runner.ts          # Claude Code / Gemini CLI実行
+│   ├── cli-auth.ts            # CLIツール認証管理
+│   ├── project-context.ts     # プロジェクトコンテキスト自動生成
 │   ├── user-profile.ts        # ユーザープロファイル自動学習
 │   ├── command-safety.ts      # コマンド安全チェック（5段階）+ リカバリ提案
-│   ├── git-assistant.ts       # @git 自然言語Gitガイド（5コアインテント + LLM委譲）
-│   ├── gemini.ts              # Gemini API統合
-│   ├── perplexity.ts          # Perplexity API統合
-│   ├── team-roundtable.ts     # @team マルチAI並列実行
+│   ├── git-assistant.ts       # @git 自然言語Gitガイド
+│   ├── auto-setup.ts          # SetupWizardオーケストレーター
 │   ├── theme-engine.ts        # テーマエンジン（30トークン）
 │   ├── sounds.ts              # サウンドシステム（14種）
-│   ├── keybindings.ts         # キーバインド設定
-│   ├── accessibility.ts       # アクセシビリティ
-│   ├── obsidian-rag.ts        # Obsidian RAG
-│   ├── plugin-api.ts          # プラグインシステム
 │   ├── creator-engine.ts      # プロジェクト生成エンジン
+│   ├── obsidian-collector.ts  # Obsidian論文/記事収集
 │   └── i18n/
 │       ├── index.ts           # i18nエンジン（Zustand + expo-localization）
 │       └── locales/
@@ -148,6 +151,14 @@ Shelly/
 | Bridge 経由で Termux コマンド実行 | WebSocket で shelly-bridge/server.js に接続 | use-termux-bridge.ts |
 | handleSelectModel でファイル名保存 | model.id ではなく filename.replace('.gguf','') を localLlmModel に | settings.tsx |
 | 推奨モデルをカタログで初期展開 | ダウンロードボタンがすぐ見えるように | LlamaCppSection.tsx |
+| Groq = デフォルトチャットプロバイダ | 1,000回/日無料、爆速、日本語○ | groq.ts, use-ai-dispatch.ts |
+| チャットルーティング: Groq > Local LLM > Gemini | Groqが最速。オフライン時はローカルLLMにフォールバック | index.tsx, use-ai-dispatch.ts |
+| APIキーはexpo-secure-storeで暗号化保存 | AsyncStorageに平文保存しない | secure-store.ts |
+| APIキーはヘッダーで送信（URLパラメータ禁止） | セキュリティ: ログ/キャッシュへの漏洩防止 | gemini.ts, groq.ts |
+| Pro/Free = ビルドタイムフラグ（SHELLY_PRO env） | ソース全公開、フラグで制御。アンロック可能でも構わない | pro.ts, app.config.ts |
+| Pro機能: API統合, Local LLM, MCP, @team, Obsidian | CLIベースの基本機能は無料 | settings.tsx (ProGate) |
+| Browser タブ廃止 | WebViewはシステムブラウザに勝てない | 2026-03-19 削除 |
+| Workflow Editor 廃止 | Snippetsで代替可能 | 2026-03-19 削除 |
 
 ---
 
@@ -186,22 +197,26 @@ Shelly/
 7. **AIエラーブロック**: `components/terminal/AiBlock.tsx` にリトライ/別AIに聞くアクションボタン追加
 8. **@team UI改善**: `app/(tabs)/index.tsx` でファシリテーターまとめを先頭表示、個別回答を後に配置
 
+### 2026-03-19 OSS公開準備セッション
+
+1. **セキュリティ修正**: Gemini APIキーをURLクエリパラメータからヘッダー（`x-goog-api-key`）に移行。対象: use-speech-input.ts, use-voice-chat.ts, obsidian-collector.ts
+2. **Groq API統合**: `lib/groq.ts` 新規作成。チャット（Llama 3.3 70B, SSEストリーミング）+ Whisper音声文字起こし。APIキーはSecureStoreで暗号化保存
+3. **ウィザード改善**: SetupWizard完了画面でCLI検出（bridge WebSocket経由）。未検出時はGemini CLIワンタップインストール+自動AuthWizard起動
+4. **Pro/Freeフラグ**: `lib/pro.ts` でビルドタイム判定（`SHELLY_PRO` env）。設定画面のPro機能セクションをProGateでグレーアウト+ロックアイコン
+5. **Groqチャットディスパッチ**: `use-ai-dispatch.ts` にGroqブランチ追加。ネットワークエラー時はローカルLLMに自動フォールバック
+6. **コード削除（-6,812行）**: Browserタブ, Workflow Editor/Runner, 14テストファイル, パッチスクリプト, 旧server.js, 未使用lib（hint-tracker, log-export, snippet-share, obsidian-rag）
+7. **設定画面i18n完全化**: 全セクションヘッダー・ラベル・説明文をt()キーに置き換え。日本語翻訳追加。中高生でも使えるUI
+8. **TypeScriptエラー全解消**: AuthWizard（oauthRunning prop）、ExecutionLogPanel（unreadCount）、app.config.ts（usesCleartextTraffic型）
+
 ### 未完了・リマインド
 
-1. **⚠️ OSS公開前に必ず戻す**: `lib/i18n/index.ts` の `detectLocale()` catchブロックで SSRフォールバックを `'ja'` → `'en'` に変更する必要あり（一時的に日本語デフォルトにしている）
+1. **APKビルド確認**: 2026-03-19にGitHub Actionsトリガー済み。実機で全変更の動作確認が必要
 
-2. **APKビルド確認**: GitHub Actionsワークフロー（`.github/workflows/build-android.yml`）で実機確認が必要。Expo Webではスケール・SafeArea・Fold開閉の挙動が正しく再現できない
+2. **スクショ・PR動画**: ワイヤレスADB方式でTermux完結。アプリ安定後に撮影
 
-3. **ファイル重複の注意**: シンボリックリンクをコピーで置き換えたため、ルート直下とサブディレクトリ（例: `local-llm.ts` と `lib/local-llm.ts`）に同じファイルが存在する場合がある。`app/(tabs)/`内のimportは`@/lib/`を参照するため、`lib/`配下が正。ルート直下のファイルは参照されない可能性あり
+3. **README**: OSS公開用。「I can't write code.」の物語。Pro機能の透明性宣言（フラグ外せばアンロック可能）
 
-4. **⚠️ ブリッジサーバーのセットアップバグ**: SetupWizardのインストールコマンドが `mkdir -p ~/shelly-bridge` しか実行せず、`server.js` をコピー/生成していない。ユーザーが `node ~/shelly-bridge/server.js` を実行すると `MODULE_NOT_FOUND` エラーになる。修正方法: セットアップコマンドで `server.js` を `~/shelly-bridge/` に配置するか、`lib/bridge-bundle.ts` にサーバーコードを埋め込んでセットアップ時に書き出す仕組みにする。暫定対応: `cp ~/Shelly/server.js ~/shelly-bridge/server.js`
-
-5. **⚠️ セットアップUX全体の改善が必要**:
-   - ブリッジ + llama-server の2つを起動する必要があるが、ユーザーにとって手順が分かりづらい
-   - ポート競合時のエラー（EADDRINUSE）がユーザーフレンドリーでない
-   - 理想: SetupWizardでワンタップで全部起動できるようにする（tmuxセッション自動作成、ブリッジ+LLMサーバー同時起動）
-   - もしくは: ブリッジサーバーにllama-serverのプロセス管理機能を統合して、1コマンドで全部起動
-   - 最低限: セットアップ手順にtmuxの使い方、ポート競合時の対処法（`pkill -f "node.*server.js"`）を明記
+4. **i18n構造の単純化**: en.tsをベース、ja.tsは差分のみに。現在は両方に全キー定義されているが、フォールバック機構は既に動作している
 
 ---
 
