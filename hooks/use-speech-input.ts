@@ -9,6 +9,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTerminalStore } from '@/store/terminal-store';
 import { GEMINI_API_BASE } from '@/lib/gemini';
+import { groqTranscribe } from '@/lib/groq';
 
 type SpeechState = {
   status: 'idle' | 'recording' | 'transcribing';
@@ -86,61 +87,74 @@ export function useSpeechInput() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Send to Gemini for transcription
-      const apiKey = useTerminalStore.getState().settings.geminiApiKey;
-      if (!apiKey || apiKey.trim().length < 10) {
-        setState({
-          status: 'idle',
-          transcribedText: '',
-          error: 'Gemini APIキーが未設定または無効です。文字起こしにはGemini APIが必要です。',
-        });
-        return;
-      }
+      // Transcription priority: Groq Whisper > Gemini API
+      const settings = useTerminalStore.getState().settings;
+      const groqKey = settings.groqApiKey;
+      const geminiKey = settings.geminiApiKey;
 
-      const url = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
+      let text = '';
 
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  inline_data: {
-                    mime_type: 'audio/m4a',
-                    data: base64Audio,
-                  },
-                },
-                {
-                  text: 'この音声を正確に書き起こしてください。テキストのみ出力してください。余計な説明は不要です。',
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 1024,
-            temperature: 0.1,
+      if (groqKey && groqKey.trim().length >= 10) {
+        // Use Groq Whisper (faster, dedicated STT)
+        const result = await groqTranscribe(groqKey, uri);
+        if (!result.success) {
+          setState({ status: 'idle', transcribedText: '', error: result.error });
+          return;
+        }
+        text = result.content ?? '';
+      } else if (geminiKey && geminiKey.trim().length >= 10) {
+        // Fallback to Gemini multimodal transcription
+        const url = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiKey,
           },
-        }),
-      });
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: 'audio/m4a',
+                      data: base64Audio,
+                    },
+                  },
+                  {
+                    text: 'この音声を正確に書き起こしてください。テキストのみ出力してください。余計な説明は不要です。',
+                  },
+                ],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 1024,
+              temperature: 0.1,
+            },
+          }),
+        });
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
+        if (!res.ok) {
+          setState({
+            status: 'idle',
+            transcribedText: '',
+            error: `文字起こしエラー: HTTP ${res.status}`,
+          });
+          return;
+        }
+
+        const json = await res.json();
+        text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+      } else {
         setState({
           status: 'idle',
           transcribedText: '',
-          error: `文字起こしエラー: HTTP ${res.status}`,
+          error: '音声文字起こしにはGroqまたはGemini APIキーが必要です。設定画面で入力してください。',
         });
         return;
       }
-
-      const json = await res.json();
-      const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
 
       setState({
         status: 'idle',

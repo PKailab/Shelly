@@ -13,7 +13,8 @@
  * 4. Fallback: keyword-based classifyTask() when LLM unavailable
  *
  * Priority order (when LLM unavailable):
- *   local-llm > claude-code > codex > gemini-cli
+ *   chat: groq (if key set) > CLI fallback
+ *   code: claude-code > codex > gemini-cli
  */
 
 import type { ToolStatus } from './shelly-system-prompt';
@@ -24,7 +25,7 @@ import { getToolById } from './env-manager';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RoutingTool = 'claude-code' | 'gemini-cli' | 'codex' | 'local-llm' | 'termux';
+export type RoutingTool = 'claude-code' | 'gemini-cli' | 'codex' | 'local-llm' | 'groq' | 'termux';
 
 export interface RoutingDecision {
   tool: RoutingTool;
@@ -54,6 +55,11 @@ function buildRoutingPrompt(toolStatuses: ToolStatus[]): string {
       id: 'codex',
       name: 'Codex CLI',
       strengths: 'Fast, lightweight code fixes, simple file edits, quick tasks. Lighter than Claude Code, suited for quick modifications.',
+    },
+    {
+      id: 'groq',
+      name: 'Groq (Llama 3.3 70B)',
+      strengths: 'Fast chat responses, Q&A, translation, summarization. Cloud API with very low latency. Cannot read/write files or execute code.',
     },
     {
       id: 'local-llm',
@@ -100,10 +106,11 @@ export async function routeIntent(
   config: LocalLlmConfig,
   toolStatuses: ToolStatus[] = [],
   defaultAgent?: 'gemini-cli' | 'claude-code' | 'codex',
+  options?: { groqApiKey?: string },
 ): Promise<RoutingDecision> {
   // LLM disabled → fallback
   if (!config.enabled) {
-    return fallbackRoute(userInput, toolStatuses, defaultAgent);
+    return fallbackRoute(userInput, toolStatuses, defaultAgent, options);
   }
 
   const messages: OllamaMessage[] = [
@@ -114,7 +121,7 @@ export async function routeIntent(
   const result = await ollamaChat(config, messages, 15000, undefined, 64);
 
   if (!result.success || !result.content) {
-    return fallbackRoute(userInput, toolStatuses, defaultAgent);
+    return fallbackRoute(userInput, toolStatuses, defaultAgent, options);
   }
 
   try {
@@ -126,7 +133,7 @@ export async function routeIntent(
     // parse failure → fallback
   }
 
-  return fallbackRoute(userInput, toolStatuses, defaultAgent);
+  return fallbackRoute(userInput, toolStatuses, defaultAgent, options);
 }
 
 function parseRoutingResponse(content: string): { tool: RoutingTool; reason: string } | null {
@@ -135,7 +142,7 @@ function parseRoutingResponse(content: string): { tool: RoutingTool; reason: str
 
   try {
     const parsed = JSON.parse(jsonMatch[0]);
-    const validTools: RoutingTool[] = ['claude-code', 'gemini-cli', 'codex', 'local-llm', 'termux'];
+    const validTools: RoutingTool[] = ['claude-code', 'gemini-cli', 'codex', 'local-llm', 'groq', 'termux'];
     if (validTools.includes(parsed.tool)) {
       return { tool: parsed.tool, reason: parsed.reason || '' };
     }
@@ -192,7 +199,7 @@ function buildDecision(
  * Priority order (based on installed tools):
  *   claude-code (if installed) > codex (if installed) > gemini-cli
  *
- * - chat → local-llm (should not reach here if local LLM works, but as fallback use best installed CLI)
+ * - chat → groq (if API key set) > local-llm > best CLI
  * - code → claude-code > codex > gemini-cli
  * - research → gemini-cli (best for search)
  * - file_ops → termux
@@ -202,6 +209,7 @@ function fallbackRoute(
   userInput: string,
   toolStatuses: ToolStatus[],
   explicitDefault?: RoutingTool,
+  options?: { groqApiKey?: string },
 ): RoutingDecision {
   const input = userInput.toLowerCase();
   const category = classifyTask(userInput);
@@ -219,6 +227,7 @@ function fallbackRoute(
   // Determine best available CLI based on installed tools
   const hasClaude = toolStatuses.some((s) => s.id === 'claude-code' && s.installed);
   const hasCodex = toolStatuses.some((s) => s.id === 'codex' && s.installed);
+  const hasGroqKey = !!(options?.groqApiKey && options.groqApiKey.trim().length > 0);
 
   // Default agent priority: explicit > claude-code > codex > gemini-cli
   const defaultAgent: RoutingTool = explicitDefault
@@ -227,11 +236,15 @@ function fallbackRoute(
   const defaultLabel = defaultAgent === 'claude-code' ? 'Claude Code'
     : defaultAgent === 'codex' ? 'Codex CLI' : 'Gemini CLI';
 
+  // Chat tasks: prefer groq (fast API) if key available
+  const chatTool: RoutingTool = hasGroqKey ? 'groq' : defaultAgent;
+  const chatLabel = hasGroqKey ? 'Groq' : defaultLabel;
+
   // Code tasks: prefer claude-code if available
   const codeTool: RoutingTool = hasClaude ? 'claude-code' : defaultAgent;
 
   const categoryToTool: Record<TaskCategory, RoutingTool> = {
-    chat: defaultAgent,
+    chat: chatTool,
     code: codeTool,
     research: 'gemini-cli',
     file_ops: 'termux',
@@ -239,7 +252,7 @@ function fallbackRoute(
   };
 
   const categoryReasons: Record<TaskCategory, string> = {
-    chat: `Responding via ${defaultLabel}`,
+    chat: `Responding via ${chatLabel}`,
     code: hasClaude ? 'Code task — delegating to Claude Code' : `Code task — using ${defaultLabel}`,
     research: 'Research task — delegating to Gemini CLI',
     file_ops: 'File operation — executing directly',
@@ -259,6 +272,7 @@ export function formatRoutingMessage(decision: RoutingDecision): string {
     'claude-code': 'Claude Code',
     'gemini-cli': 'Gemini CLI',
     'codex': 'Codex CLI',
+    'groq': 'Groq',
     'local-llm': 'Local LLM',
     'termux': 'Terminal',
   };

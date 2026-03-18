@@ -9,6 +9,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useTerminalStore } from '@/store/terminal-store';
 import { speakText, stopSpeaking } from '@/lib/tts';
 import { GEMINI_API_BASE } from '@/lib/gemini';
+import { groqTranscribe } from '@/lib/groq';
 
 export type VoiceChatStatus =
   | 'idle'           // 待機中
@@ -104,40 +105,51 @@ export function useVoiceChat() {
       });
 
       const settings = useTerminalStore.getState().settings;
-      const apiKey = settings.geminiApiKey;
-      if (!apiKey || apiKey.trim().length < 10) {
-        setState((s) => ({ ...s, status: 'idle', error: 'Gemini APIキーが未設定です' }));
+      const groqKey = settings.groqApiKey;
+      const geminiKey = settings.geminiApiKey;
+
+      // Step 1: Transcribe audio (Groq Whisper > Gemini fallback)
+      let transcript = '';
+
+      if (groqKey && groqKey.trim().length >= 10) {
+        const result = await groqTranscribe(groqKey, uri);
+        if (!result.success) {
+          setState((s) => ({ ...s, status: 'idle', error: result.error }));
+          return;
+        }
+        transcript = result.content ?? '';
+      } else if (geminiKey && geminiKey.trim().length >= 10) {
+        const transcribeUrl = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
+
+        const transcribeRes = await fetch(transcribeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiKey,
+          },
+          body: JSON.stringify({
+            contents: [{
+              role: 'user',
+              parts: [
+                { inline_data: { mime_type: 'audio/m4a', data: base64Audio } },
+                { text: 'この音声を正確に書き起こしてください。テキストのみ出力してください。' },
+              ],
+            }],
+            generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
+          }),
+        });
+
+        if (!transcribeRes.ok) {
+          setState((s) => ({ ...s, status: 'idle', error: `文字起こしエラー: HTTP ${transcribeRes.status}` }));
+          return;
+        }
+
+        const transcribeJson = await transcribeRes.json();
+        transcript = transcribeJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+      } else {
+        setState((s) => ({ ...s, status: 'idle', error: '音声文字起こしにはGroqまたはGemini APIキーが必要です' }));
         return;
       }
-
-      // Step 1: Transcribe audio
-      const transcribeUrl = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
-
-      const transcribeRes = await fetch(transcribeUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [
-              { inline_data: { mime_type: 'audio/m4a', data: base64Audio } },
-              { text: 'この音声を正確に書き起こしてください。テキストのみ出力してください。' },
-            ],
-          }],
-          generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
-        }),
-      });
-
-      if (!transcribeRes.ok) {
-        setState((s) => ({ ...s, status: 'idle', error: `文字起こしエラー: HTTP ${transcribeRes.status}` }));
-        return;
-      }
-
-      const transcribeJson = await transcribeRes.json();
-      const transcript = transcribeJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
 
       if (!transcript) {
         setState((s) => ({ ...s, status: 'idle', error: '音声を認識できませんでした' }));
@@ -158,34 +170,61 @@ export function useVoiceChat() {
       }
 
       abortRef.current = new AbortController();
+      let response = '';
 
-      const chatUrl = `${GEMINI_API_BASE}/models/${settings.geminiModel || 'gemini-2.0-flash'}:generateContent`;
+      if (groqKey && groqKey.trim().length >= 10) {
+        // Use Groq for voice chat response (fast)
+        const { groqChatStream } = await import('@/lib/groq');
+        const groqHistory = conversationRef.current.slice(0, -1).map((m) => ({
+          role: (m.role === 'model' ? 'assistant' : m.role) as 'user' | 'assistant',
+          content: m.parts[0]?.text ?? '',
+        }));
+        const result = await groqChatStream(
+          groqKey,
+          transcript,
+          () => {}, // no streaming UI for voice chat
+          settings.groqModel || 'llama-3.3-70b-versatile',
+          groqHistory,
+          abortRef.current.signal,
+        );
+        if (!result.success) {
+          setState((s) => ({ ...s, status: 'idle', error: result.error }));
+          return;
+        }
+        response = result.content ?? '';
+      } else if (geminiKey && geminiKey.trim().length >= 10) {
+        // Fallback to Gemini
+        const chatUrl = `${GEMINI_API_BASE}/models/${settings.geminiModel || 'gemini-2.0-flash'}:generateContent`;
 
-      const chatRes = await fetch(chatUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        signal: abortRef.current.signal,
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{
-              text: 'あなたは音声対話アシスタントです。簡潔に、自然な話し言葉で回答してください。コードブロックやマークダウンは使わないでください。長くても3-4文で答えてください。',
-            }],
+        const chatRes = await fetch(chatUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiKey,
           },
-          contents: conversationRef.current,
-          generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-        }),
-      });
+          signal: abortRef.current.signal,
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{
+                text: 'あなたは音声対話アシスタントです。簡潔に、自然な話し言葉で回答してください。コードブロックやマークダウンは使わないでください。長くても3-4文で答えてください。',
+              }],
+            },
+            contents: conversationRef.current,
+            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+          }),
+        });
 
-      if (!chatRes.ok) {
-        setState((s) => ({ ...s, status: 'idle', error: `応答エラー: HTTP ${chatRes.status}` }));
+        if (!chatRes.ok) {
+          setState((s) => ({ ...s, status: 'idle', error: `応答エラー: HTTP ${chatRes.status}` }));
+          return;
+        }
+
+        const chatJson = await chatRes.json();
+        response = chatJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+      } else {
+        setState((s) => ({ ...s, status: 'idle', error: '応答にはGroqまたはGemini APIキーが必要です' }));
         return;
       }
-
-      const chatJson = await chatRes.json();
-      const response = chatJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
 
       conversationRef.current.push({
         role: 'model',

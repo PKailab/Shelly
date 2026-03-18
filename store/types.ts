@@ -89,7 +89,7 @@ export type AiBlock = {
   /** 元のユーザー入力 */
   input: string;
   /** ルーティング先 */
-  target: 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'team' | 'browser' | 'git' | 'agent';
+  target: 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'groq' | 'team' | 'browser' | 'git' | 'agent';
   /** 入力レイヤー */
   layer: 'mention' | 'nl_with_tool' | 'natural' | 'command';
   /** 1行サマリー（常時表示） */
@@ -309,6 +309,11 @@ export type AppSettings = {
   geminiApiKey?: string;
   /** Geminiに使用するモデル (default: gemini-2.0-flash) */
   geminiModel?: string;
+  // ─── Groq API ─────────────────────────────────────────────────────────────────
+  /** Groq API キー (https://console.groq.com) */
+  groqApiKey?: string;
+  /** Groqに使用するモデル (default: llama-3.3-70b-versatile) */
+  groqModel?: string;
   // ─── ガラス背景・壁紙 ────────────────────────────────────────────────────────────
   /** 背景の透明度 (0.0=完全透明 〜 1.0=不透明, default: 1.0) */
   backgroundOpacity: number;

@@ -13,7 +13,7 @@ import { t } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RouteTarget = 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'team' | 'browser' | 'git' | 'agent' | 'codex';
+export type RouteTarget = 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'groq' | 'team' | 'browser' | 'git' | 'agent' | 'codex';
 
 export type InputLayer =
   | 'mention'        // @claude / @gemini / @local
@@ -444,6 +444,7 @@ export function getTargetLabel(target: RouteTarget): string {
     git: 'Git Guide',
     agent: 'AI Agent',
     codex: 'Codex CLI',
+    groq: 'Groq',
   };
   return labels[target];
 }
@@ -456,6 +457,7 @@ export function getTargetColor(target: RouteTarget): string {
     termux:     '#00D4AA', // ティール（既存ブランドカラー）
     suggest:    '#6B7280', // グレー
     perplexity: '#20B2AA', // ティールグリーン（Perplexityブランドカラー）
+    groq:       '#F97316', // オレンジ（Groqブランドカラー）
     team:       '#EC4899', // ピンク（Team Tableブランドカラー）
     browser:    '#4ADE80', // グリーン
     git:        '#F97316', // オレンジ（Git公式カラー）

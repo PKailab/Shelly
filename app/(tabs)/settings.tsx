@@ -1263,6 +1263,54 @@ export default function SettingsScreen() {
           })}
         </View>
 
+            {/* ── Groq API ──────────────────────────────────────────────────── */}
+        <SectionHeader
+          title="Groq API"
+          subtitle="Ultra-fast chat & Whisper transcription (Llama 3.3 70B)"
+        />
+
+        <View style={styles.wsUrlRow}>
+          <Text style={styles.wsUrlLabel}>API Key</Text>
+          <View style={styles.wsUrlInputRow}>
+            <TextInput
+              style={[styles.wsUrlInput, { color: '#F97316' }]}
+              value={settings.groqApiKey ?? ''}
+              onChangeText={(v) => updateSettings({ groqApiKey: v.trim() })}
+              placeholder="gsk_xxxxxxxxxxxxxxxxxxxx"
+              placeholderTextColor="#4B5563"
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              returnKeyType="done"
+            />
+          </View>
+          <Text style={styles.wsUrlHint}>
+            {settings.groqApiKey
+              ? `✓ Configured — default for chat & voice transcription`
+              : `https://console.groq.com — free, no credit card required`
+            }
+          </Text>
+        </View>
+
+        <View style={styles.wsUrlRow}>
+          <Text style={styles.wsUrlLabel}>Model</Text>
+          <View style={styles.wsUrlInputRow}>
+            <TextInput
+              style={[styles.wsUrlInput, { color: '#F97316' }]}
+              value={settings.groqModel ?? 'llama-3.3-70b-versatile'}
+              onChangeText={(v) => updateSettings({ groqModel: v.trim() || 'llama-3.3-70b-versatile' })}
+              placeholder="llama-3.3-70b-versatile"
+              placeholderTextColor="#4B5563"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
+          </View>
+          <Text style={styles.wsUrlHint}>
+            llama-3.3-70b-versatile (default) / llama-3.1-8b-instant (faster)
+          </Text>
+        </View>
+
             {/* ── Perplexity API ─────────────────────────────────────────────── */}
         <SectionHeader
           title="Perplexity API"

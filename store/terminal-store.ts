@@ -34,6 +34,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   localLlmEnabled: false,
   localLlmUrl: 'http://127.0.0.1:8080',
   localLlmModel: 'Qwen2.5-3B-Instruct-Q4_K_M',
+  // Groq API — デフォルトはモデル名のみ（APIキーはSecureStoreで管理）
+  groqModel: 'llama-3.3-70b-versatile',
   // ガラス背景 — デフォルトは不透明ブラック
   backgroundOpacity: 1.0,
   blurIntensity: 0,
