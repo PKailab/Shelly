@@ -38,8 +38,8 @@ import Animated, {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from '@/lib/i18n';
-import { runAutoSetup, type SetupStep, type SetupProgress } from '@/lib/auto-setup';
-import { getStoreUrl, checkTermuxPackages } from '@/lib/termux-intent';
+import { runAutoSetup, type SetupStep, type SetupProgress, type CliDetectionResult } from '@/lib/auto-setup';
+import { getStoreUrl, checkTermuxPackages, runTermuxCommand } from '@/lib/termux-intent';
 import { AuthWizard } from '@/components/AuthWizard';
 
 const SETUP_WIZARD_KEY = '@shelly/setup_wizard_complete';
@@ -111,6 +111,9 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
   const [progress, setProgress] = useState<SetupProgress>({ step: 'installing_packages', percent: 0 });
   const [completedSteps, setCompletedSteps] = useState<Set<SetupStep>>(new Set());
   const [setupResult, setSetupResult] = useState<{ llmDetected: boolean; ttyConnected: boolean } | null>(null);
+  const [cliDetected, setCliDetected] = useState<CliDetectionResult>({ claudeCode: false, geminiCli: false, codex: false });
+  const [geminiInstalling, setGeminiInstalling] = useState(false);
+  const [geminiInstalled, setGeminiInstalled] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showAuthWizard, setShowAuthWizard] = useState(false);
   const slideTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -220,6 +223,50 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
       startSetup();
     }
   }, [isResetup, visible]);
+
+  // ── CLI detection (via bridge, after setup completes) ────────────────────
+  useEffect(() => {
+    if (wizardStep !== 'complete') return;
+    // Use bridge WebSocket to detect CLI tools
+    const detect = async () => {
+      try {
+        const { termuxSettings } = (await import('@/store/terminal-store')).useTerminalStore.getState();
+        const wsUrl = termuxSettings.wsUrl;
+        const ws = new WebSocket(wsUrl);
+        const detected: CliDetectionResult = { claudeCode: false, geminiCli: false, codex: false };
+
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => { ws.close(); resolve(); }, 8000);
+          ws.onopen = () => {
+            ws.send(JSON.stringify({
+              type: 'exec',
+              command: 'echo "CC:$(which claude 2>/dev/null && echo 1 || echo 0):GC:$(which gemini 2>/dev/null && echo 1 || echo 0):CX:$(which codex 2>/dev/null && echo 1 || echo 0)"',
+            }));
+          };
+          ws.onmessage = (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              const out = data.stdout || data.output || data.data || '';
+              if (out.includes('CC:') && out.includes('GC:')) {
+                detected.claudeCode = out.includes('CC:1');
+                detected.geminiCli = out.includes('GC:1');
+                detected.codex = out.includes('CX:1');
+                clearTimeout(timeout);
+                ws.close();
+                resolve();
+              }
+            } catch {}
+          };
+          ws.onerror = () => { clearTimeout(timeout); resolve(); };
+        });
+
+        setCliDetected(detected);
+      } catch {
+        // CLI detection failure is non-fatal
+      }
+    };
+    detect();
+  }, [wizardStep]);
 
   // ── Done ───────────────────────────────────────────────────────────────────
 
@@ -471,32 +518,93 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
         />
       </View>
 
-      {/* Gemini recommendation card for beginners */}
-      <View style={[styles.resultCard, { borderColor: '#3B82F620', marginTop: 12 }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-          <MaterialIcons name="auto-awesome" size={18} color="#3B82F6" />
-          <Text style={{ color: '#3B82F6', fontSize: 13, fontWeight: '700', fontFamily: 'monospace' }}>
-            {t('setup2.gemini_recommend_title')}
-          </Text>
-          <View style={{ backgroundColor: '#4ADE8030', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
-            <Text style={{ color: '#4ADE80', fontSize: 9, fontWeight: '700', fontFamily: 'monospace' }}>
-              {t('setup2.free_badge')}
-            </Text>
-          </View>
-        </View>
-        <Text style={{ color: '#9CA3AF', fontSize: 11, fontFamily: 'monospace', lineHeight: 16 }}>
-          {t('setup2.gemini_recommend_desc')}
-        </Text>
-      </View>
-
-      {/* Auth setup button */}
-      <Pressable
-        style={[styles.primaryBtn, { backgroundColor: '#3B82F6', marginTop: 12 }]}
-        onPress={() => setShowAuthWizard(true)}
-      >
-        <MaterialIcons name="login" size={18} color="#FFF" />
-        <Text style={[styles.primaryBtnText, { color: '#FFF' }]}>{t('setup2.setup_ai_auth')}</Text>
-      </Pressable>
+      {/* CLI detection results & Gemini CLI setup */}
+      {(() => {
+        const hasCli = cliDetected?.claudeCode || cliDetected?.geminiCli || cliDetected?.codex || geminiInstalled;
+        return hasCli ? (
+          /* CLI detected — show status + auth button */
+          <>
+            <View style={[styles.resultCard, { borderColor: '#4ADE8020', marginTop: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <MaterialIcons name="check-circle" size={18} color="#4ADE80" />
+                <Text style={{ color: '#4ADE80', fontSize: 13, fontWeight: '700', fontFamily: 'monospace' }}>
+                  AI CLI Ready
+                </Text>
+              </View>
+              <Text style={{ color: '#9CA3AF', fontSize: 11, fontFamily: 'monospace', lineHeight: 16 }}>
+                {[
+                  cliDetected?.claudeCode && 'Claude Code',
+                  (cliDetected?.geminiCli || geminiInstalled) && 'Gemini CLI',
+                  cliDetected?.codex && 'Codex',
+                ].filter(Boolean).join(' / ')} detected. Authenticate to start using.
+              </Text>
+            </View>
+            <Pressable
+              style={[styles.primaryBtn, { backgroundColor: '#3B82F6', marginTop: 12 }]}
+              onPress={() => setShowAuthWizard(true)}
+            >
+              <MaterialIcons name="login" size={18} color="#FFF" />
+              <Text style={[styles.primaryBtnText, { color: '#FFF' }]}>{t('setup2.setup_ai_auth')}</Text>
+            </Pressable>
+          </>
+        ) : (
+          /* No CLI detected — guide Gemini CLI installation */
+          <>
+            <View style={[styles.resultCard, { borderColor: '#3B82F620', marginTop: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <MaterialIcons name="auto-awesome" size={18} color="#3B82F6" />
+                <Text style={{ color: '#3B82F6', fontSize: 13, fontWeight: '700', fontFamily: 'monospace' }}>
+                  {t('setup2.gemini_recommend_title')}
+                </Text>
+                <View style={{ backgroundColor: '#4ADE8030', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                  <Text style={{ color: '#4ADE80', fontSize: 9, fontWeight: '700', fontFamily: 'monospace' }}>
+                    {t('setup2.free_badge')}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ color: '#9CA3AF', fontSize: 11, fontFamily: 'monospace', lineHeight: 16 }}>
+                {t('setup2.gemini_recommend_desc')}
+              </Text>
+              {geminiInstalling && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                  <Text style={{ color: '#3B82F6', fontSize: 11, fontFamily: 'monospace' }}>
+                    Installing Gemini CLI...
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Pressable
+              style={[styles.primaryBtn, { backgroundColor: '#3B82F6', marginTop: 12, opacity: geminiInstalling ? 0.5 : 1 }]}
+              disabled={geminiInstalling}
+              onPress={async () => {
+                setGeminiInstalling(true);
+                try {
+                  const result = await runTermuxCommand({
+                    command: 'npm install -g @anthropic-ai/gemini-cli 2>&1 && which gemini && echo "GEMINI_INSTALL_OK"',
+                  });
+                  // Wait for npm install to finish (fire-and-forget via RUN_COMMAND)
+                  await new Promise((r) => setTimeout(r, 15000));
+                  // Verify installation
+                  const check = await runTermuxCommand({ command: 'which gemini 2>/dev/null && echo "OK" || echo "FAIL"' });
+                  await new Promise((r) => setTimeout(r, 2000));
+                  setGeminiInstalled(true);
+                  setGeminiInstalling(false);
+                  // Auto-open auth wizard for Gemini login
+                  setShowAuthWizard(true);
+                } catch {
+                  setGeminiInstalling(false);
+                }
+              }}
+            >
+              <MaterialIcons name="download" size={18} color="#FFF" />
+              <Text style={[styles.primaryBtnText, { color: '#FFF' }]}>
+                Install Gemini CLI (Free)
+              </Text>
+            </Pressable>
+          </>
+        );
+      })()}
 
       <Pressable
         style={[styles.primaryBtn, { backgroundColor: '#4ADE80', marginTop: 8 }]}

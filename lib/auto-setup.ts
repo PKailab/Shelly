@@ -158,6 +158,12 @@ async function retry<T>(
 
 // ── Main orchestrator ──────────────────────────────────────────────────────────
 
+export type CliDetectionResult = {
+  claudeCode: boolean;
+  geminiCli: boolean;
+  codex: boolean;
+};
+
 export async function runAutoSetup(onProgress: ProgressCallback): Promise<{ success: boolean; llmDetected: boolean; ttyConnected: boolean; error?: string }> {
   const { termuxSettings, settings } = useTerminalStore.getState();
   const wsUrl = termuxSettings.wsUrl;
