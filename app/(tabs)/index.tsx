@@ -443,9 +443,11 @@ export default function ChatScreen() {
 
     let target: string = parsed.target;
 
-    // Natural language → default to local LLM (with routing) or Gemini
+    // Natural language → Groq (fast chat) > Local LLM (routing) > Gemini > error
     if (parsed.layer === 'natural') {
-      if (settings.localLlmEnabled) {
+      if (settings.groqApiKey) {
+        target = 'groq';
+      } else if (settings.localLlmEnabled) {
         target = 'local';
       } else if (settings.geminiApiKey) {
         target = 'gemini';

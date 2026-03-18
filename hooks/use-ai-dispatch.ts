@@ -25,6 +25,7 @@ import type { OllamaMessage } from '@/lib/local-llm';
 import { generateId } from '@/lib/id';
 import { t } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
+import { groqChatStream, type GroqMessage } from '@/lib/groq';
 
 // ─── Auth URL detection ──────────────────────────────────────────────────────
 
@@ -427,6 +428,139 @@ export function useAIDispatch() {
           updateMessage(chatSessionId, msgId, {
             content: '',
             error: `Local LLM error: ${err instanceof Error ? err.message : String(err)}`,
+            isStreaming: false,
+          });
+        }
+      }
+      return { handled: true };
+    }
+
+    // ── Groq (fast chat, offline → local LLM fallback) ──
+    if (target === 'groq') {
+      const groqKey = settings.groqApiKey ?? '';
+      if (!groqKey) {
+        // No key — shouldn't reach here, but handle gracefully
+        return { handled: false };
+      }
+
+      const msgId = addAssistantMessage(chatSessionId, 'groq');
+      streamingMsgRef.current = { sessionId: chatSessionId, msgId };
+
+      try {
+        let accumulatedText = '';
+        updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '', tokenCount: 0, streamingStartTime: Date.now() });
+
+        const groqHistory: GroqMessage[] = messages.slice(-6).map((m) => ({
+          role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+          content: m.content,
+        }));
+
+        const result = await groqChatStream(
+          groqKey,
+          promptWithFiles,
+          (chunk, done) => {
+            if (signal.aborted) return;
+            if (chunk) {
+              accumulatedText += chunk;
+              updateMessage(chatSessionId, msgId, {
+                streamingText: accumulatedText,
+                tokenCount: estimateTokens(accumulatedText),
+                isStreaming: !done,
+              });
+            }
+            if (done) {
+              updateMessage(chatSessionId, msgId, {
+                content: accumulatedText,
+                streamingText: undefined,
+                isStreaming: false,
+                tokenCount: estimateTokens(accumulatedText),
+              });
+              useExecutionLogStore.getState().addEntry({
+                source: 'ai-agent',
+                agent: 'Groq',
+                userInput: prompt,
+                aiResponse: accumulatedText.slice(0, 200),
+              });
+            }
+          },
+          settings.groqModel || 'llama-3.3-70b-versatile',
+          groqHistory,
+          signal,
+        );
+
+        // Offline fallback: if Groq failed due to network, try local LLM
+        if (!result.success && result.networkError && settings.localLlmEnabled) {
+          // Clear the failed Groq message
+          updateMessage(chatSessionId, msgId, {
+            content: '',
+            streamingText: 'オフライン検出 — ローカルLLMにフォールバック中...',
+            isStreaming: true,
+          });
+
+          accumulatedText = '';
+          const { ollamaChatStream } = await import('@/lib/local-llm');
+          const config = {
+            baseUrl: settings.localLlmUrl,
+            model: settings.localLlmModel,
+            enabled: settings.localLlmEnabled,
+          };
+          const ollamaHistory: OllamaMessage[] = messages.slice(-6).map((m) => ({
+            role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
+            content: m.content,
+          }));
+
+          const ollamaMessages: OllamaMessage[] = [
+            ...ollamaHistory,
+            { role: 'user', content: promptWithFiles },
+          ];
+          const localResult = await ollamaChatStream(
+            config, ollamaMessages,
+            (chunk, done) => {
+              if (signal.aborted) return;
+              if (chunk) {
+                accumulatedText += chunk;
+                updateMessage(chatSessionId, msgId, {
+                  streamingText: accumulatedText,
+                  tokenCount: estimateTokens(accumulatedText),
+                  isStreaming: !done,
+                });
+              }
+              if (done) {
+                updateMessage(chatSessionId, msgId, {
+                  content: accumulatedText,
+                  streamingText: undefined,
+                  isStreaming: false,
+                  tokenCount: estimateTokens(accumulatedText),
+                  llmModelLabel: `${settings.localLlmModel} (offline fallback)`,
+                });
+                useExecutionLogStore.getState().addEntry({
+                  source: 'ai-agent',
+                  agent: 'Local LLM (offline fallback)',
+                  userInput: prompt,
+                  aiResponse: accumulatedText.slice(0, 200),
+                });
+              }
+            },
+            120000,
+            signal,
+          );
+
+          if (!localResult.success && !accumulatedText) {
+            updateMessage(chatSessionId, msgId, {
+              content: '', error: 'オフラインで、ローカルLLMにも接続できません',
+              isStreaming: false,
+            });
+          }
+        } else if (!result.success && !accumulatedText) {
+          updateMessage(chatSessionId, msgId, {
+            content: '', error: result.error ?? 'Groq error',
+            isStreaming: false,
+          });
+        }
+      } catch (err) {
+        if (!signal.aborted) {
+          updateMessage(chatSessionId, msgId, {
+            content: '', error: `Groq error: ${err instanceof Error ? err.message : String(err)}`,
             isStreaming: false,
           });
         }
