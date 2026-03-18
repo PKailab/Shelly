@@ -111,13 +111,14 @@ export function useVoiceChat() {
       }
 
       // Step 1: Transcribe audio
-      const transcribeUrl =
-        `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent` +
-        `?key=${encodeURIComponent(apiKey)}`;
+      const transcribeUrl = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
 
       const transcribeRes = await fetch(transcribeUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: JSON.stringify({
           contents: [{
             role: 'user',
@@ -158,13 +159,14 @@ export function useVoiceChat() {
 
       abortRef.current = new AbortController();
 
-      const chatUrl =
-        `${GEMINI_API_BASE}/models/${settings.geminiModel || 'gemini-2.0-flash'}:generateContent` +
-        `?key=${encodeURIComponent(apiKey)}`;
+      const chatUrl = `${GEMINI_API_BASE}/models/${settings.geminiModel || 'gemini-2.0-flash'}:generateContent`;
 
       const chatRes = await fetch(chatUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         signal: abortRef.current.signal,
         body: JSON.stringify({
           systemInstruction: {

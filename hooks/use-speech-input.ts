@@ -97,13 +97,14 @@ export function useSpeechInput() {
         return;
       }
 
-      const url =
-        `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent` +
-        `?key=${encodeURIComponent(apiKey)}`;
+      const url = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
 
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
         body: JSON.stringify({
           contents: [
             {
