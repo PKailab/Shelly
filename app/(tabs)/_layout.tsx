@@ -12,6 +12,7 @@ import { MultiPaneToggle } from "@/components/multi-pane/MultiPaneToggle";
 import { CommandPalette } from "@/components/CommandPalette";
 import { QuickTerminal } from "@/components/QuickTerminal";
 import { SetupWizard, isSetupWizardComplete } from "@/components/SetupWizard";
+import { BridgeRecoveryBanner } from "@/components/BridgeRecoveryBanner";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useI18n } from "@/lib/i18n";
 import { useTheme, useThemeStore } from "@/lib/theme-engine";
@@ -109,6 +110,7 @@ export default function TabLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
+      <BridgeRecoveryBanner />
       <Tabs
         screenOptions={{
           headerShown: false,
