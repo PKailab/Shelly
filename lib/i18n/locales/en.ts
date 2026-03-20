@@ -244,10 +244,9 @@ const en: Record<string, string> = {
   // Install targets
   'setup2.install_termux': 'Termux',
   'setup2.install_termux_desc': 'Linux environment (required)',
-  'setup2.install_tasker': 'Termux:Tasker',
-  'setup2.install_tasker_desc': 'Auto-setup plugin (required)',
   'setup2.install_boot': 'Termux:Boot',
   'setup2.install_boot_desc': 'Auto-start on reboot (recommended)',
+  'setup2.install_termux_bootstrap': 'After installing, open Termux once to complete its initial setup (1-2 min).',
   'setup2.installed': 'Installed',
   'setup2.install_fdroid': 'Get from F-Droid (free)',
   'setup2.install_playstore': 'Get from Google Play',
@@ -286,9 +285,37 @@ const en: Record<string, string> = {
   'setup2.error_title': 'Setup Failed',
   'setup2.error_permission': 'Termux:Tasker needs permission to run commands.\nOpen Termux once, then try again.',
   'setup2.error_not_installed': 'Termux:Tasker is not installed.\nInstall it and try again.',
-  'setup2.error_bridge': 'Could not connect to the bridge.\nMake sure Termux is running.',
+  'setup2.error_bridge': 'Could not connect to the bridge.\nOpen Termux and run the bridge server manually.',
   'setup2.error_generic': 'Something went wrong. Please try again.',
   'setup2.retry': 'Try Again',
+
+  // Step 3: Termux initialization
+  'setup2.init_title': 'Initialize Termux',
+  'setup2.init_desc': 'Tap "Start Setup" to install the required tools in Termux.\nThis may take a few minutes on first run.',
+  'setup2.init_start': 'Start Setup',
+  'setup2.init_waiting': 'Setting up Termux...',
+  'setup2.init_waiting_desc': 'Installing packages and starting the bridge.\nThis screen will advance automatically.',
+  'setup2.init_timeout_title': 'Taking longer than expected',
+  'setup2.init_timeout_desc': 'You can paste this command in Termux manually:',
+  'setup2.init_copy': 'Copy Command',
+  'setup2.init_copied': 'Copied!',
+  'setup2.init_open_termux': 'Open Termux',
+  'setup2.init_permission_failed': 'Could not send command to Termux.\nPlease paste the command manually.',
+
+  // Step 4: Auto-setup via bridge
+  'setup2.auto_title': 'Finishing Setup',
+  'setup2.auto_desc': 'Configuring Shelly via bridge connection.',
+  'setup2.auto_step_boot': 'Setting up auto-start',
+  'setup2.auto_step_ttyd': 'Starting terminal server',
+  'setup2.auto_step_cli': 'Detecting AI tools',
+  'setup2.auto_step_llm': 'Detecting local AI',
+
+  // Bridge recovery banner
+  'bridge.disconnected_title': 'Termux bridge disconnected',
+  'bridge.restart_termux': 'Restart in Termux',
+  'bridge.reconnect': 'Reconnect',
+  'bridge.recovery_command': 'cd ~/shelly-bridge && node server.js',
+  'bridge.copied': 'Command copied',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': 'Just Talk to It',
   'setup2.slide1_desc': 'Type in natural language.\nShelly converts it to the right command.',

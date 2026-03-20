@@ -245,10 +245,9 @@ const ja: Record<string, string> = {
   // Install targets
   'setup2.install_termux': 'Termux',
   'setup2.install_termux_desc': 'Linux環境（必須）',
-  'setup2.install_tasker': 'Termux:Tasker',
-  'setup2.install_tasker_desc': '自動セットアップ用（必須）',
   'setup2.install_boot': 'Termux:Boot',
   'setup2.install_boot_desc': '再起動時の自動起動（推奨）',
+  'setup2.install_termux_bootstrap': 'インストール後、Termuxを一度開いて初期セットアップを完了してください（1〜2分）。',
   'setup2.installed': 'インストール済み',
   'setup2.install_fdroid': 'F-Droidで取得（無料）',
   'setup2.install_playstore': 'Google Playで取得',
@@ -287,9 +286,37 @@ const ja: Record<string, string> = {
   'setup2.error_title': 'セットアップ失敗',
   'setup2.error_permission': 'Termux:Taskerにコマンド実行の権限が必要です。\nTermuxを一度開いてから、もう一度お試しください。',
   'setup2.error_not_installed': 'Termux:Taskerがインストールされていません。\nインストールしてから再度お試しください。',
-  'setup2.error_bridge': 'ブリッジに接続できませんでした。\nTermuxが起動しているか確認してください。',
+  'setup2.error_bridge': 'ブリッジに接続できませんでした。\nTermuxを開いてブリッジサーバーを手動で起動してください。',
   'setup2.error_generic': '問題が発生しました。もう一度お試しください。',
   'setup2.retry': 'もう一度試す',
+
+  // Step 3: Termux初期化
+  'setup2.init_title': 'Termuxの初期化',
+  'setup2.init_desc': '「セットアップ開始」をタップすると、必要なツールをTermuxにインストールします。\n初回は数分かかることがあります。',
+  'setup2.init_start': 'セットアップ開始',
+  'setup2.init_waiting': 'Termuxをセットアップ中...',
+  'setup2.init_waiting_desc': 'パッケージのインストールとブリッジの起動を行っています。\n完了すると自動で次に進みます。',
+  'setup2.init_timeout_title': '予想より時間がかかっています',
+  'setup2.init_timeout_desc': 'Termuxでこのコマンドを手動で実行できます：',
+  'setup2.init_copy': 'コマンドをコピー',
+  'setup2.init_copied': 'コピーしました！',
+  'setup2.init_open_termux': 'Termuxを開く',
+  'setup2.init_permission_failed': 'Termuxにコマンドを送信できませんでした。\nコマンドを手動で貼り付けてください。',
+
+  // Step 4: ブリッジ経由の自動セットアップ
+  'setup2.auto_title': 'セットアップの仕上げ',
+  'setup2.auto_desc': 'ブリッジ経由でShellyを設定中です。',
+  'setup2.auto_step_boot': '自動起動を設定中',
+  'setup2.auto_step_ttyd': 'ターミナルサーバーを起動中',
+  'setup2.auto_step_cli': 'AIツールを検出中',
+  'setup2.auto_step_llm': 'ローカルAIを検出中',
+
+  // ブリッジ復帰バナー
+  'bridge.disconnected_title': 'Termuxブリッジが切断されています',
+  'bridge.restart_termux': 'Termuxで再起動',
+  'bridge.reconnect': '再接続',
+  'bridge.recovery_command': 'cd ~/shelly-bridge && node server.js',
+  'bridge.copied': 'コマンドをコピーしました',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': '話しかけるだけ',
   'setup2.slide1_desc': '自然な日本語で入力すると\nShellyが適切なコマンドに変換します。',
