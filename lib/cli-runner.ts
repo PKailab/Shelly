@@ -158,7 +158,7 @@ export function buildCliCommand(req: CliRunRequest): CliRunPlan {
 
   if (req.tool === 'claude') {
     // claude --print "<prompt>" in the target directory
-    command = `cd "${req.targetPath}" && claude --print "${escapeShellArg(prompt)}"`;
+    command = `cd "${req.targetPath}" && claude --print "${escapeShellArg(prompt)}" < /dev/null`;
     // Claude Code may still require interactive mode for complex tasks
     if (req.userInput.length > 200 || req.userInput.includes('プロジェクト全体')) {
       isInteractiveFallback = true;
