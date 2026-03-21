@@ -246,7 +246,7 @@ const en: Record<string, string> = {
   'setup2.install_termux_desc': 'Linux environment (required)',
   'setup2.install_boot': 'Termux:Boot',
   'setup2.install_boot_desc': 'Auto-start on reboot (recommended)',
-  'setup2.install_termux_bootstrap': 'After installing, open Termux once to complete its initial setup (1-2 min).',
+  'setup2.install_termux_bootstrap': 'After installing, open Termux once to complete its initial setup (1-2 min).\nThen run: echo "allow-external-apps=true" >> ~/.termux/termux.properties',
   'setup2.installed': 'Installed',
   'setup2.install_fdroid': 'Get from F-Droid (free)',
   'setup2.install_playstore': 'Get from Google Play',
