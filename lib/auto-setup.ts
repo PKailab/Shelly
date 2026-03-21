@@ -213,9 +213,11 @@ export async function runPhase2Setup(
     codex: cliOut.includes('CX:1'),
   };
 
-  // 4. LLM detection
+  // 4. LLM detection (check running → if not, try to start llama-server with available model)
   onProgress({ step: 'llm_detect', results });
   let llmDetected = false;
+
+  // First check if already running
   for (const port of ['8080', '11434']) {
     const url = `http://127.0.0.1:${port}`;
     try {
@@ -230,6 +232,43 @@ export async function runPhase2Setup(
       }
     } catch {}
   }
+
+  // If not running, try to start llama-server with available GGUF model
+  if (!llmDetected) {
+    const hasLlama = await exec('which llama-server >/dev/null 2>&1 && echo YES || echo NO', { timeoutMs: 5000 });
+    if (hasLlama.stdout.includes('YES')) {
+      // Find a GGUF model
+      const modelFind = await exec(
+        '(find ~/models ~/llama.cpp/models -maxdepth 2 -name "*.gguf" -size +100M 2>/dev/null) | head -1',
+        { timeoutMs: 10000 },
+      );
+      const modelPath = modelFind.stdout.trim();
+      if (modelPath) {
+        // Start llama-server in background
+        await exec(
+          `nohup llama-server -m "${modelPath}" --host 127.0.0.1 --port 8080 -ngl 0 -c 2048 -t 4 > /dev/null 2>&1 &`,
+          { timeoutMs: 5000 },
+        );
+        // Wait for startup (model loading takes time)
+        for (let i = 0; i < 10; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          try {
+            const check = await checkOllamaConnection('http://127.0.0.1:8080');
+            if (check.available) {
+              llmDetected = true;
+              useTerminalStore.getState().updateSettings({
+                localLlmEnabled: true,
+                localLlmUrl: 'http://127.0.0.1:8080',
+                localLlmModel: check.models[0] || modelPath.split('/').pop()?.replace('.gguf', '') || 'default',
+              });
+              break;
+            }
+          } catch {}
+        }
+      }
+    }
+  }
+
   results.llm = llmDetected;
 
   onProgress({ step: 'complete', results });
