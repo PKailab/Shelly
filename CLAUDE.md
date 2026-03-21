@@ -208,15 +208,29 @@ Shelly/
 7. **設定画面i18n完全化**: 全セクションヘッダー・ラベル・説明文をt()キーに置き換え。日本語翻訳追加。中高生でも使えるUI
 8. **TypeScriptエラー全解消**: AuthWizard（oauthRunning prop）、ExecutionLogPanel（unreadCount）、app.config.ts（usesCleartextTraffic型）
 
+### 2026-03-21 SetupWizard根本修正 + 全体点検
+
+1. **SetupWizard 2フェーズ分離**: fire-and-forget祈りを排除。Phase 1はRUN_COMMANDで`&&`チェインの一括送信+WebSocket接続ポーリング（最大5分）。Phase 2はbridge WebSocket経由で全残作業を結果確認付きで実行
+2. **`ws`パッケージ問題解消**: Phase 1のコマンドに`npm install ws`を含めて確実にインストール
+3. **Termux:Tasker依存除去**: RUN_COMMANDはTermux本体のServiceで動作。Taskerをインストール一覧から削除
+4. **BridgeRecoveryBanner**: 全タブ上部に切断時の復帰バナー表示（Termux再起動コマンドコピー+再接続+dismiss）
+5. **Gemini CLIパッケージ名修正**: `@anthropic-ai/gemini-cli` → `@google/gemini-cli`
+6. **AndroidManifest**: `com.termux.permission.RUN_COMMAND` + `<queries>` 追加
+7. **全体点検（16件修正）**: AuthWizard正規表現、安全ダイアログPromise未処理、設定ロード/保存、LLMテストnull、APIキーマスク、sedエスケープ、ストリーミング復元、デモモード判定簡素化、コマンド履歴メモリ等
+8. **設計書**: `docs/superpowers/specs/2026-03-21-setup-wizard-bridge-fix-design.md`
+9. **実装計画**: `docs/superpowers/plans/2026-03-21-setup-wizard-bridge-fix.md`
+
 ### 未完了・リマインド
 
-1. **APKビルド確認**: 2026-03-19にGitHub Actionsトリガー済み。実機で全変更の動作確認が必要
+1. **実機テスト**: Maestro（E2Eテスト）をWindows PCに導入予定。SetupWizard → Chat → コマンド実行の一連フローを自動テスト
 
 2. **スクショ・PR動画**: ワイヤレスADB方式でTermux完結。アプリ安定後に撮影
 
-3. **README**: OSS公開用。「I can't write code.」の物語。Pro機能の透明性宣言（フラグ外せばアンロック可能）
+3. **README**: OSS公開用。「I can't write code.」の物語 → 済（README.md作成済み）
 
-4. **i18n構造の単純化**: en.tsをベース、ja.tsは差分のみに。現在は両方に全キー定義されているが、フォールバック機構は既に動作している
+4. **隠しタブ整理**: creator/snippets/obsidian/search が `href: null` で非表示だがコード残存。死んだコードの削除検討
+
+5. **i18n構造の単純化**: en.tsをベース、ja.tsは差分のみに。現在は両方に全キー定義されているが、フォールバック機構は既に動作している
 
 ---
 
