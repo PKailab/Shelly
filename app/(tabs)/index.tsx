@@ -740,6 +740,22 @@ export default function ChatScreen() {
           />
         </View>
 
+        {/* Suggestion chips when chat is empty */}
+        {messages.length === 0 && !isAnyStreaming && onboardingStep === 'complete' && (
+          <View style={styles.suggestRow}>
+            {[
+              { label: '📂 ファイル一覧', cmd: 'ファイル一覧' },
+              { label: '💬 こんにちは', cmd: 'こんにちは' },
+              { label: '🚀 アプリ作って', cmd: 'アプリ作って' },
+              { label: '@claude', cmd: '@claude ' },
+            ].map((s) => (
+              <Pressable key={s.cmd} style={styles.suggestChip} onPress={() => handleSend(s.cmd)}>
+                <Text style={styles.suggestText}>{s.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         <CommandInput
           ref={commandInputRef}
           onSend={handleSend}
@@ -769,6 +785,26 @@ const styles = StyleSheet.create({
   },
   chatArea: {
     flex: 1,
+  },
+  suggestRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  suggestChip: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  suggestText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontFamily: 'monospace',
   },
   safetyOverlay: {
     flex: 1,
