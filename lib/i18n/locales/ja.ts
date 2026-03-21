@@ -438,6 +438,8 @@ const ja: Record<string, string> = {
   // ── Mention Dropdown ────────────────────────────────────────────
   'mention.local_desc': 'ローカルAIに聞く',
   'mention.claude_desc': 'コード生成・編集',
+  'mention.codex_desc': '高速コードアシスタント',
+  'mention.cerebras_desc': '高速チャット（Qwen3-235B）',
   'mention.gemini_desc': '調査・画像分析',
   'mention.perplexity_desc': 'リアルタイムWeb検索',
   'mention.git_desc': 'Git操作ガイド',

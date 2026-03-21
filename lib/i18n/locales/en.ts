@@ -437,6 +437,8 @@ const en: Record<string, string> = {
   // ── Mention Dropdown ────────────────────────────────────────────
   'mention.local_desc': 'Ask local AI',
   'mention.claude_desc': 'Code generation & edit',
+  'mention.codex_desc': 'Fast code assistant',
+  'mention.cerebras_desc': 'Fast chat (Qwen3-235B)',
   'mention.gemini_desc': 'Research & image analysis',
   'mention.perplexity_desc': 'Real-time web search',
   'mention.git_desc': 'Git operations guide',

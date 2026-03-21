@@ -253,8 +253,15 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
             </View>
           ) : <View />}
           <Text style={[styles.timestamp, { color: colors.inactive }]}>
-            {message.tokenCount ? `${message.tokenCount} tok · ` : ''}
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {message.isStreaming && message.streamingStartTime ? (
+              (() => {
+                const elapsed = Math.floor((Date.now() - message.streamingStartTime) / 1000);
+                const tps = elapsed > 0 && message.tokenCount ? (message.tokenCount / elapsed).toFixed(1) : null;
+                return `${message.tokenCount ?? 0} tok${tps ? ` · ${tps} t/s` : ''} · ${elapsed}s`;
+              })()
+            ) : (
+              `${message.tokenCount ? `${message.tokenCount} tok · ` : ''}${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+            )}
           </Text>
         </View>
       </View>
@@ -266,11 +273,18 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
 
 function CommandExecView({ exec, colors }: { exec: { command: string; output: string; exitCode: number | null; isCollapsed: boolean }; colors: ThemeColorPalette }) {
   const [collapsed, setCollapsed] = useState(exec.isCollapsed);
-  // Sync with prop when parent updates (e.g. streaming → finalized)
+  const [outputCopied, setOutputCopied] = useState(false);
   useEffect(() => { setCollapsed(exec.isCollapsed); }, [exec.isCollapsed]);
   const isError = exec.exitCode !== null && exec.exitCode !== 0;
   const outputLines = exec.output.split('\n');
   const shouldCollapse = outputLines.length > 5;
+
+  const handleCopyOutput = useCallback(async () => {
+    await Clipboard.setStringAsync(exec.output);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setOutputCopied(true);
+    setTimeout(() => setOutputCopied(false), 1500);
+  }, [exec.output]);
 
   return (
     <View style={[styles.execBlock, { borderColor: isError ? '#F8717133' : '#2D2D2D' }]}>
@@ -287,6 +301,12 @@ function CommandExecView({ exec, colors }: { exec: { command: string; output: st
               {isError ? `exit ${exec.exitCode}` : 'ok'}
             </Text>
           </View>
+        )}
+        {/* Copy output button */}
+        {exec.output && (
+          <TouchableOpacity onPress={handleCopyOutput} activeOpacity={0.7} style={{ padding: 4 }}>
+            <MaterialIcons name={outputCopied ? 'check' : 'content-copy'} size={12} color={outputCopied ? '#4ADE80' : '#6B7280'} />
+          </TouchableOpacity>
         )}
         {shouldCollapse && (
           <MaterialIcons name={collapsed ? 'expand-more' : 'expand-less'} size={14} color="#6B7280" />
