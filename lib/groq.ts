@@ -140,7 +140,30 @@ export async function groqChatStream(
 
     const reader = res.body?.getReader();
     if (!reader) {
-      return { success: false, error: 'レスポンスボディが読み取れません' };
+      // Fallback: ReadableStream not available (React Native)
+      const text = await res.text();
+      let fullContent = '';
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === '[DONE]') break;
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const content = chunk.choices?.[0]?.delta?.content ?? chunk.choices?.[0]?.message?.content ?? '';
+          if (content) fullContent += content;
+        } catch {}
+      }
+      if (fullContent) {
+        onChunk(fullContent, true);
+        return { success: true, content: fullContent };
+      }
+      try {
+        const json = JSON.parse(text);
+        const content = json.choices?.[0]?.message?.content ?? '';
+        if (content) { onChunk(content, true); return { success: true, content }; }
+      } catch {}
+      return { success: false, error: 'レスポンスの解析に失敗しました' };
     }
 
     const { fullContent } = await readGroqSSE(reader, onChunk);

@@ -217,7 +217,25 @@ export async function geminiChatStream(
 
     const reader = res.body?.getReader();
     if (!reader) {
-      return { success: false, error: 'レスポンスボディが読み取れません' };
+      // Fallback: ReadableStream not available (React Native)
+      const text = await res.text();
+      let fullContent = '';
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === '[DONE]') break;
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const part = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          if (part) fullContent += part;
+        } catch {}
+      }
+      if (!fullContent) {
+        try { fullContent = JSON.parse(text).candidates?.[0]?.content?.parts?.[0]?.text ?? ''; } catch {}
+      }
+      if (fullContent) { onChunk(fullContent, true); return { success: true, content: fullContent }; }
+      return { success: false, error: 'レスポンスの解析に失敗しました' };
     }
 
     const { fullContent } = await readGeminiSSE(reader, onChunk);
@@ -311,7 +329,25 @@ export async function geminiMultimodalStream(
 
     const reader = res.body?.getReader();
     if (!reader) {
-      return { success: false, error: 'レスポンスボディが読み取れません' };
+      // Fallback: ReadableStream not available (React Native)
+      const text = await res.text();
+      let fullContent = '';
+      for (const line of text.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === '[DONE]') break;
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const part = chunk.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+          if (part) fullContent += part;
+        } catch {}
+      }
+      if (!fullContent) {
+        try { fullContent = JSON.parse(text).candidates?.[0]?.content?.parts?.[0]?.text ?? ''; } catch {}
+      }
+      if (fullContent) { onChunk(fullContent, true); return { success: true, content: fullContent }; }
+      return { success: false, error: 'レスポンスの解析に失敗しました' };
     }
 
     const { fullContent } = await readGeminiSSE(reader, onChunk);
