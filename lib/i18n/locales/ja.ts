@@ -318,6 +318,20 @@ const ja: Record<string, string> = {
   'settings.cerebras_configured': 'Cerebras 設定済み ✓',
   'settings.cerebras_hint': '無料: 1日100万トークン。cloud.cerebras.ai で登録',
 
+  // チャットオンボーディング
+  'onboarding.welcome': '🎉 セットアップ完了！\n\nここがShellyのメイン画面です。自然な言葉で入力すると、Shellyがコマンドを実行します。\n\nまずは試してみましょう — 下に**「ファイル一覧」**と入力してください。',
+  'onboarding.after_cmd': '👆 自然言語がコマンドに変換されて実行されました！\n\n次は、AIチャットをセットアップしましょう。\n\n**Cerebras**は無料のAIで、挨拶や質問、日常会話に自然に応答します。',
+  'onboarding.cerebras_prompt': '🔑 Cerebras APIキーを取得してください（無料）:\n1. cloud.cerebras.ai を開く\n2. アカウント作成（無料）\n3. APIキーをコピー\n4. 下に貼り付け',
+  'onboarding.cerebras_done': '✅ Cerebrasが使えるようになりました！「こんにちは」と打つと自然に応答します。\n\n🎤 音声入力も使えるようにしますか？**Groq**（無料）で音声→テキスト変換ができます。',
+  'onboarding.groq_prompt': '🔑 Groq APIキーを取得してください（無料）:\n1. console.groq.com を開く\n2. アカウント作成（無料）\n3. APIキーをコピー\n4. 下に貼り付け',
+  'onboarding.complete': '🚀 準備完了！\n\nできること:\n• 自然に会話 — Cerebrasが応答\n• 「アプリ作って」— CLIがコード生成\n• @claude / @gemini — AIを指定\n• 音声入力 🎤 — マイクボタンをタップ\n• ターミナルタブ — シェル直接操作\n\n何でも聞いてください！',
+  'onboarding.setup_cerebras': 'Cerebrasをセットアップ（無料）',
+  'onboarding.setup_groq': 'Groqをセットアップ（無料）',
+  'onboarding.skip': 'あとで設定する',
+  'onboarding.open_browser': 'ブラウザで開く',
+  'onboarding.save_key': 'APIキーを保存',
+  'onboarding.key_placeholder': 'APIキーを貼り付け...',
+
   // ブリッジ復帰バナー
   'bridge.disconnected_title': 'Termuxブリッジが切断されています',
   'bridge.restart_termux': 'Termuxで再起動',

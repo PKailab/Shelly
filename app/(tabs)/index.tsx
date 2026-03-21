@@ -43,6 +43,8 @@ import { VoiceChat } from '@/components/VoiceChat';
 import { generateId } from '@/lib/id';
 import { useTranslation } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
+import { ChatOnboarding } from '@/components/ChatOnboarding';
+import { type OnboardingStep, getOnboardingStep, setOnboardingStep, isOnboardingDone } from '@/lib/chat-onboarding';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -82,6 +84,10 @@ export default function ChatScreen() {
     s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null
   );
 
+  // ── Onboarding ──
+  const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
+  const onboardingChecked = useRef(false);
+
   // Load chat store on mount
   useEffect(() => {
     loadChat();
@@ -94,6 +100,24 @@ export default function ChatScreen() {
       createChatSession('New Chat');
     }
   }, [chatLoaded, chatSession]);
+
+  // Check onboarding status after chat loads
+  useEffect(() => {
+    if (!chatLoaded || onboardingChecked.current) return;
+    onboardingChecked.current = true;
+    getOnboardingStep().then((step) => {
+      setOnboardingStepState(step);
+      // Auto-add welcome message if onboarding just starting
+      if (step === 'welcome' && chatSessionId && messages.length === 0) {
+        addMessage(chatSessionId, {
+          id: generateId(),
+          role: 'assistant',
+          content: t('onboarding.welcome'),
+          timestamp: Date.now(),
+        });
+      }
+    });
+  }, [chatLoaded, chatSessionId]);
 
   // Get current chat session messages
   const messages = chatSession?.messages ?? [];
@@ -414,6 +438,18 @@ export default function ChatScreen() {
               isCollapsed: (output + stderr).split('\n').length > 10,
             }],
           });
+          // Advance onboarding after first successful command
+          if (onboardingStep === 'welcome' && result.exitCode === 0) {
+            setOnboardingStep('after_first_cmd');
+            setOnboardingStepState('after_first_cmd');
+            // Add onboarding message
+            addMessage(chatSessionId, {
+              id: generateId(),
+              role: 'assistant',
+              content: t('onboarding.after_cmd'),
+              timestamp: Date.now(),
+            });
+          }
           // Log to shared execution log (visible in Terminal tab)
           useExecutionLogStore.getState().addEntry({
             source: 'chat',
@@ -683,6 +719,7 @@ export default function ChatScreen() {
 
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ChatHeader onVoiceChat={() => setShowVoiceChat(true)} />
+      <ChatOnboarding step={onboardingStep} onStepChange={setOnboardingStepState} />
 
       <KeyboardAvoidingView
         key={`kav-${layoutKey}`}

@@ -317,6 +317,20 @@ const en: Record<string, string> = {
   'settings.cerebras_configured': 'Cerebras configured ✓',
   'settings.cerebras_hint': 'Free: 1M tokens/day. Sign up at cloud.cerebras.ai',
 
+  // Chat onboarding
+  'onboarding.welcome': '🎉 Setup complete!\n\nThis is Shelly\'s main screen. You can type naturally and Shelly will execute commands for you.\n\nLet\'s try it — type **"file list"** below.',
+  'onboarding.after_cmd': '👆 Your natural language was converted to a command and executed!\n\nNext, let\'s set up AI chat so you can have natural conversations.\n\n**Cerebras** is a free AI that responds to greetings, questions, and everyday conversation.',
+  'onboarding.cerebras_prompt': '🔑 Get your free Cerebras API key:\n1. Open cloud.cerebras.ai\n2. Create an account (free)\n3. Copy your API key\n4. Paste it below',
+  'onboarding.cerebras_done': '✅ Cerebras is ready! Try saying "hello" — you\'ll get a natural response.\n\n🎤 Want voice input too? Set up **Groq** (free) for speech-to-text.',
+  'onboarding.groq_prompt': '🔑 Get your free Groq API key:\n1. Open console.groq.com\n2. Create an account (free)\n3. Copy your API key\n4. Paste it below',
+  'onboarding.complete': '🚀 All set!\n\nWhat you can do:\n• Chat naturally — Cerebras responds\n• Say "build me an app" — CLI generates code\n• @claude / @gemini — choose specific AI\n• Voice input 🎤 — tap the mic button\n• Terminal tab — full shell access\n\nAsk me anything!',
+  'onboarding.setup_cerebras': 'Set up Cerebras (free)',
+  'onboarding.setup_groq': 'Set up Groq (free)',
+  'onboarding.skip': 'Set up later',
+  'onboarding.open_browser': 'Open in browser',
+  'onboarding.save_key': 'Save API key',
+  'onboarding.key_placeholder': 'Paste API key here...',
+
   // Bridge recovery banner
   'bridge.disconnected_title': 'Termux bridge disconnected',
   'bridge.restart_termux': 'Restart in Termux',
