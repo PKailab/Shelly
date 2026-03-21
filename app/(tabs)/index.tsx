@@ -648,6 +648,11 @@ export default function ChatScreen() {
                             isCollapsed: (output + stderr).split('\n').length > 10,
                           }],
                         });
+                      }).catch((err) => {
+                        updateMessage(chatSessionId, msgId, {
+                          content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+                          isStreaming: false,
+                        });
                       });
                     } else {
                       executeCommandSafely(cmd);

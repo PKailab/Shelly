@@ -501,7 +501,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       }
       const forStorage = stripApiKeys(updated);
       AsyncStorage.setItem('shelly_settings', JSON.stringify(forStorage)).catch((e) => {
-        console.warn('[Settings] persist failed:', e);
+        console.error('[Settings] persist failed — settings may be lost on restart:', e);
       });
       return { settings: updated };
     });
@@ -544,8 +544,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       set({ settings, termuxSettings, isSettingsLoaded: true });
       // Restore terminal sessions
       await get().loadSessionState();
-    } catch {
-      set({ isSettingsLoaded: true });
+    } catch (err) {
+      console.error('[Settings] loadSettings failed, using defaults:', err);
+      set({ settings: DEFAULT_SETTINGS, termuxSettings: DEFAULT_TERMUX_SETTINGS, isSettingsLoaded: true });
     }
   },
 
