@@ -443,27 +443,36 @@ export default function ChatScreen() {
 
     let target: string = parsed.target;
 
-    // Natural language → route to user's default CLI agent
-    // Groq is reserved for intent classification, Whisper, and CLI output interpretation
+    // Natural language → route by priority: Groq > Local LLM > default CLI agent
+    // Groq handles conversational chat (fastest, free 1000 req/day)
+    // Local LLM handles offline chat
+    // CLI agents (Claude/Gemini/Codex) handle code-related tasks
     if (parsed.layer === 'natural') {
-      const defaultCli = settings.defaultAgent || 'gemini-cli';
-      const cliTargetMap: Record<string, string> = {
-        'claude-code': 'claude',
-        'gemini-cli': 'gemini',
-        'codex': 'codex',
-      };
-      const cliTarget = cliTargetMap[defaultCli];
-      if (cliTarget) {
-        target = cliTarget;
+      if (settings.groqApiKey) {
+        // Groq: fastest, best for conversational chat
+        target = 'groq';
       } else if (settings.localLlmEnabled) {
+        // Local LLM: offline fallback for chat
         target = 'local';
       } else {
-        const msgId = addAssistantMessage(undefined);
-        updateMessage(chatSessionId, msgId, {
-          content: t('chat.no_ai_configured'),
-          isStreaming: false,
-        });
-        return;
+        // CLI fallback: route to user's default CLI agent
+        const defaultCli = settings.defaultAgent || 'gemini-cli';
+        const cliTargetMap: Record<string, string> = {
+          'claude-code': 'claude',
+          'gemini-cli': 'gemini',
+          'codex': 'codex',
+        };
+        const cliTarget = cliTargetMap[defaultCli];
+        if (cliTarget) {
+          target = cliTarget;
+        } else {
+          const msgId = addAssistantMessage(undefined);
+          updateMessage(chatSessionId, msgId, {
+            content: t('chat.no_ai_configured'),
+            isStreaming: false,
+          });
+          return;
+        }
       }
     }
 
