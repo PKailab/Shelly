@@ -406,7 +406,7 @@ export default function SettingsScreen() {
       const timer = setTimeout(() => controller.abort(), 5000);
       const res = await fetch(url, { signal: controller.signal }).catch(() => null);
       clearTimeout(timer);
-      if (res && res.ok) {
+      if (res != null && res.ok) {
         const data = await res.json().catch(() => null);
         const _models: string[] = (data?.models ?? []).map((m: { name: string }) => m.name);
         setLlmTestResult('success');

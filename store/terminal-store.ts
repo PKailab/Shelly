@@ -613,7 +613,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           })),
         entries: s.entries
           .filter((e: any) => !e.isStreaming) // skip streaming AI blocks
-          .slice(-50),
+          .slice(-50)
+          .map((e: any) => ({
+            ...e,
+            isStreaming: false,
+            streamingText: undefined, // clear partial streaming text
+          })),
       }));
       await AsyncStorage.setItem('shelly_terminal_sessions', JSON.stringify({
         sessions: serializable,

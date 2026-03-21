@@ -16,7 +16,7 @@ const MAX_CHUNK_SIZE = 1_000_000;
 
 /** Sanitize URL to remove API key from log output */
 function sanitizeUrl(url: string): string {
-  return url.replace(/[?&]key=[^&]+/, '?key=***');
+  return url.replace(/([?&])key=[^&]+/g, '$1key=***');
 }
 
 /** Shared SSE stream reader for Gemini responses */

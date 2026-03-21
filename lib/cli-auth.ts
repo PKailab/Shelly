@@ -132,12 +132,14 @@ export async function storeApiKey(
 
   const envVar = config.envVar;
   const escapedKey = apiKey.replace(/'/g, "'\\''");
+  // Escape envVar for sed regex (defense-in-depth — envVar is hardcoded but may change)
+  const sedSafeVar = envVar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   try {
     // Create ~/.shellyrc if not exists, remove old entry for this var, then append
     const cmd = [
       'touch ~/.shellyrc',
-      `sed -i '/^export ${envVar}=/d' ~/.shellyrc`,
+      `sed -i '/^export ${sedSafeVar}=/d' ~/.shellyrc`,
       `echo 'export ${envVar}='"'"'${escapedKey}'"'"'' >> ~/.shellyrc`,
       // Also export immediately so subsequent checks work
       `export ${envVar}='${escapedKey}'`,

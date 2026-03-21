@@ -300,10 +300,9 @@ export default function ChatScreen() {
 
     // ── Demo mode: mock responses when Termux & AI are unavailable ──
     const hasAnyApi = settings.geminiApiKey || settings.localLlmEnabled || settings.perplexityApiKey;
-    const isDemoMention = !isBridgeConnected && !hasAnyApi && parsed.layer === 'mention';
-    if (!isBridgeConnected && !hasAnyApi && (parsed.layer !== 'mention' || isDemoMention)) {
+    if (!isBridgeConnected && !hasAnyApi) {
       // Determine agent for demo AI mocks
-      const demoAgent: ChatAgent | undefined = isDemoMention
+      const demoAgent: ChatAgent | undefined = parsed.layer === 'mention'
         ? (parsed.target === 'claude' ? 'claude' : parsed.target === 'gemini' ? 'gemini' : parsed.target === 'perplexity' ? 'perplexity' : parsed.target === 'local' ? 'local' : undefined)
         : undefined;
       addUserMessage(input);
@@ -499,7 +498,9 @@ export default function ChatScreen() {
           error: `Error: ${err instanceof Error ? err.message : String(err)}`,
           isStreaming: false,
         });
-      } catch {} // Last resort: swallow to prevent white screen
+      } catch (innerErr) {
+        console.error('[handleSend] Failed to display error:', innerErr);
+      }
     }
   }, [chatSessionId, connectionMode, sendCommand, activeSession.id, activeSession.currentDir, settings, addMessage, updateMessage, setLastInputMode, router, addUserMessage, addAssistantMessage, bridgeRunCommand, execForContext, aiDispatch, isBridgeConnected]);
 
@@ -522,7 +523,7 @@ export default function ChatScreen() {
     // Delete from the user message onward
     deleteMessagesFrom(chatSessionId, userMsg.id);
     // Delay re-send to next tick so messagesRef picks up the deletion
-    setTimeout(() => handleSend(originalInput), 0);
+    queueMicrotask(() => handleSend(originalInput));
   }, [chatSessionId, deleteMessagesFrom, handleSend]);
 
   // ── Edit: remove from edited message onward, put text back in input ──
