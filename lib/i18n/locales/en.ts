@@ -331,6 +331,10 @@ const en: Record<string, string> = {
   'onboarding.save_key': 'Save API key',
   'onboarding.key_placeholder': 'Paste API key here...',
 
+  // CLI session
+  'session.started': '{{cli}} session started. All messages will go to {{cli}} until you type "logout".',
+  'session.ended': '{{cli}} session ended.',
+
   // Bridge recovery banner
   'bridge.disconnected_title': 'Termux bridge disconnected',
   'bridge.restart_termux': 'Restart in Termux',

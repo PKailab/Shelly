@@ -32,13 +32,21 @@ function getActiveChat(settings: {
 }
 
 export function StatusIndicator() {
-  const { bridgeStatus, settings } = useTerminalStore();
+  const { bridgeStatus, settings, activeCliSession } = useTerminalStore();
   const { isConnected } = useTermuxBridge();
 
   const bridgeColor = isConnected ? '#4ADE80' : bridgeStatus === 'connecting' ? '#FBBF24' : '#6B7280';
   const bridgeLabel = isConnected ? 'Bridge' : bridgeStatus === 'connecting' ? 'Connecting' : 'Offline';
   const chat = getActiveChat(settings);
   const llmLabel = getActiveLlmLabel();
+
+  // CLI session labels
+  const cliSessionMap: Record<string, { label: string; color: string }> = {
+    claude: { label: 'Claude Code', color: '#D4A574' },
+    codex: { label: 'Codex', color: '#4ADE80' },
+    gemini: { label: 'Gemini CLI', color: '#60A5FA' },
+  };
+  const cliSession = activeCliSession ? cliSessionMap[activeCliSession] : null;
 
   return (
     <View style={styles.container}>
@@ -50,11 +58,19 @@ export function StatusIndicator() {
 
       <Text style={styles.separator}>·</Text>
 
-      {/* Chat AI */}
-      <View style={styles.item}>
-        <MaterialIcons name="chat-bubble-outline" size={10} color={chat.color} />
-        <Text style={[styles.label, { color: chat.color }]}>{chat.label}</Text>
-      </View>
+      {/* CLI session or Chat AI */}
+      {cliSession ? (
+        <View style={styles.item}>
+          <MaterialIcons name="code" size={10} color={cliSession.color} />
+          <Text style={[styles.label, { color: cliSession.color }]}>{cliSession.label}</Text>
+          <Text style={[styles.label, { color: '#6B7280', fontSize: 8 }]}> (session)</Text>
+        </View>
+      ) : (
+        <View style={styles.item}>
+          <MaterialIcons name="chat-bubble-outline" size={10} color={chat.color} />
+          <Text style={[styles.label, { color: chat.color }]}>{chat.label}</Text>
+        </View>
+      )}
 
       {/* Local LLM (if running) */}
       {llmLabel && (

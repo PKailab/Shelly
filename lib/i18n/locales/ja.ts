@@ -332,6 +332,10 @@ const ja: Record<string, string> = {
   'onboarding.save_key': 'APIキーを保存',
   'onboarding.key_placeholder': 'APIキーを貼り付け...',
 
+  // CLIセッション
+  'session.started': '{{cli}} セッションを開始しました。「ログアウト」と入力するまで、すべてのメッセージが {{cli}} に送信されます。',
+  'session.ended': '{{cli}} セッションを終了しました。',
+
   // ブリッジ復帰バナー
   'bridge.disconnected_title': 'Termuxブリッジが切断されています',
   'bridge.restart_termux': 'Termuxで再起動',

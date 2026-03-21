@@ -66,6 +66,8 @@ export default function ChatScreen() {
     pendingCommand,
     settings,
     setLastInputMode,
+    activeCliSession,
+    setActiveCliSession,
   } = useTerminalStore();
   const activeSession = useActiveSession();
 
@@ -306,6 +308,28 @@ export default function ChatScreen() {
     }
 
     try {
+
+    // ── CLI session control ──
+    // Exit session: "ログアウト", "/exit", "@exit"
+    const exitPatterns = /^(ログアウト|\/exit|@exit|exit session|セッション終了)$/i;
+    if (exitPatterns.test(input.trim()) && activeCliSession) {
+      const prev = activeCliSession;
+      setActiveCliSession(null);
+      addMessage(chatSessionId, {
+        id: generateId(), role: 'assistant', content: `${prev === 'claude' ? 'Claude Code' : prev === 'codex' ? 'Codex' : 'Gemini CLI'} セッションを終了しました。`, timestamp: Date.now(),
+      });
+      return;
+    }
+
+    // @mention for CLI → start session
+    if (parsed.layer === 'mention' && ['claude', 'codex', 'gemini'].includes(parsed.target)) {
+      setActiveCliSession(parsed.target as 'claude' | 'codex' | 'gemini');
+    }
+
+    // Active CLI session: override natural language routing
+    if (parsed.layer === 'natural' && activeCliSession) {
+      parsed = { ...parsed, layer: 'mention' as any, target: activeCliSession };
+    }
 
     // Auto-learn (background)
     if (parsed.layer === 'command') {

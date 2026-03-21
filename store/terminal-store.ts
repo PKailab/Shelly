@@ -102,6 +102,10 @@ type TerminalState = {
   /** Last input mode: 'shell' for commands, 'natural' for natural language */
   lastInputMode: 'shell' | 'natural';
 
+  /** Active CLI session — when set, all natural language input goes to this CLI */
+  activeCliSession: 'claude' | 'codex' | 'gemini' | null;
+  setActiveCliSession: (session: 'claude' | 'codex' | 'gemini' | null) => void;
+
   // Actions — sessions
   addSession: () => void;
   removeSession: (id: string) => void;
@@ -185,6 +189,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   termuxSettings: DEFAULT_TERMUX_SETTINGS,
   pendingCommand: null,
   lastInputMode: 'shell',
+  activeCliSession: null,
+  setActiveCliSession: (session) => set({ activeCliSession: session }),
 
   // ── Session management ──────────────────────────────────────────────────────
 
