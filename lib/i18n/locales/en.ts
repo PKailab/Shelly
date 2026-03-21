@@ -246,7 +246,7 @@ const en: Record<string, string> = {
   'setup2.install_termux_desc': 'Linux environment (required)',
   'setup2.install_boot': 'Termux:Boot',
   'setup2.install_boot_desc': 'Auto-start on reboot (recommended)',
-  'setup2.install_termux_bootstrap': 'After installing, open Termux once to complete its initial setup (1-2 min).\nThen run: echo "allow-external-apps=true" >> ~/.termux/termux.properties',
+  'setup2.install_termux_bootstrap': 'After installing, open Termux once to complete its initial setup (1-2 min).',
   'setup2.installed': 'Installed',
   'setup2.install_fdroid': 'Get from F-Droid (free)',
   'setup2.install_playstore': 'Get from Google Play',
@@ -298,6 +298,7 @@ const en: Record<string, string> = {
   'setup2.init_copy': 'Copy Command',
   'setup2.init_copied': 'Copied!',
   'setup2.init_open_termux': 'Open Termux',
+  'setup2.init_paste_hint': 'Tap the button above → switch to Termux → long-press to paste → press Enter.\nShelly will detect the connection automatically.',
   'setup2.init_permission_failed': 'Could not send command to Termux.\nPlease paste the command manually.',
 
   // Step 4: Auto-setup via bridge

@@ -247,7 +247,7 @@ const ja: Record<string, string> = {
   'setup2.install_termux_desc': 'Linux環境（必須）',
   'setup2.install_boot': 'Termux:Boot',
   'setup2.install_boot_desc': '再起動時の自動起動（推奨）',
-  'setup2.install_termux_bootstrap': 'インストール後、Termuxを一度開いて初期セットアップを完了してください（1〜2分）。\n次に以下を実行: echo "allow-external-apps=true" >> ~/.termux/termux.properties',
+  'setup2.install_termux_bootstrap': 'インストール後、Termuxを一度開いて初期セットアップを完了してください（1〜2分）。',
   'setup2.installed': 'インストール済み',
   'setup2.install_fdroid': 'F-Droidで取得（無料）',
   'setup2.install_playstore': 'Google Playで取得',
@@ -299,6 +299,7 @@ const ja: Record<string, string> = {
   'setup2.init_copy': 'コマンドをコピー',
   'setup2.init_copied': 'コピーしました！',
   'setup2.init_open_termux': 'Termuxを開く',
+  'setup2.init_paste_hint': 'ボタンをタップ → Termuxに切り替え → 長押しで貼り付け → Enterを押す。\nShellyが自動で接続を検知します。',
   'setup2.init_permission_failed': 'Termuxにコマンドを送信できませんでした。\nコマンドを手動で貼り付けてください。',
 
   // Step 4: ブリッジ経由の自動セットアップ

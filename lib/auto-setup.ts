@@ -9,7 +9,6 @@
  *          boot script設置 / ttyd起動 / CLI検出 / LLM検出
  */
 
-import { runTermuxCommand } from './termux-intent';
 import { BRIDGE_SERVER_JS } from './bridge-bundle';
 import { useTerminalStore } from '@/store/terminal-store';
 import { checkOllamaConnection } from './local-llm';
@@ -115,25 +114,27 @@ export function buildSetupCommand(): string {
 
 // ── Phase 1: RUN_COMMAND + WS polling ───────────────────────────────────────
 
-const PHASE1_TIMEOUT_MS = 300_000; // 5 minutes
 const PHASE1_POLL_INTERVAL = 2000;
+const PHASE1_TIMEOUT_MS = 300_000; // 5 minutes
 
+/**
+ * Phase 1: Poll for bridge connection.
+ *
+ * The setup command must be executed by the user in Termux (copy-paste).
+ * RUN_COMMAND is NOT used — it requires allow-external-apps=true which
+ * contradicts the "Termuxless" design philosophy (user shouldn't configure Termux).
+ *
+ * Flow:
+ * 1. SetupWizard copies setup command to clipboard and opens Termux
+ * 2. User pastes and presses Enter in Termux
+ * 3. This function polls ws://127.0.0.1:8765 until bridge connects
+ */
 export async function runPhase1Setup(
   onProgress: (p: Phase1Progress) => void,
 ): Promise<{ success: boolean; error?: string }> {
   const { wsUrl } = useTerminalStore.getState().termuxSettings;
 
-  // Send the entire setup as a single && chain via RUN_COMMAND
-  onProgress({ step: 'sending_command', elapsedSeconds: 0 });
-
-  const result = await runTermuxCommand({ command: buildSetupCommand() });
-
-  if (!result.success) {
-    onProgress({ step: 'permission_error', elapsedSeconds: 0 });
-    return { success: false, error: 'PERMISSION_DENIED' };
-  }
-
-  // Poll for bridge connection
+  // Poll for bridge connection (user is executing command in Termux)
   onProgress({ step: 'waiting_bridge', elapsedSeconds: 0 });
   const startTime = Date.now();
 

@@ -153,64 +153,33 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
     };
   }, [wizardStep]);
 
-  // ── Phase 1: RUN_COMMAND + WS polling ──────────────────────────────────
+  // ── Phase 1: Copy command + open Termux + poll for bridge ────────────
 
-  const startPhase1 = useCallback(async () => {
-    setShowManualFallback(false);
-    setPhase1Progress(null);
-
-    const result = await runPhase1Setup((p) => {
-      setPhase1Progress(p);
-      if (p.step === 'timeout') {
-        setShowManualFallback(true);
-      }
-    });
-
-    if (result.success) {
-      setWizardStep('auto');
-    } else if (result.error === 'PERMISSION_DENIED') {
-      setShowManualFallback(true);
-      setPhase1Progress({ step: 'permission_error', elapsedSeconds: 0 });
-    } else if (result.error === 'TIMEOUT') {
-      setShowManualFallback(true);
-    }
+  const handleCopyAndOpenTermux = useCallback(async () => {
+    await Clipboard.setStringAsync(buildSetupCommand());
+    setInitCopied(true);
+    setTimeout(() => setInitCopied(false), 3000);
+    try { await Linking.openURL('com.termux://'); } catch {}
   }, []);
 
-  // Auto-start Phase 1 when entering init step
+  // Start polling when entering init step
   useEffect(() => {
-    if (wizardStep === 'init') {
-      startPhase1();
-    }
-  }, [wizardStep, startPhase1]);
+    if (wizardStep !== 'init') return;
 
-  // Keep polling even during manual fallback (user might paste command and it connects)
-  useEffect(() => {
-    if (wizardStep !== 'init' || !showManualFallback) return;
-    // Continue polling in background
-    const interval = setInterval(async () => {
-      const { useTerminalStore } = await import('@/store/terminal-store');
-      const { wsUrl } = useTerminalStore.getState().termuxSettings;
-      try {
-        const ws = new WebSocket(wsUrl);
-        const timeout = setTimeout(() => { try { ws.close(); } catch {} }, 3000);
-        ws.onopen = () => ws.send(JSON.stringify({ type: 'ping' }));
-        ws.onmessage = (e) => {
-          try {
-            const msg = JSON.parse(e.data as string);
-            if (msg.type === 'pong' || msg.type === 'ready') {
-              clearTimeout(timeout);
-              try { ws.close(); } catch {}
-              clearInterval(interval);
-              useTerminalStore.getState().setConnectionMode('termux');
-              setWizardStep('auto');
-            }
-          } catch {}
-        };
-        ws.onerror = () => { clearTimeout(timeout); };
-      } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [wizardStep, showManualFallback]);
+    // Start Phase 1 polling (no RUN_COMMAND — user pastes command in Termux)
+    let cancelled = false;
+    const poll = async () => {
+      const result = await runPhase1Setup((p) => {
+        if (!cancelled) setPhase1Progress(p);
+      });
+      if (!cancelled && result.success) {
+        setWizardStep('auto');
+      }
+    };
+    poll();
+
+    return () => { cancelled = true; };
+  }, [wizardStep]);
 
   // ── Phase 2: Bridge-based setup ──────────────────────────────────────────
 
@@ -371,122 +340,67 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
     );
   };
 
-  // ── Render: Step 3 — Init (Phase 1) ────────────────────────────────────
+  // ── Render: Step 3 — Init (Phase 1: copy command + open Termux + poll) ──
 
   const currentSlide = SLIDES[slideIndex];
 
   const renderInitStep = () => (
     <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
-      {!showManualFallback ? (
-        <>
-          {/* Feature slideshow while waiting */}
-          <Animated.View
-            key={`slide-${slideIndex}`}
-            entering={FadeInRight.duration(500)}
-            exiting={FadeOutLeft.duration(300)}
-            style={styles.slideContainer}
-          >
-            <View style={[styles.slideIconCircle, { backgroundColor: currentSlide.color + '20' }]}>
-              <MaterialIcons name={currentSlide.icon as any} size={36} color={currentSlide.color} />
-            </View>
-            <Text style={[styles.slideTitle, { color: currentSlide.color }]}>
-              {t(currentSlide.titleKey)}
-            </Text>
-            <Text style={styles.slideDesc}>{t(currentSlide.descKey)}</Text>
-            {currentSlide.exampleKey && (
-              <View style={styles.slideExample}>
-                <Text style={styles.slideExampleText}>{t(currentSlide.exampleKey)}</Text>
-              </View>
-            )}
-          </Animated.View>
+      <View style={[styles.iconCircle, { backgroundColor: '#60A5FA20' }]}>
+        <MaterialIcons name="terminal" size={48} color="#60A5FA" />
+      </View>
 
-          {/* Slide dots */}
-          <View style={styles.slideDots}>
-            {SLIDES.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.slideDot,
-                  i === slideIndex && { backgroundColor: currentSlide.color, width: 16 },
-                ]}
-              />
-            ))}
-          </View>
+      <Text style={[styles.title, { color: '#60A5FA' }]}>{t('setup2.init_title')}</Text>
+      <Text style={styles.description}>{t('setup2.init_desc')}</Text>
 
-          {/* Waiting indicator */}
-          <View style={styles.waitingContainer}>
-            <ActivityIndicator size="small" color="#60A5FA" />
-            <Text style={styles.waitingText}>
-              {t('setup2.init_waiting')}
-              {phase1Progress?.elapsedSeconds != null && phase1Progress.elapsedSeconds > 0
-                ? ` (${phase1Progress.elapsedSeconds}s)`
-                : ''}
-            </Text>
-          </View>
+      {/* Main action: copy + open Termux in one tap */}
+      <Pressable
+        style={[styles.primaryBtn, { backgroundColor: '#00D4AA' }]}
+        onPress={handleCopyAndOpenTermux}
+      >
+        <MaterialIcons name="content-paste-go" size={20} color="#000" />
+        <Text style={styles.primaryBtnText}>
+          {initCopied ? t('setup2.init_copied') : t('setup2.init_start')}
+        </Text>
+      </Pressable>
 
-          <Text style={styles.hint}>{t('setup2.init_waiting_desc')}</Text>
-        </>
-      ) : (
-        <>
-          {/* Manual fallback — show command to copy */}
-          <View style={[styles.iconCircle, { backgroundColor: '#FBBF2420' }]}>
-            <MaterialIcons name="terminal" size={48} color="#FBBF24" />
-          </View>
+      <Text style={styles.hint}>{t('setup2.init_paste_hint')}</Text>
 
-          <Text style={[styles.title, { color: '#FBBF24' }]}>
-            {phase1Progress?.step === 'permission_error'
-              ? t('setup2.init_permission_failed').split('\n')[0]
-              : t('setup2.init_timeout_title')}
-          </Text>
-          <Text style={styles.description}>{t('setup2.init_timeout_desc')}</Text>
+      {/* Polling indicator */}
+      <View style={[styles.waitingContainer, { marginTop: 16 }]}>
+        <ActivityIndicator size="small" color="#60A5FA" />
+        <Text style={styles.waitingText}>
+          {t('setup2.init_waiting')}
+          {phase1Progress?.elapsedSeconds != null && phase1Progress.elapsedSeconds > 0
+            ? ` (${phase1Progress.elapsedSeconds}s)`
+            : ''}
+        </Text>
+      </View>
 
-          <View style={styles.commandBox}>
-            <Text style={styles.commandText} selectable numberOfLines={8}>
-              pkg install -y nodejs-lts ttyd{'\n'}
-              && mkdir -p ~/shelly-bridge{'\n'}
-              && cd ~/shelly-bridge{'\n'}
-              && npm init -y && npm install ws{'\n'}
-              && node server.js
-            </Text>
-          </View>
+      {/* Feature slideshow while waiting */}
+      <Animated.View
+        key={`slide-${slideIndex}`}
+        entering={FadeInRight.duration(500)}
+        exiting={FadeOutLeft.duration(300)}
+        style={[styles.slideContainer, { marginTop: 12 }]}
+      >
+        <Text style={[styles.slideTitle, { color: currentSlide.color, fontSize: 14 }]}>
+          {t(currentSlide.titleKey)}
+        </Text>
+        <Text style={[styles.slideDesc, { fontSize: 11 }]}>{t(currentSlide.descKey)}</Text>
+      </Animated.View>
 
-          <Pressable
-            style={[styles.primaryBtn, { backgroundColor: '#60A5FA' }]}
-            onPress={async () => {
-              // Copy a simplified version (without server.js content — full command is too long)
-              // User needs server.js to exist already, so we include the curl fallback
-              await Clipboard.setStringAsync(
-                'pkg install -y nodejs-lts ttyd && mkdir -p ~/shelly-bridge && cd ~/shelly-bridge && npm init -y 2>/dev/null && npm install ws 2>&1 && node server.js'
-              );
-              setInitCopied(true);
-              setTimeout(() => setInitCopied(false), 2000);
-            }}
-          >
-            <MaterialIcons name="content-copy" size={18} color="#000" />
-            <Text style={styles.primaryBtnText}>
-              {initCopied ? t('setup2.init_copied') : t('setup2.init_copy')}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.primaryBtn, { backgroundColor: '#4ADE80', marginTop: 8 }]}
-            onPress={async () => {
-              try { await Linking.openURL('com.termux://'); } catch {}
-            }}
-          >
-            <MaterialIcons name="open-in-new" size={18} color="#000" />
-            <Text style={styles.primaryBtnText}>{t('setup2.init_open_termux')}</Text>
-          </Pressable>
-
-          {/* Still polling in background */}
-          <View style={[styles.waitingContainer, { marginTop: 12 }]}>
-            <ActivityIndicator size="small" color="#6B7280" />
-            <Text style={[styles.waitingText, { color: '#6B7280' }]}>
-              {t('setup2.init_waiting_desc').split('\n')[1]}
-            </Text>
-          </View>
-        </>
-      )}
+      <View style={styles.slideDots}>
+        {SLIDES.map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.slideDot,
+              i === slideIndex && { backgroundColor: currentSlide.color, width: 16 },
+            ]}
+          />
+        ))}
+      </View>
 
       <Pressable style={styles.skipBtn} onPress={handleSkip}>
         <Text style={styles.skipBtnText}>{t('setup.skip')}</Text>
