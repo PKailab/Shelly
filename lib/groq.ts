@@ -254,21 +254,14 @@ export async function groqTranscribe(
   }
 
   try {
-    const FileSystem = await import('expo-file-system/legacy');
-    const base64Audio = await FileSystem.readAsStringAsync(audioUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    // Convert base64 to Blob for FormData
-    const binaryString = atob(base64Audio);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: 'audio/m4a' });
-
+    // React Native: use { uri, type, name } object instead of Blob
+    // (Blob constructor with ArrayBuffer is not supported in RN)
     const formData = new FormData();
-    formData.append('file', blob, 'audio.m4a');
+    formData.append('file', {
+      uri: audioUri,
+      type: 'audio/m4a',
+      name: 'audio.m4a',
+    } as any);
     formData.append('model', GROQ_WHISPER_MODEL);
     formData.append('language', language);
     formData.append('response_format', 'text');

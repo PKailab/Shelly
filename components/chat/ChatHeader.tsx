@@ -12,6 +12,8 @@ import { withAlpha } from '@/lib/theme-utils';
 import { useChatStore } from '@/store/chat-store';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { StatusIndicator } from '@/components/StatusIndicator';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 
 type ChatHeaderProps = {
   onVoiceChat?: () => void;
@@ -22,6 +24,8 @@ export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
   const { isConnected } = useTermuxBridge();
   const { getActiveSession, createSession } = useChatStore();
   const session = getActiveSession();
+  const layout = useDeviceLayout();
+  const { isMultiPane, toggleMultiPane } = useMultiPaneStore();
 
   const handleNewChat = () => {
     createSession('New Chat');
@@ -37,6 +41,17 @@ export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
           <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4ADE80' : colors.inactive }]} />
         </View>
         <View style={styles.rightActions}>
+          {layout.isWide && (
+            <TouchableOpacity
+              onPress={toggleMultiPane}
+              style={styles.newChatBtn}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Multi-pane"
+            >
+              <MaterialIcons name={isMultiPane ? 'fullscreen' : 'view-column'} size={18} color={isMultiPane ? colors.accent : colors.inactive} />
+            </TouchableOpacity>
+          )}
           {onVoiceChat && (
             <TouchableOpacity
               onPress={onVoiceChat}
