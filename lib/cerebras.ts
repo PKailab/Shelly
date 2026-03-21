@@ -137,7 +137,36 @@ export async function cerebrasChatStream(
 
     const reader = res.body?.getReader();
     if (!reader) {
-      return { success: false, error: 'レスポンスボディが読み取れません' };
+      // Fallback: ReadableStream not available (React Native polyfill limitation)
+      // Read the full response as text and parse SSE manually
+      const text = await res.text();
+      let fullContent = '';
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (jsonStr === '[DONE]') break;
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const content = chunk.choices?.[0]?.delta?.content ?? chunk.choices?.[0]?.message?.content ?? '';
+          if (content) fullContent += content;
+        } catch {}
+      }
+      if (fullContent) {
+        onChunk(fullContent, true);
+        return { success: true, content: fullContent };
+      }
+      // Try non-streaming parse (Cerebras may return standard completion format)
+      try {
+        const json = JSON.parse(text);
+        const content = json.choices?.[0]?.message?.content ?? '';
+        if (content) {
+          onChunk(content, true);
+          return { success: true, content };
+        }
+      } catch {}
+      return { success: false, error: 'レスポンスの解析に失敗しました' };
     }
 
     const { fullContent } = await readSSE(reader, onChunk);
