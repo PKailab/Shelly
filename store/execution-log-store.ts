@@ -29,8 +29,58 @@ export type ExecutionLogEntry = {
   isStreaming?: boolean;
 };
 
+/** エラー検出パターン — sessionBufferで優先保持 */
+const ERROR_PATTERNS = [
+  /error/i, /fail/i, /exception/i, /fatal/i,
+  /ENOENT/, /EACCES/, /EPERM/,
+  /TypeError/, /SyntaxError/, /ReferenceError/,
+  /exit code [1-9]/, /exit status [1-9]/,
+  /command not found/i, /permission denied/i,
+];
+
+function isErrorLine(text: string): boolean {
+  return ERROR_PATTERNS.some((p) => p.test(text));
+}
+
+/** ターミナル出力行（2層バッファ用） */
+export type TerminalOutputLine = {
+  text: string;
+  timestamp: number;
+  isError: boolean;
+};
+
+const HOT_BUFFER_SIZE = 100;
+const SESSION_BUFFER_SIZE = 1000;
+
+/**
+ * sessionBufferがSESSION_BUFFER_SIZEを超えた場合、
+ * エラー行を優先保持し、非エラー行から先にFIFO破棄する。
+ */
+function pruneSessionBuffer(buffer: TerminalOutputLine[]): TerminalOutputLine[] {
+  if (buffer.length <= SESSION_BUFFER_SIZE) return buffer;
+
+  const errorLines = buffer.filter((l) => l.isError);
+  const normalLines = buffer.filter((l) => !l.isError);
+
+  if (errorLines.length >= SESSION_BUFFER_SIZE) {
+    return errorLines.slice(-SESSION_BUFFER_SIZE);
+  }
+
+  const normalKeep = SESSION_BUFFER_SIZE - errorLines.length;
+  return [
+    ...normalLines.slice(-normalKeep),
+    ...errorLines,
+  ].sort((a, b) => a.timestamp - b.timestamp);
+}
+
 type ExecutionLogStore = {
   entries: ExecutionLogEntry[];
+  /** リアルタイムオーバーレイ用（直近100行） */
+  hotBuffer: TerminalOutputLine[];
+  /** クロスペインインテリジェンス用（直近1000行、エラー優先保持） */
+  sessionBuffer: TerminalOutputLine[];
+  /** @deprecated hotBufferのtext配列を返す（後方互換） */
+  terminalOutput: string[];
   /** ターミナルタブでログパネルが開いているか */
   isLogPanelOpen: boolean;
   /** 未読ログ数（ターミナルタブにいない時に増加） */
@@ -38,27 +88,26 @@ type ExecutionLogStore = {
 
   addEntry: (entry: Omit<ExecutionLogEntry, 'id' | 'timestamp'>) => void;
   updateEntry: (id: string, updates: Partial<ExecutionLogEntry>) => void;
+  /** ターミナル出力行を2層バッファに追加 */
+  addTerminalOutput: (line: string) => void;
+  /** エラー行の前後contextLines行を含む直近出力を取得 */
+  getRecentOutput: (lines?: number, contextLines?: number) => string;
+  /** ターミナル出力をクリア */
+  clearTerminalOutput: () => void;
   clearEntries: () => void;
   toggleLogPanel: () => void;
   resetUnread: () => void;
-
-  /** 直近100行のターミナル出力（ANSIストリップ済み） */
-  terminalOutput: string[];
-  /** ターミナル出力を追加（100行超でFIFO破棄） */
-  addTerminalOutput: (line: string) => void;
-  /** 直近N行を結合して返す（デフォルト50行） */
-  getRecentOutput: (lines?: number) => string;
-  /** ターミナル出力をクリア */
-  clearTerminalOutput: () => void;
 };
 
 let _logId = 0;
 
 export const useExecutionLogStore = create<ExecutionLogStore>((set, get) => ({
   entries: [],
+  hotBuffer: [],
+  sessionBuffer: [],
+  terminalOutput: [],
   isLogPanelOpen: false,
   unreadCount: 0,
-  terminalOutput: [],
 
   addEntry: (entry) => {
     const id = `elog-${++_logId}-${Date.now()}`;
@@ -68,7 +117,7 @@ export const useExecutionLogStore = create<ExecutionLogStore>((set, get) => ({
       timestamp: Date.now(),
     };
     set((state) => ({
-      entries: [...state.entries.slice(-100), newEntry], // Keep last 100
+      entries: [...state.entries.slice(-100), newEntry],
       unreadCount: state.unreadCount + 1,
     }));
     return id;
@@ -82,22 +131,52 @@ export const useExecutionLogStore = create<ExecutionLogStore>((set, get) => ({
     }));
   },
 
-  clearEntries: () => set({ entries: [], unreadCount: 0 }),
+  addTerminalOutput: (text: string) => {
+    const line: TerminalOutputLine = {
+      text,
+      timestamp: Date.now(),
+      isError: isErrorLine(text),
+    };
+    set((state) => {
+      const newHot = [...state.hotBuffer.slice(-(HOT_BUFFER_SIZE - 1)), line];
+      return {
+        hotBuffer: newHot,
+        sessionBuffer: pruneSessionBuffer([...state.sessionBuffer, line]),
+        terminalOutput: newHot.map((l) => l.text),
+      };
+    });
+  },
+
+  getRecentOutput: (lines = 50, contextLines = 5) => {
+    const { sessionBuffer } = get();
+    const recent = sessionBuffer.slice(-lines);
+    if (contextLines <= 0 || recent.length === 0) {
+      return recent.map((l) => l.text).join('\n');
+    }
+
+    // エラー行の前後contextLines行もコンテキストとして含める
+    const includeSet = new Set<number>();
+    for (let i = 0; i < recent.length; i++) {
+      if (recent[i].isError) {
+        for (let j = Math.max(0, i - contextLines); j <= Math.min(recent.length - 1, i + contextLines); j++) {
+          includeSet.add(j);
+        }
+      }
+    }
+    if (includeSet.size === 0 || includeSet.size >= recent.length) {
+      return recent.map((l) => l.text).join('\n');
+    }
+    return recent
+      .filter((_, i) => includeSet.has(i))
+      .map((l) => l.text)
+      .join('\n');
+  },
+
+  clearTerminalOutput: () => set({ hotBuffer: [], sessionBuffer: [], terminalOutput: [] }),
+
+  clearEntries: () => set({ entries: [], hotBuffer: [], sessionBuffer: [], terminalOutput: [], unreadCount: 0 }),
 
   toggleLogPanel: () => set((state) => ({ isLogPanelOpen: !state.isLogPanelOpen })),
 
   resetUnread: () => set({ unreadCount: 0 }),
-
-  addTerminalOutput: (line) => {
-    set((state) => ({
-      terminalOutput: [...state.terminalOutput, line].slice(-100),
-    }));
-  },
-
-  getRecentOutput: (lines = 50) => {
-    const { terminalOutput } = get();
-    return terminalOutput.slice(-lines).join('\n');
-  },
-
-  clearTerminalOutput: () => set({ terminalOutput: [] }),
 }));

@@ -5,6 +5,11 @@
 
 type RunCommandFn = (cmd: string) => Promise<{ stdout: string; exitCode: number }>;
 
+/** Shell-escape a string for safe use in single-quoted arguments */
+function shellEscape(s: string): string {
+  return "'" + s.replace(/'/g, "'\\''") + "'";
+}
+
 export type SaveResult = {
   commitHash: string;
   message: string;
@@ -18,6 +23,13 @@ const DEFAULT_GITIGNORE = `node_modules/
 *.log
 .env
 .env.*
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+credentials.json
+service-account*.json
 dist/
 build/
 .DS_Store
@@ -28,16 +40,17 @@ export async function initGitIfNeeded(
   projectDir: string,
   runCommand: RunCommandFn,
 ): Promise<void> {
-  const { exitCode } = await runCommand(`git -C ${projectDir} rev-parse --git-dir`);
+  const dir = shellEscape(projectDir);
+  const { exitCode } = await runCommand(`git -C ${dir} rev-parse --git-dir`);
   if (exitCode !== 0) {
-    await runCommand(`git -C ${projectDir} init`);
-    const { exitCode: igExists } = await runCommand(`test -f ${projectDir}/.gitignore`);
+    await runCommand(`git -C ${dir} init`);
+    const { exitCode: igExists } = await runCommand(`test -f ${dir}/.gitignore`);
     if (igExists !== 0) {
       const escaped = DEFAULT_GITIGNORE.replace(/'/g, "'\\''");
-      await runCommand(`printf '%s' '${escaped}' > ${projectDir}/.gitignore`);
+      await runCommand(`printf '%s' '${escaped}' > ${dir}/.gitignore`);
     }
-    await runCommand(`git -C ${projectDir} add -A`);
-    await runCommand(`git -C ${projectDir} commit -m "Auto: Initial savepoint" --allow-empty`);
+    await runCommand(`git -C ${dir} add -A`);
+    await runCommand(`git -C ${dir} commit -m "Auto: Initial savepoint" --allow-empty`);
   }
 }
 
@@ -46,18 +59,19 @@ export async function checkAndSave(
   projectDir: string,
   runCommand: RunCommandFn,
 ): Promise<SaveResult | null> {
-  const { stdout: status } = await runCommand(`git -C ${projectDir} status --porcelain`);
+  const dir = shellEscape(projectDir);
+  const { stdout: status } = await runCommand(`git -C ${dir} status --porcelain`);
   if (!status.trim()) return null;
 
   const message = generateCommitMessage(status);
 
-  await runCommand(`git -C ${projectDir} add -A`);
+  await runCommand(`git -C ${dir} add -A`);
   const { exitCode } = await runCommand(
-    `git -C ${projectDir} commit -m "${message.replace(/"/g, '\\"')}"`,
+    `git -C ${dir} commit -m "${message.replace(/"/g, '\\"')}"`,
   );
   if (exitCode !== 0) return null;
 
-  const { stdout: hash } = await runCommand(`git -C ${projectDir} rev-parse --short HEAD`);
+  const { stdout: hash } = await runCommand(`git -C ${dir} rev-parse --short HEAD`);
 
   const lines = status.trim().split('\n').filter(Boolean);
   const created = lines.filter((l) => l.startsWith('?') || l.startsWith('A')).length;
@@ -117,9 +131,10 @@ export async function revertLastSavepoint(
   projectDir: string,
   runCommand: RunCommandFn,
 ): Promise<boolean> {
-  const { exitCode } = await runCommand(`git -C ${projectDir} revert HEAD --no-edit`);
+  const dir = shellEscape(projectDir);
+  const { exitCode } = await runCommand(`git -C ${dir} revert HEAD --no-edit`);
   if (exitCode !== 0) {
-    await runCommand(`git -C ${projectDir} revert --abort`);
+    await runCommand(`git -C ${dir} revert --abort`);
     return false;
   }
   return true;
@@ -130,7 +145,8 @@ export async function getLastDiff(
   projectDir: string,
   runCommand: RunCommandFn,
 ): Promise<string> {
-  const { stdout } = await runCommand(`git -C ${projectDir} diff HEAD~1 HEAD`);
+  const dir = shellEscape(projectDir);
+  const { stdout } = await runCommand(`git -C ${dir} diff HEAD~1 HEAD`);
   return stdout;
 }
 

@@ -1,12 +1,19 @@
 /**
  * llm-interpreter.ts
  *
- * Termuxコマンド出力をLocal LLMで自然言語に通訳するモジュール。
+ * Termuxコマンド出力をLLMで自然言語に通訳するモジュール。
+ *
+ * フォールバック順:
+ *   1. Cerebras API（高速推論）
+ *   2. Groq API（高速推論）
+ *   3. Gemini CLI（`gemini -p`、Google OAuth認証済み）
+ *   4. ローカルLLM（Ollama / llama-server）
  *
  * 機能:
- * 1. コマンド完了後の出力をLocal LLMで解説（成功/エラー）
+ * 1. コマンド完了後の出力をLLMで解説（成功/エラー）
  * 2. エラー時は原因と修正コマンドを提案
  * 3. ストリーミング表示対応
+ * 4. 5秒デバウンスバッチ翻訳
  */
 
 import type { OutputLine } from '@/store/types';
@@ -17,6 +24,8 @@ export type InterpretResult = {
   type: InterpretType;
   text: string;
   suggestedCommand?: string;
+  /** どのプロバイダで通訳したか */
+  provider?: 'cerebras' | 'groq' | 'gemini-cli' | 'local';
 };
 
 export type StreamingCallback = (chunk: string) => void;
@@ -28,15 +37,245 @@ export type LlmConfig = {
   enabled: boolean;
 };
 
+/** フォールバックチェーン設定 */
+export type FallbackConfig = {
+  cerebrasApiKey?: string;
+  cerebrasModel?: string;
+  groqApiKey?: string;
+  groqModel?: string;
+  geminiCliAvailable?: boolean;
+  /** Gemini CLIがターミナルで対話実行中かどうか（trueならスキップ） */
+  geminiCliInUse?: boolean;
+  localLlm: LlmConfig;
+};
+
+// ─── Debounce State ──────────────────────────────────────────────────────────
+
+const DEBOUNCE_MS = 5000;
+const MAX_BATCH_LINES = 50;
+
+let _translateBuffer: string[] = [];
+let _translateTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingResolve: ((batch: string) => void) | null = null;
+
 /**
- * Termuxコマンドの出力をLocal LLMで通訳する。
+ * デバウンス付きでターミナル出力行を蓄積する。
+ * 5秒間出力が止まった時点でバッチをresolveする。
+ *
+ * @returns バッチ化された出力テキスト（5秒後にresolve）
+ */
+export function pushTranslateLine(line: string): Promise<string> | null {
+  _translateBuffer.push(line);
+
+  // 既にPromiseが作られている場合は追加のみ（resolveは1回だけ）
+  if (_translateTimer) {
+    clearTimeout(_translateTimer);
+  }
+
+  // 最初の行で新しいPromiseを作る
+  const isFirst = _translateBuffer.length === 1;
+
+  const promise = isFirst
+    ? new Promise<string>((resolve) => { _pendingResolve = resolve; })
+    : null;
+
+  _translateTimer = setTimeout(() => {
+    const batch = _translateBuffer.slice(-MAX_BATCH_LINES).join('\n');
+    _translateBuffer = [];
+    _translateTimer = null;
+    _pendingResolve?.(batch);
+    _pendingResolve = null;
+  }, DEBOUNCE_MS);
+
+  return promise;
+}
+
+/** デバウンスタイマーをリセットする（テスト用） */
+export function resetTranslateBuffer(): void {
+  if (_translateTimer) clearTimeout(_translateTimer);
+  _translateBuffer = [];
+  _translateTimer = null;
+  _pendingResolve = null;
+}
+
+// ─── Fallback Chain ──────────────────────────────────────────────────────────
+
+/**
+ * フォールバックチェーンでLLM通訳を実行する。
+ * Cerebras → Groq → Gemini CLI → ローカルLLM の順に試行。
+ */
+async function interpretWithFallback(
+  systemPrompt: string,
+  userContent: string,
+  fallback: FallbackConfig,
+  onChunk: StreamingCallback,
+): Promise<{ text: string; provider: InterpretResult['provider'] }> {
+  // 1. Cerebras API
+  if (fallback.cerebrasApiKey) {
+    try {
+      const text = await callOpenAICompatible(
+        'https://api.cerebras.ai/v1/chat/completions',
+        fallback.cerebrasApiKey,
+        fallback.cerebrasModel ?? 'qwen-3-235b-a22b-instruct-2507',
+        systemPrompt,
+        userContent,
+        onChunk,
+      );
+      if (text) return { text, provider: 'cerebras' };
+    } catch { /* fallthrough */ }
+  }
+
+  // 2. Groq API
+  if (fallback.groqApiKey) {
+    try {
+      const text = await callOpenAICompatible(
+        'https://api.groq.com/openai/v1/chat/completions',
+        fallback.groqApiKey,
+        fallback.groqModel ?? 'llama-3.3-70b-versatile',
+        systemPrompt,
+        userContent,
+        onChunk,
+      );
+      if (text) return { text, provider: 'groq' };
+    } catch { /* fallthrough */ }
+  }
+
+  // 3. Gemini CLI（`gemini -p`）
+  if (fallback.geminiCliAvailable && !fallback.geminiCliInUse) {
+    try {
+      const text = await callGeminiCli(systemPrompt, userContent, onChunk);
+      if (text) return { text, provider: 'gemini-cli' };
+    } catch { /* fallthrough */ }
+  }
+
+  // 4. ローカルLLM
+  if (fallback.localLlm.enabled && fallback.localLlm.baseUrl) {
+    try {
+      const text = await callOpenAICompatible(
+        `${fallback.localLlm.baseUrl.replace(/\/$/, '')}/v1/chat/completions`,
+        undefined,
+        fallback.localLlm.model,
+        systemPrompt,
+        userContent,
+        onChunk,
+      );
+      if (text) return { text, provider: 'local' };
+    } catch { /* fallthrough */ }
+  }
+
+  return { text: '', provider: undefined };
+}
+
+/** OpenAI互換APIにストリーミングリクエストを送信 */
+async function callOpenAICompatible(
+  apiUrl: string,
+  apiKey: string | undefined,
+  model: string,
+  systemPrompt: string,
+  userContent: string,
+  onChunk: StreamingCallback,
+): Promise<string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ],
+        max_tokens: 256,
+        temperature: 0.3,
+        stream: true,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+    if (!response.ok) return '';
+
+    const reader = response.body?.getReader();
+    if (!reader) return '';
+
+    return await readSSEStream(reader, onChunk);
+  } catch {
+    clearTimeout(timer);
+    return '';
+  }
+}
+
+/** Gemini CLI（`gemini -p`）で通訳 */
+async function callGeminiCli(
+  systemPrompt: string,
+  userContent: string,
+  onChunk: StreamingCallback,
+): Promise<string> {
+  // React Native環境ではchild_processが使えないため、
+  // TermuxBridge経由でgeminiコマンドを実行する必要がある。
+  // ここではrunCommand相当の関数が必要だが、llm-interpreterはpure関数なので
+  // 呼び出し側からrunCommandを渡す設計にする（Phase 5で統合時に接続）。
+  // 現時点ではスキップしてフォールバック。
+  return '';
+}
+
+/** SSEストリームを読み取ってテキストを返す */
+async function readSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onChunk: StreamingCallback,
+): Promise<string> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullText = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === '[DONE]') return fullText;
+
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed.choices?.[0]?.delta?.content ?? '';
+        if (delta) {
+          fullText += delta;
+          onChunk(delta);
+        }
+      } catch {
+        // JSON parse error — skip
+      }
+    }
+  }
+
+  return fullText;
+}
+
+// ─── Main Functions ──────────────────────────────────────────────────────────
+
+/**
+ * Termuxコマンドの出力をLLMで通訳する（フォールバックチェーン対応）。
  * ストリーミングでコールバックに逐次チャンクを渡す。
  *
  * @param command   実行されたコマンド
  * @param output    OutputLine配列
  * @param exitCode  終了コード（null = まだ実行中）
- * @param config    Local LLM設定
+ * @param config    Local LLM設定（後方互換）
  * @param onChunk   ストリーミングコールバック
+ * @param options   追加オプション
  * @returns         通訳結果（完了後）
  */
 export async function interpretTermuxOutput(
@@ -45,9 +284,21 @@ export async function interpretTermuxOutput(
   exitCode: number | null,
   config: LlmConfig,
   onChunk: StreamingCallback,
-  options?: { verbosity?: 'verbose' | 'minimal'; projectContext?: string },
+  options?: {
+    verbosity?: 'verbose' | 'minimal';
+    projectContext?: string;
+    fallback?: FallbackConfig;
+  },
 ): Promise<InterpretResult> {
-  if (!config.enabled || !config.baseUrl) {
+  // fallbackが渡されなければ従来通りLocal LLMのみ
+  const fallbackConfig: FallbackConfig = options?.fallback ?? { localLlm: config };
+
+  const anyEnabled = fallbackConfig.cerebrasApiKey
+    || fallbackConfig.groqApiKey
+    || fallbackConfig.geminiCliAvailable
+    || (fallbackConfig.localLlm.enabled && fallbackConfig.localLlm.baseUrl);
+
+  if (!anyEnabled) {
     return { type: 'progress', text: '' };
   }
 
@@ -104,79 +355,26 @@ export async function interpretTermuxOutput(
     ? `コマンド: ${command}\n終了コード: ${exitCode}\n\nstdout:\n${stdout || '(なし)'}\n\nstderr:\n${stderr || '(なし)'}`
     : `コマンド: ${command}\n\n出力:\n${stdout || '(出力なし)'}`;
 
-  // llama-server (OpenAI互換) のストリーミングAPI
-  const apiUrl = `${config.baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
+  const { text: fullText, provider } = await interpretWithFallback(
+    systemPrompt,
+    userContent,
+    fallbackConfig,
+    onChunk,
+  );
 
-  let fullText = '';
+  // 修正コマンドを抽出（「修正: コマンド」形式）
   let suggestedCommand: string | undefined;
-
-  try {
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-        max_tokens: 256,
-        temperature: 0.3,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      return { type: isError ? 'error' : 'success', text: '' };
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) return { type: isError ? 'error' : 'success', text: '' };
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const data = trimmed.slice(5).trim();
-        if (data === '[DONE]') break;
-
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content ?? '';
-          if (delta) {
-            fullText += delta;
-            onChunk(delta);
-          }
-        } catch {
-          // JSON parse error — skip
-        }
-      }
-    }
-
-    // 修正コマンドを抽出（「修正: コマンド」形式）
-    const fixMatch = fullText.match(/修正[:：]\s*(.+)/);
-    if (fixMatch) {
-      suggestedCommand = fixMatch[1].trim();
-    }
-
-    return {
-      type: isError ? 'error' : 'success',
-      text: fullText,
-      suggestedCommand,
-    };
-  } catch {
-    return { type: isError ? 'error' : 'success', text: '' };
+  const fixMatch = fullText.match(/修正[:：]\s*(.+)/);
+  if (fixMatch) {
+    suggestedCommand = fixMatch[1].trim();
   }
+
+  return {
+    type: isError ? 'error' : 'success',
+    text: fullText,
+    suggestedCommand,
+    provider,
+  };
 }
 
 /**
@@ -226,36 +424,7 @@ export async function explainCommandIntent(
     const reader = response.body?.getReader();
     if (!reader) return '';
 
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const data = trimmed.slice(5).trim();
-        if (data === '[DONE]') break;
-
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content ?? '';
-          if (delta) {
-            fullText += delta;
-            onChunk?.(delta);
-          }
-        } catch {
-          // JSON parse error — skip
-        }
-      }
-    }
-
+    fullText = await readSSEStream(reader, onChunk ?? (() => {}));
     return fullText;
   } catch {
     return '';
