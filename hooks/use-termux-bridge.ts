@@ -1,7 +1,12 @@
 /**
- * useTermuxBridge  — v1.3
+ * useTermuxBridge  — v1.4
  *
  * Manages the WebSocket connection to the Termux bridge server.
+ *
+ * Changes in v1.4:
+ *  - Auto-recovery via TermuxBridge native module when reconnect exhausted
+ *  - Attempts to restart bridge+ttyd via start-shelly.sh before showing manual banner
+ *  - Session resume: tracks activeCliSession for claude --continue after recovery
  *
  * Changes in v1.3:
  *  - cancelCurrent() now sends cancel message AND immediately marks block as 'cancelling'
@@ -33,6 +38,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useTerminalStore } from '@/store/terminal-store';
 import { notifyCommandComplete } from '@/lib/command-notifier';
+import { runTermuxCommand } from '@/lib/termux-intent';
 
 /** Generate a collision-resistant request ID */
 function genRequestId(prefix: string): string {
@@ -96,6 +102,8 @@ export type CreateProjectResult =
 
 const MAX_RECONNECT = 5;
 const CANCEL_TIMEOUT_MS = 5000; // force-finalize if no 'cancelled' response in 5s
+const AUTO_RECOVERY_POLL_INTERVAL = 3000; // 3s between recovery polls
+const AUTO_RECOVERY_MAX_POLLS = 10; // 30s total recovery window
 
 export function useTermuxBridge() {
   const {
@@ -122,6 +130,10 @@ export function useTermuxBridge() {
   const cancelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const appStateRef = useRef<AppStateStatus>('active');
   const [isReconnectExhausted, setIsReconnectExhausted] = useState(false);
+  const [isAutoRecovering, setIsAutoRecovering] = useState(false);
+  const [autoRecoveryFailed, setAutoRecoveryFailed] = useState(false);
+  const autoRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveredFromCrashRef = useRef(false);
 
   // ── Request-specific message handlers (EventEmitter pattern) ─────────────
   const requestHandlersRef = useRef<Map<string, (msg: ServerMessage) => void>>(new Map());
@@ -268,7 +280,8 @@ export function useTermuxBridge() {
     // Battery guard: only reconnect when in foreground, mode is termux, autoReconnect is on
     if (!autoReconnect || mode !== 'termux') return;
     if (reconnectAttemptsRef.current >= MAX_RECONNECT) {
-      setIsReconnectExhausted(true);
+      // Instead of immediately exhausting, try auto-recovery first
+      attemptAutoRecovery();
       return;
     }
     if (appStateRef.current !== 'active') return; // don't reconnect in background
@@ -285,6 +298,87 @@ export function useTermuxBridge() {
       }
     }, delay);
   }, [connect]);
+
+  // ── Auto-recovery via Native Module ─────────────────────────────────────────
+
+  const clearAutoRecoveryTimer = () => {
+    if (autoRecoveryTimerRef.current) {
+      clearTimeout(autoRecoveryTimerRef.current);
+      autoRecoveryTimerRef.current = null;
+    }
+  };
+
+  const attemptAutoRecovery = useCallback(async () => {
+    // Prevent double-triggering
+    if (isAutoRecovering) return;
+
+    setIsAutoRecovering(true);
+    setAutoRecoveryFailed(false);
+    setIsReconnectExhausted(false);
+
+    // Remember if there was an active CLI session before crash
+    const { activeCliSession } = useTerminalStore.getState();
+    if (activeCliSession) {
+      recoveredFromCrashRef.current = true;
+    }
+
+    // Step 1: Restart Termux services via Native Module
+    const startCmd = [
+      'pkill -f "node.*server.js" 2>/dev/null; ',
+      'pkill -f ttyd 2>/dev/null; ',
+      'sleep 1; ',
+      'if [ -x ~/shelly-bridge/start-shelly.sh ]; then ',
+      '  bash ~/shelly-bridge/start-shelly.sh; ',
+      'else ',
+      '  ttyd -p 7681 -W bash > /dev/null 2>&1 & ',
+      '  cd ~/shelly-bridge && node server.js; ',
+      'fi',
+    ].join('');
+
+    const result = await runTermuxCommand({ command: startCmd, background: true });
+
+    if (!result.success) {
+      // Native module failed (permission denied, Termux not installed, etc.)
+      setIsAutoRecovering(false);
+      setAutoRecoveryFailed(true);
+      setIsReconnectExhausted(true);
+      return;
+    }
+
+    // Step 2: Poll for bridge to come back online
+    let pollCount = 0;
+    const poll = () => {
+      pollCount++;
+      if (pollCount > AUTO_RECOVERY_MAX_POLLS) {
+        // Recovery timed out — fall back to manual
+        setIsAutoRecovering(false);
+        setAutoRecoveryFailed(true);
+        setIsReconnectExhausted(true);
+        return;
+      }
+
+      // Reset counter and try connecting
+      reconnectAttemptsRef.current = 0;
+      connect();
+
+      // Check if connected after a short delay
+      autoRecoveryTimerRef.current = setTimeout(() => {
+        const { bridgeStatus: currentStatus } = useTerminalStore.getState();
+        if (currentStatus === 'connected') {
+          // Recovery succeeded!
+          setIsAutoRecovering(false);
+          setAutoRecoveryFailed(false);
+          setIsReconnectExhausted(false);
+          return;
+        }
+        // Not connected yet, keep polling
+        poll();
+      }, AUTO_RECOVERY_POLL_INTERVAL);
+    };
+
+    // Wait 2s for Termux to start, then begin polling
+    autoRecoveryTimerRef.current = setTimeout(poll, 2000);
+  }, [connect, isAutoRecovering]);
 
   // ── Cancel timeout helper ──────────────────────────────────────────────────
 
@@ -492,6 +586,7 @@ export function useTermuxBridge() {
     return () => {
       clearReconnectTimer();
       clearCancelTimeout();
+      clearAutoRecoveryTimer();
       if (flushTimerRef.current) { clearTimeout(flushTimerRef.current); flushTimerRef.current = null; }
     };
   }, [connectionMode]);
@@ -898,6 +993,9 @@ export function useTermuxBridge() {
   const resetReconnect = useCallback(() => {
     reconnectAttemptsRef.current = 0;
     setIsReconnectExhausted(false);
+    setAutoRecoveryFailed(false);
+    setIsAutoRecovering(false);
+    clearAutoRecoveryTimer();
     connect();
   }, [connect]);
 
@@ -920,6 +1018,10 @@ export function useTermuxBridge() {
     isConnected: bridgeStatus === 'connected',
     isConnecting: bridgeStatus === 'connecting',
     isReconnectExhausted,
+    isAutoRecovering,
+    autoRecoveryFailed,
+    /** True if this connection was restored after a crash (for session resume) */
+    recoveredFromCrash: recoveredFromCrashRef.current,
     hasActiveCommand: activeItemRef.current !== null,
   };
 }

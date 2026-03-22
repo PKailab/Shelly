@@ -342,6 +342,10 @@ const ja: Record<string, string> = {
   'bridge.reconnect': '再接続',
   'bridge.recovery_command': 'cd ~/shelly-bridge && node server.js',
   'bridge.copied': 'コマンドをコピーしました',
+  'bridge.auto_recovering': 'Termuxを自動復旧中...',
+  'bridge.auto_recovery_failed': '自動復旧に失敗しました。手動で再起動してください。',
+  'bridge.session_resume_prompt': '前回のClaudeセッションを引き継ぎますか？',
+  'bridge.session_resume_yes': '引き継ぐ',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': '話しかけるだけ',
   'setup2.slide1_desc': '自然な日本語で入力すると\nShellyが適切なコマンドに変換します。',

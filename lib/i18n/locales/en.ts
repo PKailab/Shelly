@@ -341,6 +341,10 @@ const en: Record<string, string> = {
   'bridge.reconnect': 'Reconnect',
   'bridge.recovery_command': 'cd ~/shelly-bridge && node server.js',
   'bridge.copied': 'Command copied',
+  'bridge.auto_recovering': 'Restarting Termux automatically...',
+  'bridge.auto_recovery_failed': 'Auto-recovery failed. Please restart manually.',
+  'bridge.session_resume_prompt': 'Resume previous Claude session?',
+  'bridge.session_resume_yes': 'Resume',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': 'Just Talk to It',
   'setup2.slide1_desc': 'Type in natural language.\nShelly converts it to the right command.',
