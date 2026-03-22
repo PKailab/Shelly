@@ -158,6 +158,12 @@ export default function ChatScreen() {
     [bridgeRunCommand],
   );
 
+  // ── ActionBlock background execution ──
+  const runCommandInBackground = useCallback(async (command: string) => {
+    const result = await bridgeRunCommand(command, {});
+    return { stdout: result.stdout ?? '', exitCode: result.exitCode ?? null };
+  }, [bridgeRunCommand]);
+
   const currentDir = activeSession?.currentDir ?? '';
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -825,6 +831,8 @@ export default function ChatScreen() {
             isStreaming={isAnyStreaming}
             projectDir={currentDir || undefined}
             runCommand={isBridgeConnected ? savepointExec : undefined}
+            sendToTerminal={isBridgeConnected ? sendCommand : undefined}
+            runCommandInBackground={isBridgeConnected ? runCommandInBackground : undefined}
           />
         </View>
 

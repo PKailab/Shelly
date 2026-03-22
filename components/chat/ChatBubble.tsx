@@ -21,6 +21,9 @@ import { SavepointBubble } from '@/components/SavepointBubble';
 import { WebPreviewModal } from '@/components/WebPreviewModal';
 import { useSavepointStore } from '@/store/savepoint-store';
 import { useTerminalStore } from '@/store/terminal-store';
+import { parseCodeBlocks, hasCodeBlocks } from '@/lib/parse-code-blocks';
+import { ActionBlock } from '@/components/chat/ActionBlock';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 // ─── Agent Colors ────────────────────────────────────────────────────────────
 
@@ -67,13 +70,16 @@ type Props = {
   onDelete?: (messageId: string) => void;
   projectDir?: string;
   runCommand?: (cmd: string) => Promise<{ stdout: string; exitCode: number }>;
+  sendToTerminal?: (text: string) => void;
+  runCommandInBackground?: (command: string) => Promise<{ stdout: string; exitCode: number | null }>;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand }: Props) {
+export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { isWide } = useDeviceLayout();
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const savepointInfo = useSavepointStore((s) => s.messageSavepoints[message.id]);
@@ -175,35 +181,62 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
         )}
 
         {/* Message text (Markdown) */}
-        {displayText ? (
-          <View style={styles.markdownWrap}>
-            <Markdown
-              style={{
-                body: { color: colors.foregroundDim, fontSize, fontFamily: 'monospace', lineHeight: 21 },
-                code_inline: { backgroundColor: withAlpha(colors.foreground, 0.08), color: colors.accent, fontFamily: 'monospace', fontSize: fontSize - 1, paddingHorizontal: 4, borderRadius: 3 },
-                code_block: { backgroundColor: '#0D0D0D', color: '#E8E8E8', fontFamily: 'monospace', fontSize: fontSize - 1, padding: 10, borderRadius: 6, lineHeight: 18 },
-                fence: { backgroundColor: '#0D0D0D', color: '#E8E8E8', fontFamily: 'monospace', fontSize: fontSize - 1, padding: 10, borderRadius: 6, lineHeight: 18 },
-                heading1: { color: colors.foreground, fontSize: fontSize + 4, fontWeight: '700', fontFamily: 'monospace', marginVertical: 6 },
-                heading2: { color: colors.foreground, fontSize: fontSize + 2, fontWeight: '700', fontFamily: 'monospace', marginVertical: 4 },
-                heading3: { color: colors.foreground, fontSize: fontSize + 1, fontWeight: '600', fontFamily: 'monospace', marginVertical: 3 },
-                link: { color: colors.link ?? colors.accent },
-                blockquote: { borderLeftColor: agentColor, borderLeftWidth: 3, paddingLeft: 10, opacity: 0.85 },
-                bullet_list_icon: { color: colors.foregroundDim },
-                ordered_list_icon: { color: colors.foregroundDim },
-              }}
-            >
-              {displayText}
-            </Markdown>
-            {message.isStreaming && (
-              <Text style={{ color: agentColor, fontSize: 14, fontFamily: 'monospace' }}>{'\u258B'}</Text>
-            )}
-          </View>
-        ) : message.isStreaming ? (
-          <View style={[styles.markdownWrap, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-            <ActivityIndicator size="small" color={agentColor} />
-            <Text style={{ color: agentColor, fontSize: 12, fontFamily: 'monospace', opacity: 0.7 }}>{t('chat.thinking')}</Text>
-          </View>
-        ) : null}
+        {(() => {
+          const markdownStyles = {
+            body: { color: colors.foregroundDim, fontSize, fontFamily: 'monospace', lineHeight: 21 },
+            code_inline: { backgroundColor: withAlpha(colors.foreground, 0.08), color: colors.accent, fontFamily: 'monospace', fontSize: fontSize - 1, paddingHorizontal: 4, borderRadius: 3 },
+            code_block: { backgroundColor: '#0D0D0D', color: '#E8E8E8', fontFamily: 'monospace', fontSize: fontSize - 1, padding: 10, borderRadius: 6, lineHeight: 18 },
+            fence: { backgroundColor: '#0D0D0D', color: '#E8E8E8', fontFamily: 'monospace', fontSize: fontSize - 1, padding: 10, borderRadius: 6, lineHeight: 18 },
+            heading1: { color: colors.foreground, fontSize: fontSize + 4, fontWeight: '700' as const, fontFamily: 'monospace', marginVertical: 6 },
+            heading2: { color: colors.foreground, fontSize: fontSize + 2, fontWeight: '700' as const, fontFamily: 'monospace', marginVertical: 4 },
+            heading3: { color: colors.foreground, fontSize: fontSize + 1, fontWeight: '600' as const, fontFamily: 'monospace', marginVertical: 3 },
+            link: { color: colors.link ?? colors.accent },
+            blockquote: { borderLeftColor: agentColor, borderLeftWidth: 3, paddingLeft: 10, opacity: 0.85 },
+            bullet_list_icon: { color: colors.foregroundDim },
+            ordered_list_icon: { color: colors.foregroundDim },
+          };
+          if (displayText) {
+            return (
+              <View style={styles.markdownWrap}>
+                {hasCodeBlocks(displayText) && !message.isStreaming ? (
+                  <>
+                    {parseCodeBlocks(displayText).map((seg, i) =>
+                      seg.type === 'text' ? (
+                        <Markdown key={i} style={markdownStyles}>
+                          {seg.content}
+                        </Markdown>
+                      ) : (
+                        <ActionBlock
+                          key={i}
+                          code={seg.content}
+                          language={seg.language}
+                          isWide={isWide}
+                          onExecuteInTerminal={isWide ? sendToTerminal : undefined}
+                          onExecuteInBackground={!isWide ? runCommandInBackground : undefined}
+                        />
+                      )
+                    )}
+                  </>
+                ) : (
+                  <Markdown style={markdownStyles}>
+                    {displayText}
+                  </Markdown>
+                )}
+                {message.isStreaming && (
+                  <Text style={{ color: agentColor, fontSize: 14, fontFamily: 'monospace' }}>{'\u258B'}</Text>
+                )}
+              </View>
+            );
+          } else if (message.isStreaming) {
+            return (
+              <View style={[styles.markdownWrap, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                <ActivityIndicator size="small" color={agentColor} />
+                <Text style={{ color: agentColor, fontSize: 12, fontFamily: 'monospace', opacity: 0.7 }}>{t('chat.thinking')}</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
 
         {/* Command executions */}
         {message.executions && message.executions.length > 0 && (

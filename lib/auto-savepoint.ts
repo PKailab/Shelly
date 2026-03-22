@@ -150,6 +150,61 @@ export async function getLastDiff(
   return stdout;
 }
 
+// ─── Timeline (セーブポイント一覧) ──────────────────────────────────────────
+
+export type TimelineEntry = {
+  hash: string;
+  message: string;
+  relativeTime: string;
+};
+
+/** Get commit timeline for project (savepoint history) */
+export async function getTimeline(
+  projectDir: string,
+  runCommand: RunCommandFn,
+  limit: number = 20,
+): Promise<TimelineEntry[]> {
+  const dir = shellEscape(projectDir);
+  const { stdout, exitCode } = await runCommand(
+    `git -C ${dir} log --oneline --format='%h|%s|%cr' -${limit} 2>/dev/null`,
+  );
+  if (exitCode !== 0 || !stdout.trim()) return [];
+  return stdout.trim().split('\n').map((line) => {
+    const parts = line.split('|');
+    const hash = parts[0] ?? '';
+    const message = parts[1] ?? '';
+    const relativeTime = parts.slice(2).join('|'); // relativeTime may contain '|' in some locales
+    return { hash, message, relativeTime };
+  });
+}
+
+/** Checkout a specific savepoint */
+export async function checkoutSavepoint(
+  projectDir: string,
+  hash: string,
+  runCommand: RunCommandFn,
+): Promise<boolean> {
+  const dir = shellEscape(projectDir);
+  // Sanitize hash: only allow hex characters
+  const safeHash = hash.replace(/[^a-f0-9]/gi, '');
+  if (!safeHash) return false;
+  const { exitCode } = await runCommand(`git -C ${dir} checkout ${safeHash}`);
+  return exitCode === 0;
+}
+
+/** Get diff between a savepoint and current HEAD */
+export async function getDiffFromSavepoint(
+  projectDir: string,
+  hash: string,
+  runCommand: RunCommandFn,
+): Promise<string> {
+  const dir = shellEscape(projectDir);
+  const safeHash = hash.replace(/[^a-f0-9]/gi, '');
+  if (!safeHash) return '';
+  const { stdout } = await runCommand(`git -C ${dir} diff ${safeHash} HEAD`);
+  return stdout;
+}
+
 /** Detect if a command likely modifies files */
 export function isFileChangingCommand(command: string): boolean {
   const cmd = command.trim().split(/\s+/)[0];

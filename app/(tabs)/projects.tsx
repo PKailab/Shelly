@@ -28,6 +28,7 @@ import { useTerminalStore } from '@/store/terminal-store';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation } from '@/lib/i18n';
+import { ProjectTimeline } from '@/components/ProjectTimeline';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export default function ProjectsScreen() {
   const isConnected = bridgeStatus === 'connected';
   const [projectDirs, setProjectDirs] = useState<ProjectEntry[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [expandedTimeline, setExpandedTimeline] = useState<string | null>(null);
 
   const exec = useCallback(async (cmd: string): Promise<string | null> => {
     try {
@@ -299,41 +301,72 @@ export default function ProjectsScreen() {
             </View>
           )}
 
-          {isConnected && !isLoadingProjects && projectDirs.map((proj) => (
-            <TouchableOpacity
-              key={proj.path}
-              style={[styles.projectCard, { backgroundColor: c.surfaceHigh, borderColor: c.border }]}
-              onPress={() => handleOpenProject(proj.path)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.projectIcon, { backgroundColor: withAlpha(proj.isGit ? '#60A5FA' : '#FBBF24', 0.15) }]}>
-                <MaterialIcons
-                  name={proj.isGit ? 'source' : 'folder'}
-                  size={22}
-                  color={proj.isGit ? '#60A5FA' : '#FBBF24'}
-                />
-              </View>
-              <View style={styles.projectInfo}>
-                <Text style={[styles.projectName, { color: c.foreground }]}>{proj.name}</Text>
-                <Text style={[styles.projectPath, { color: c.muted }]}>
-                  {proj.path.replace(/^~\//, '')}
-                </Text>
-                <View style={styles.badgeRow}>
-                  {proj.isGit && (
-                    <View style={[styles.badge, { backgroundColor: '#60A5FA20' }]}>
-                      <Text style={[styles.badgeText, { color: '#60A5FA' }]}>git</Text>
+          {isConnected && !isLoadingProjects && projectDirs.map((proj) => {
+            const isTimelineOpen = expandedTimeline === proj.path;
+            return (
+              <View
+                key={proj.path}
+                style={[styles.projectCard, { backgroundColor: c.surfaceHigh, borderColor: c.border }]}
+              >
+                <TouchableOpacity
+                  style={styles.projectCardInner}
+                  onPress={() => handleOpenProject(proj.path)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.projectIcon, { backgroundColor: withAlpha(proj.isGit ? '#60A5FA' : '#FBBF24', 0.15) }]}>
+                    <MaterialIcons
+                      name={proj.isGit ? 'source' : 'folder'}
+                      size={22}
+                      color={proj.isGit ? '#60A5FA' : '#FBBF24'}
+                    />
+                  </View>
+                  <View style={styles.projectInfo}>
+                    <Text style={[styles.projectName, { color: c.foreground }]}>{proj.name}</Text>
+                    <Text style={[styles.projectPath, { color: c.muted }]}>
+                      {proj.path.replace(/^~\//, '')}
+                    </Text>
+                    <View style={styles.badgeRow}>
+                      {proj.isGit && (
+                        <View style={[styles.badge, { backgroundColor: '#60A5FA20' }]}>
+                          <Text style={[styles.badgeText, { color: '#60A5FA' }]}>git</Text>
+                        </View>
+                      )}
+                      {proj.hasPackageJson && (
+                        <View style={[styles.badge, { backgroundColor: '#34D39920' }]}>
+                          <Text style={[styles.badgeText, { color: '#34D399' }]}>node</Text>
+                        </View>
+                      )}
                     </View>
-                  )}
-                  {proj.hasPackageJson && (
-                    <View style={[styles.badge, { backgroundColor: '#34D39920' }]}>
-                      <Text style={[styles.badgeText, { color: '#34D399' }]}>node</Text>
-                    </View>
-                  )}
-                </View>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={20} color={c.inactive} />
+                </TouchableOpacity>
+
+                {/* Timeline toggle (git repos only) */}
+                {proj.isGit && (
+                  <TouchableOpacity
+                    style={[styles.timelineToggle, { borderTopColor: c.border }]}
+                    onPress={() => setExpandedTimeline(isTimelineOpen ? null : proj.path)}
+                    activeOpacity={0.7}
+                  >
+                    <MaterialIcons name="history" size={14} color={c.accent} />
+                    <Text style={[styles.timelineToggleText, { color: c.accent }]}>
+                      {t('timeline.title')}
+                    </Text>
+                    <MaterialIcons
+                      name={isTimelineOpen ? 'expand-less' : 'expand-more'}
+                      size={16}
+                      color={c.accent}
+                    />
+                  </TouchableOpacity>
+                )}
+
+                {/* Timeline accordion */}
+                {isTimelineOpen && (
+                  <ProjectTimeline projectPath={proj.path} runCommand={runCommand} />
+                )}
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={c.inactive} />
-            </TouchableOpacity>
-          ))}
+            );
+          })}
 
           {isConnected && !isLoadingProjects && projectDirs.length === 0 && (
             <View style={styles.emptyBox}>
@@ -488,12 +521,28 @@ const styles = StyleSheet.create({
   },
   // Project items
   projectCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  projectCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  timelineToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    borderTopWidth: 1,
+  },
+  timelineToggleText: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
   projectIcon: {
     width: 40,
