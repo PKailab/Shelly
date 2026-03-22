@@ -67,6 +67,11 @@ const en: Record<string, string> = {
   'snippets.delete': 'Delete',
 
   // ── AI Block ──────────────────────────────────────────────────────
+  'action.execute': '▶ Run',
+  'action.executing': 'Running...',
+  'action.safety_title': '⚠ Confirm Command',
+  'action.execute_anyway': 'Execute Anyway',
+
   'ai.copy': 'Copy',
   'ai.copied': 'Copied',
   'ai.speak': 'Read Aloud',
@@ -538,6 +543,17 @@ const en: Record<string, string> = {
   'projects.no_folders': 'No folders found in\n~/dev/ or ~/projects/',
   'projects.no_chats': 'No chats yet.\nTap + New Chat to start.',
   'projects.no_matching': 'No matching chats',
+
+  // ── Timeline ─────────────────────────────────────────────────────
+  'timeline.title': 'Timeline',
+  'timeline.view_diff': 'View changes',
+  'timeline.revert': 'Revert to this point',
+  'timeline.revert_confirm': 'Revert to this point? Unsaved changes will be lost.',
+  'timeline.revert_success': 'Reverted successfully',
+  'timeline.revert_fail': 'Failed to revert',
+  'timeline.empty': 'No savepoints yet',
+  'timeline.show_more': 'Show more',
+  'timeline.action_title': 'Savepoint',
 
   // ── Creator Screen ──────────────────────────────────────────────
   'creator.tagline': 'Create with natural language',

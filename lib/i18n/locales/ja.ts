@@ -67,6 +67,11 @@ const ja: Record<string, string> = {
   'snippets.delete': '削除',
 
   // ── AI Block ──────────────────────────────────────────────────────
+  'action.execute': '▶ 実行',
+  'action.executing': '実行中...',
+  'action.safety_title': '⚠ コマンド確認',
+  'action.execute_anyway': '実行する',
+
   'ai.copy': 'コピー',
   'ai.copied': 'コピー済み',
   'ai.speak': '読み上げ',
@@ -540,6 +545,17 @@ const ja: Record<string, string> = {
   'projects.no_folders': '~/dev/ や ~/projects/ にフォルダが見つかりません',
   'projects.no_chats': 'チャットがありません。\n+ 新しいチャットで始めましょう。',
   'projects.no_matching': '一致するチャットがありません',
+
+  // ── Timeline ─────────────────────────────────────────────────────
+  'timeline.title': 'タイムライン',
+  'timeline.view_diff': '差分を見る',
+  'timeline.revert': 'この時点に戻す',
+  'timeline.revert_confirm': 'この時点に戻しますか？現在の未保存の変更は失われます。',
+  'timeline.revert_success': '戻しました',
+  'timeline.revert_fail': '戻せませんでした',
+  'timeline.empty': 'セーブポイントがありません',
+  'timeline.show_more': 'もっと見る',
+  'timeline.action_title': 'セーブポイント',
 
   // ── Creator Screen ──────────────────────────────────────────────
   'creator.tagline': '自然言語で作成',
