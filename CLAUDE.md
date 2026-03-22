@@ -163,6 +163,11 @@ Shelly/
 | クロスペインインテリジェンス: ターミナル参照検出 | input-router.ts内で正規表現マッチ（日英8パターン） | input-router.ts |
 | クロスペインインテリジェンス: 出力注入方式 | Local LLM=customCtx内、外部API=ユーザーメッセージ末尾 | use-ai-dispatch.ts |
 | クロスペインインテリジェンス: 有効条件 | Wide=常時注入、Single=パターンマッチ時のみ、空=フォールバック | use-ai-dispatch.ts, index.tsx |
+| ActionBlock | ChatBubble内でコードブロック分割レンダリング。ストリーミング中はパース不可のため完了後のみ | ChatBubble.tsx, parse-code-blocks.ts |
+| ActionBlock実行方式 | Wide=Terminal送信、Single=Bridge裏実行 | ActionBlock.tsx |
+| インテント別プロンプト | reference/second-opinion/session-summaryで異なるAIシステムプロンプト | input-router.ts, use-ai-dispatch.ts |
+| リアルタイム翻訳 | Chat上部オーバーレイ（履歴汚さない）。1sデバウンス、10s自動消去 | TranslateOverlay.tsx |
+| LLMフォールバック | Cerebras→Groq→Local LLM（速度順）。Gemini CLIはBridge依存のため将来対応 | realtime-translate.ts |
 
 ---
 
