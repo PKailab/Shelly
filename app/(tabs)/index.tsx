@@ -456,7 +456,7 @@ export default function ChatScreen() {
     // ── Image-attached → dispatch to Gemini multimodal ──
     if (images && images.length > 0) {
       addUserMessage(input);
-      await aiDispatch({ target: 'gemini', prompt: parsed.prompt, chatSessionId, messages: messagesRef.current, images, files });
+      await aiDispatch({ target: 'gemini', prompt: parsed.prompt, chatSessionId, messages: messagesRef.current, images, files, isWide });
       return;
     }
 
