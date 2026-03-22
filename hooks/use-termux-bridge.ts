@@ -35,7 +35,8 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Linking } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useTerminalStore } from '@/store/terminal-store';
 import { notifyCommandComplete } from '@/lib/command-notifier';
 import { runTermuxCommand } from '@/lib/termux-intent';
@@ -338,11 +339,15 @@ export function useTermuxBridge() {
     const result = await runTermuxCommand({ command: startCmd, background: true });
 
     if (!result.success) {
-      // Native module failed (permission denied, Termux not installed, etc.)
-      setIsAutoRecovering(false);
-      setAutoRecoveryFailed(true);
-      setIsReconnectExhausted(true);
-      return;
+      // Native module failed — fallback: open Termux app and copy command
+      const recoveryCmd = 'cd ~/shelly-bridge && node server.js';
+      try {
+        await Clipboard.setStringAsync(recoveryCmd);
+        await Linking.openURL('com.termux://');
+      } catch {
+        // Termux not installed or clipboard failed — fall through to polling anyway
+      }
+      // Still poll in case Termux was already running and just needed a nudge
     }
 
     // Step 2: Poll for bridge to come back online

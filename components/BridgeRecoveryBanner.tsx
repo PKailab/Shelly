@@ -9,6 +9,7 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Linking, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTranslation } from '@/lib/i18n';
@@ -17,6 +18,7 @@ import { useTerminalStore } from '@/store/terminal-store';
 
 export function BridgeRecoveryBanner() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { connectionMode, bridgeStatus } = useTerminalStore();
   const {
     isReconnectExhausted,
@@ -58,10 +60,12 @@ export function BridgeRecoveryBanner() {
     connectionMode === 'termux' &&
     (bridgeStatus === 'error' || bridgeStatus === 'disconnected');
 
+  const bannerPadding = { paddingTop: insets.top };
+
   // Show auto-recovering banner
   if (isDisconnected && isAutoRecovering) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, bannerPadding]}>
         <View style={styles.content}>
           <ActivityIndicator size="small" color="#00D4AA" />
           <Text style={styles.recoveringText}>{t('bridge.auto_recovering')}</Text>
@@ -73,7 +77,7 @@ export function BridgeRecoveryBanner() {
   // Show session resume banner after successful recovery
   if (showSessionResume && bridgeStatus === 'connected') {
     return (
-      <View style={[styles.container, styles.successContainer]}>
+      <View style={[styles.container, styles.successContainer, bannerPadding]}>
         <View style={styles.content}>
           <MaterialIcons name="refresh" size={18} color="#00D4AA" />
           <Text style={styles.successText}>{t('bridge.session_resume_prompt')}</Text>
@@ -127,7 +131,7 @@ export function BridgeRecoveryBanner() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, bannerPadding]}>
       <View style={styles.content}>
         <MaterialIcons name="warning-amber" size={18} color="#FBBF24" />
         <Text style={styles.text}>
