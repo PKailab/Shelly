@@ -12,6 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Markdown from 'react-native-markdown-display';
+import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation } from '@/lib/i18n';
@@ -80,12 +81,21 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { isWide } = useDeviceLayout();
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const savepointInfo = useSavepointStore((s) => s.messageSavepoints[message.id]);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUser = message.role === 'user';
   const agentColor = getAgentColor(message.agent);
+
+  const handleOpenInTerminal = useCallback((command: string) => {
+    if (sendToTerminal) {
+      sendToTerminal(command);
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push('/(tabs)/terminal' as any);
+  }, [sendToTerminal, router]);
 
   useEffect(() => {
     return () => { if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current); };
@@ -242,7 +252,7 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
         {message.executions && message.executions.length > 0 && (
           <View style={styles.execContainer}>
             {message.executions.map((exec, i) => (
-              <CommandExecView key={i} exec={exec} colors={colors} />
+              <CommandExecView key={i} exec={exec} colors={colors} onOpenInTerminal={handleOpenInTerminal} />
             ))}
           </View>
         )}
@@ -346,7 +356,12 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
 
 // ─── Command Execution Sub-component ─────────────────────────────────────────
 
-function CommandExecView({ exec, colors }: { exec: { command: string; output: string; exitCode: number | null; isCollapsed: boolean }; colors: ThemeColorPalette }) {
+function CommandExecView({ exec, colors, onOpenInTerminal }: {
+  exec: { command: string; output: string; exitCode: number | null; isCollapsed: boolean };
+  colors: ThemeColorPalette;
+  onOpenInTerminal?: (command: string) => void;
+}) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(exec.isCollapsed);
   const [outputCopied, setOutputCopied] = useState(false);
   useEffect(() => { setCollapsed(exec.isCollapsed); }, [exec.isCollapsed]);
@@ -391,6 +406,19 @@ function CommandExecView({ exec, colors }: { exec: { command: string; output: st
         <Text style={styles.execOutput} selectable>
           {exec.output}
         </Text>
+      )}
+      {/* Open in Terminal link */}
+      {onOpenInTerminal && (
+        <TouchableOpacity
+          style={styles.openInTerminalRow}
+          onPress={() => onOpenInTerminal(exec.command)}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="terminal" size={12} color={colors.accent} />
+          <Text style={[styles.openInTerminalText, { color: colors.accent }]}>
+            {t('exec.open_in_terminal')}
+          </Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -562,6 +590,20 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#1A1A1A',
     paddingTop: 6,
+  },
+  openInTerminalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+  },
+  openInTerminalText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
   },
 
   // Citations

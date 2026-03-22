@@ -546,6 +546,9 @@ const ja: Record<string, string> = {
   'projects.no_chats': 'チャットがありません。\n+ 新しいチャットで始めましょう。',
   'projects.no_matching': '一致するチャットがありません',
 
+  // ── Command Execution ─────────────────────────────────────────────
+  'exec.open_in_terminal': 'Terminalで開く',
+
   // ── Timeline ─────────────────────────────────────────────────────
   'timeline.title': 'タイムライン',
   'timeline.view_diff': '差分を見る',

@@ -544,6 +544,9 @@ const en: Record<string, string> = {
   'projects.no_chats': 'No chats yet.\nTap + New Chat to start.',
   'projects.no_matching': 'No matching chats',
 
+  // ── Command Execution ─────────────────────────────────────────────
+  'exec.open_in_terminal': 'Open in Terminal',
+
   // ── Timeline ─────────────────────────────────────────────────────
   'timeline.title': 'Timeline',
   'timeline.view_diff': 'View changes',
