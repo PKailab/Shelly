@@ -40,6 +40,7 @@ import { checkCommandSafety, needsConfirmation, dangerLevelColor } from '@/lib/c
 import { useTheme } from '@/hooks/use-theme';
 import { VoiceChat } from '@/components/VoiceChat';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { TranslateOverlay } from '@/components/chat/TranslateOverlay';
 
 import { generateId } from '@/lib/id';
 import { useTranslation } from '@/lib/i18n';
@@ -820,6 +821,7 @@ export default function ChatScreen() {
         keyboardVerticalOffset={Platform.OS === 'android' ? 56 : 0}
       >
         <View style={styles.chatArea}>
+          <TranslateOverlay />
           <ChatMessageList
             messages={messages}
             fontSize={settings.fontSize ?? 14}
