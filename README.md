@@ -7,7 +7,8 @@
 
 <p align="center">
   A chat-first terminal IDE for Android.<br>
-  Talk to your phone. It builds things.
+  Chat and Terminal, side by side. Connected by AI.<br>
+  <em>Say "fix the error on the right" — and it's done.</em>
 </p>
 
 <p align="center">
@@ -47,21 +48,60 @@ Shelly fills the gap between conversation and execution. You type "make me a por
 
 For the person who wants to build things but doesn't speak terminal, Shelly translates. For the person who speaks terminal fluently, a raw shell is one tab away.
 
+### The Copy-Paste Problem
+
+But there's a deeper pain that even experienced developers live with every day.
+
+You're running Claude Code in the terminal. It throws an error. You select the error text. You copy it. You switch to a browser tab — ChatGPT, Claude, whatever. You paste. You ask "what went wrong?" You read the answer. You copy the fix. You switch back to the terminal. You paste. You run it.
+
+**Seven steps. Every single time.**
+
+This isn't a beginner problem. This is the daily workflow of every developer using CLI-based AI tools. The terminal and the chat live in different worlds, and *you* are the copy-paste bridge between them.
+
+### The Solution: Cross-Pane Intelligence
+
+Shelly puts Chat and Terminal side by side — and connects them with AI.
+
+Say **"fix the error on the right"** in the Chat pane. Shelly reads the terminal output, understands the error, explains it in plain language, and generates executable commands. Tap **[▶ Run]** and the fix lands directly in the Terminal pane.
+
+No copy. No paste. No tab switching. Zero friction.
+
+This works because Shelly's Chat pane is aware of what's happening in the Terminal pane — always, in real time. On wide screens (foldables, tablets), the terminal context is injected into every AI conversation automatically. On single-pane phones, just say "the error" or "the terminal output" and Shelly knows what you mean.
+
+**Three levels of value:**
+- **Level 1:** Chat alone — build things by talking. The entry point for beginners.
+- **Level 2:** Terminal alone — a full TTY for power users.
+- **Level 3:** Both panes, side by side — a development experience that doesn't exist anywhere else.
+
 ---
 
 ## Features
 
-- **Chat-first UI** — Talk naturally, get real execution. Commands run behind the scenes in Termux.
-- **Multi-agent AI routing** — Automatically selects Claude Code, Gemini, Perplexity, or local LLM based on the task.
-- **@mention routing** — `@claude`, `@gemini`, `@local`, `@perplexity`, `@team` for direct control.
-- **5-level command safety** — Every command is risk-assessed before execution. Dangerous operations require explicit confirmation.
-- **Termux bridge** — Native Kotlin module for direct Termux integration. No WebSocket server required.
-- **Voice input** — Speak commands and hear AI responses.
+### Cross-Pane Intelligence
+- **"Fix the error on the right"** — AI reads terminal output and responds with executable fixes
+- **ActionBlock** — Code blocks in AI responses have [▶ Run] buttons that execute directly in Terminal
+- **Real-time terminal awareness** — Chat AI always knows what's happening in Terminal (wide mode: automatic, single pane: on reference)
+- **CLI Co-Pilot** — Real-time translation of terminal output, approval prompt explanations, second opinions, session summaries
+- **Auto-savepoint timeline** — Game-like save/load system. Every change is auto-committed. Revert to any point with one tap.
+
+### Chat-First Development
+- **Natural language execution** — Talk naturally, get real execution. Commands run behind the scenes in Termux.
+- **Multi-agent AI routing** — Automatically selects Claude Code, Gemini, Perplexity, Cerebras, Groq, or local LLM based on the task.
+- **@mention routing** — `@claude`, `@gemini`, `@local`, `@perplexity`, `@cerebras`, `@team` for direct control.
 - **Creator engine** — "Build me an app" → full project scaffolding from natural language.
-- **Local LLM support** — Run Gemma/Llama on-device via llama.cpp with guided setup wizard.
+- **Voice input** — Speak commands and hear AI responses.
+
+### Safety & Learning
+- **5-level command safety** — Every command is risk-assessed before execution. Dangerous operations require explicit confirmation.
+- **Learning mode** — AI explains what each command does and what the output means, in your language.
+- **Onboarding wizard** — 5-minute setup from zero. Termux install, AI configuration, everything guided.
+
+### Power Features
+- **Termux bridge** — Native Kotlin module for direct Termux integration. No WebSocket server required.
+- **Local LLM support** — Run Gemma/Qwen on-device via llama.cpp with guided setup wizard.
 - **Terminal tab** — Full TTY access with Japanese input support (something Termux alone can't do).
 - **Multi-pane layout** — Split view on foldable/wide screens.
-- **Project management** — Chat history tied to project folders, like conversations in ChatGPT.
+- **Project management** — Chat history tied to project folders, with savepoint timeline.
 - **Obsidian RAG** — Search your Obsidian vault from the terminal.
 - **Snippet manager** — Save and reuse code snippets.
 - **Theme engine** — 30+ customizable tokens.
@@ -70,6 +110,8 @@ For the person who wants to build things but doesn't speak terminal, Shelly tran
 ---
 
 ## Architecture
+
+### Chat → Execution Pipeline
 
 ```
 User input (natural language)
@@ -84,7 +126,7 @@ User input (natural language)
     ┌──────┴──────┐
     ▼             ▼
 ┌────────┐  ┌──────────┐
-│ Light  │  │ AI Agent │  ← Claude Code / Gemini / Local LLM / Perplexity
+│ Light  │  │ AI Agent │  ← Claude Code / Gemini / Local LLM / Perplexity / Cerebras / Groq
 │ Tasks  │  │ Selection│
 │(direct)│  └────┬─────┘
 └────────┘       │
@@ -108,6 +150,32 @@ The Input Router is the heart of Shelly. It decides whether your message is:
 - A **slash command** → executed as a shortcut
 
 This design emerged from a non-engineer's question: *"Why do I have to know which tool to use? Can't the app just figure it out?"*
+
+### Cross-Pane Intelligence
+
+```
+┌─────────────────────────────────────────────────┐
+│              Shelly (Wide Mode)                  │
+│                                                  │
+│  ┌──────────────┐    ┌────────────────────────┐  │
+│  │   Chat Pane   │    │    Terminal Pane        │  │
+│  │              │    │                        │  │
+│  │  User: "fix  │    │  $ npm run build       │  │
+│  │  the error   │    │  Error: Cannot find     │  │
+│  │  on the      │    │  module './utils'       │  │
+│  │  right"      │    │                        │  │
+│  │              │    │                        │  │
+│  │  AI: The     │◄───│  (output captured       │  │
+│  │  error is... │    │   via xterm.js buffer)  │  │
+│  │              │    │                        │  │
+│  │  ┌────────┐  │    │                        │  │
+│  │  │▶ Run   │──┼───►│  $ mv util.ts utils.ts │  │
+│  │  └────────┘  │    │                        │  │
+│  └──────────────┘    └────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+Chat reads Terminal. Terminal executes Chat. The user just talks.
 
 ---
 
@@ -160,11 +228,6 @@ Shelly communicates with Termux via a native bridge module. On first launch, the
 2. Granting necessary permissions
 3. Configuring the bridge connection
 
-For manual setup:
-```bash
-cd ~/shelly-bridge && node server.js
-```
-
 ---
 
 ## Design Philosophy
@@ -172,6 +235,8 @@ cd ~/shelly-bridge && node server.js
 Shelly was designed by someone who can't use a terminal — for people who can't use a terminal.
 
 Every design decision comes from the question: *"If I don't know what this command does, how should the app protect me and teach me at the same time?"*
+
+The cross-pane system comes from an even simpler question: *"Why do I have to copy an error from one window and paste it into another? Can't the app just see what's on my screen?"*
 
 Read the full design philosophy: **[docs/DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md)**
 
@@ -191,7 +256,7 @@ Read the contributing guide: **[CONTRIBUTING.md](CONTRIBUTING.md)**
 
 **RYO ITABASHI** — Creative Director at [Rebuild Factoryz](https://rebuildfactoryz.com/). Branding and design are my profession. Code is not.
 
-I built Shelly because I wanted to use Claude Code on my phone, but Termux was too intimidating. So I made a chat interface that hides the terminal complexity while keeping its full power.
+I built Shelly because I wanted to use Claude Code on my phone, but Termux was too intimidating. So I made a chat interface that hides the terminal complexity while keeping its full power. Then I realized the real problem wasn't the terminal itself — it was the gap between the terminal and the AI. So I connected them.
 
 The keyboard in the screenshots is **Nacre** — a split-layout Android IME I built (also through AI) to solve the input problem on mobile. Shelly handles the interface. Nacre handles the input. Together, they make phone-only development actually possible.
 
