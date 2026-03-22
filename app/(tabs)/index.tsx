@@ -748,8 +748,8 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         key={`kav-${layoutKey}`}
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'android' ? 56 : 0}
       >
         <View style={styles.chatArea}>
           <ChatMessageList

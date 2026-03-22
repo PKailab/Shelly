@@ -324,16 +324,21 @@ export function useTermuxBridge() {
     }
 
     // Step 1: Restart Termux services via Native Module
+    // Use absolute paths — RunCommandService doesn't source .bashrc so PATH may be bare
+    const PREFIX = '/data/data/com.termux/files/usr';
+    const HOME = '/data/data/com.termux/files/home';
     const startCmd = [
-      'pkill -f "node.*server.js" 2>/dev/null; ',
-      'pkill -f ttyd 2>/dev/null; ',
-      'sleep 1; ',
-      'if [ -x ~/shelly-bridge/start-shelly.sh ]; then ',
-      '  bash ~/shelly-bridge/start-shelly.sh; ',
-      'else ',
-      '  ttyd -p 7681 -W bash > /dev/null 2>&1 & ',
-      '  cd ~/shelly-bridge && node server.js; ',
-      'fi',
+      `export PATH=${PREFIX}/bin:$PATH; `,
+      `export HOME=${HOME}; `,
+      `pkill -f "node.*server.js" 2>/dev/null; `,
+      `pkill -f ttyd 2>/dev/null; `,
+      `sleep 1; `,
+      `if [ -x ${HOME}/shelly-bridge/start-shelly.sh ]; then `,
+      `  nohup ${PREFIX}/bin/bash ${HOME}/shelly-bridge/start-shelly.sh > /dev/null 2>&1 & `,
+      `else `,
+      `  nohup ${PREFIX}/bin/ttyd -p 7681 -W ${PREFIX}/bin/bash > /dev/null 2>&1 & `,
+      `  cd ${HOME}/shelly-bridge && nohup ${PREFIX}/bin/node server.js > /dev/null 2>&1 & `,
+      `fi`,
     ].join('');
 
     const result = await runTermuxCommand({ command: startCmd, background: true });
