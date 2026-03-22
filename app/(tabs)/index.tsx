@@ -39,6 +39,7 @@ import { requestNotificationPermission } from '@/lib/command-notifier';
 import { checkCommandSafety, needsConfirmation, dangerLevelColor } from '@/lib/command-safety';
 import { useTheme } from '@/hooks/use-theme';
 import { VoiceChat } from '@/components/VoiceChat';
+import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 import { generateId } from '@/lib/id';
 import { useTranslation } from '@/lib/i18n';
@@ -136,6 +137,9 @@ export default function ChatScreen() {
 
   // ── AI dispatch (extracted from handleSend) ──
   const { dispatch: aiDispatch, cancelStreaming } = useAIDispatch();
+
+  // ── Device layout (for cross-pane intelligence) ──
+  const { isWide } = useDeviceLayout();
 
   const execForContext = useCallback(
     async (cmd: string): Promise<string> => {
@@ -611,7 +615,7 @@ export default function ChatScreen() {
     }
 
     // Dispatch to AI agent (with conversation context + file attachments)
-    const result = await aiDispatch({ target, prompt: parsed.prompt, chatSessionId, messages: messagesRef.current, files });
+    const result = await aiDispatch({ target, prompt: parsed.prompt, chatSessionId, messages: messagesRef.current, files, isWide });
     if (!result.handled) {
       const msgId = addAssistantMessage(undefined);
       updateMessage(chatSessionId, msgId, {

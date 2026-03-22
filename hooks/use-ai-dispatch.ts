@@ -26,6 +26,7 @@ import { generateId } from '@/lib/id';
 import { t } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
 import { groqChatStream, type GroqMessage } from '@/lib/groq';
+import { hasTerminalReference } from '@/lib/input-router';
 
 // ─── Auth URL detection ──────────────────────────────────────────────────────
 
@@ -157,6 +158,28 @@ function toPerplexityHistory(messages: ChatMessage[], maxPairs = 4): Array<{ rol
   return history;
 }
 
+// ─── Cross-pane terminal context injection ──────────────────────────────────
+
+const TERMINAL_CONTEXT_SUFFIX = '\n---\nThe user is referring to the terminal output shown above. Analyze it and respond to their request.\nIf your response includes commands or code that can fix the issue, format them as fenced code blocks (```) so the user can execute them directly.';
+
+/**
+ * Build terminal output context for AI injection.
+ * Returns empty string if no context available (= fallback to normal response).
+ *
+ * Wide mode: always inject terminal context (terminal is always visible)
+ * Single pane: only when user explicitly references terminal
+ * Empty output: always fallback to normal response
+ */
+function getTerminalContextForPrompt(prompt: string, isWide: boolean): string {
+  const shouldInject = isWide || hasTerminalReference(prompt);
+  if (!shouldInject) return '';
+
+  const termOutput = useExecutionLogStore.getState().getRecentOutput(50);
+  if (!termOutput) return '';
+
+  return `\n\n--- Terminal Output (last 50 lines) ---\n${termOutput}${TERMINAL_CONTEXT_SUFFIX}`;
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type DispatchParams = {
@@ -166,6 +189,8 @@ type DispatchParams = {
   messages: ChatMessage[];
   images?: ImageAttachment[];
   files?: FileAttachment[];
+  /** Whether device is in wide/multi-pane layout (for cross-pane intelligence) */
+  isWide?: boolean;
 };
 
 type DispatchResult = {
@@ -257,7 +282,7 @@ export function useAIDispatch() {
 
   /** Main dispatch function */
   const dispatch = useCallback(async (params: DispatchParams): Promise<DispatchResult> => {
-    const { target, prompt, chatSessionId, messages, images, files } = params;
+    const { target, prompt, chatSessionId, messages, images, files, isWide } = params;
     const fileContext = files?.length ? buildFileContext(files) : '';
     const promptWithFiles = fileContext ? `${prompt}\n\n[Attached Files]\n${fileContext}` : prompt;
 
@@ -343,6 +368,9 @@ export function useAIDispatch() {
         let accumulatedText = '';
         updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: '', tokenCount: 0, streamingStartTime: Date.now() });
 
+        // Cross-pane: inject terminal context
+        const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
+
         // Load all context layers in parallel
         const ollamaHistory = toOllamaHistory(messages);
         const activeSession = useTerminalStore.getState().sessions.find(
@@ -392,7 +420,7 @@ export function useAIDispatch() {
           ollamaHistory,
           projectCtx || undefined,
           userProfile || undefined,
-          [customCtx, decisionLog ? `\n# Past Design Decisions\n${decisionLog}` : ''].filter(Boolean).join('\n') || undefined,
+          [customCtx, decisionLog ? `\n# Past Design Decisions\n${decisionLog}` : '', termCtx].filter(Boolean).join('\n') || undefined,
           undefined, // toolStatuses
           undefined, // defaultAgent
           signal,
@@ -456,9 +484,13 @@ export function useAIDispatch() {
           content: m.content,
         }));
 
+        // Cross-pane: inject terminal context
+        const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
+        const cerebrasPrompt = termCtx ? promptWithFiles + termCtx : promptWithFiles;
+
         const result = await cerebrasChatStream(
           cerebrasKey,
-          promptWithFiles,
+          cerebrasPrompt,
           (chunk, done) => {
             if (signal.aborted) return;
             if (chunk) {
@@ -574,9 +606,13 @@ export function useAIDispatch() {
           content: m.content,
         }));
 
+        // Cross-pane: inject terminal context
+        const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
+        const groqPrompt = termCtx ? promptWithFiles + termCtx : promptWithFiles;
+
         const result = await groqChatStream(
           groqKey,
-          promptWithFiles,
+          groqPrompt,
           (chunk, done) => {
             if (signal.aborted) return;
             if (chunk) {
@@ -707,7 +743,10 @@ export function useAIDispatch() {
       try {
         const { perplexitySearchStream } = await import('@/lib/perplexity');
         const pplxHistory = toPerplexityHistory(messages);
-        await perplexitySearchStream(apiKey, promptWithFiles, (chunk, done, cits) => {
+        // Cross-pane: inject terminal context
+        const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
+        const pplxPrompt = termCtx ? promptWithFiles + termCtx : promptWithFiles;
+        await perplexitySearchStream(apiKey, pplxPrompt, (chunk, done, cits) => {
           if (signal.aborted) return;
           if (chunk) {
             accumulated += chunk;
@@ -745,7 +784,8 @@ export function useAIDispatch() {
 
       // APIキーなし → Gemini CLIをTermux経由で実行
       if (!apiKey && connectionMode === 'termux') {
-        const contextualPrompt = promptWithFiles + toTextContext(messages);
+        const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
+        const contextualPrompt = promptWithFiles + toTextContext(messages) + termCtx;
         const escaped = contextualPrompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
         const cliCommand = `gemini --prompt "${escaped}"`;
         let accumulated = `$ ${cliCommand}\n\n`;
@@ -798,7 +838,10 @@ export function useAIDispatch() {
       try {
         const { geminiChatStream } = await import('@/lib/gemini');
         const geminiHistory = toGeminiHistory(messages);
-        const result = await geminiChatStream(apiKey, promptWithFiles, (chunk, done) => {
+        // Cross-pane: inject terminal context
+        const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
+        const geminiPrompt = termCtx ? promptWithFiles + termCtx : promptWithFiles;
+        const result = await geminiChatStream(apiKey, geminiPrompt, (chunk, done) => {
           if (signal.aborted) return;
           if (chunk) {
             accumulated += chunk;
