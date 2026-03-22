@@ -346,6 +346,15 @@ const ja: Record<string, string> = {
   'bridge.auto_recovery_failed': '自動復旧に失敗しました。手動で再起動してください。',
   'bridge.session_resume_prompt': '前回のClaudeセッションを引き継ぎますか？',
   'bridge.session_resume_yes': '引き継ぐ',
+  // オートセーブポイント
+  'savepoint.files_changed': '{{count}}個のファイルを変更しました',
+  'savepoint.undo': '元に戻す',
+  'savepoint.reverted': '元に戻しました',
+  'savepoint.view_changes': '変更を見る',
+  'savepoint.revert_failed': '元に戻せませんでした。',
+  // Webプレビュー
+  'preview.title': 'プレビュー',
+  'preview.open': 'プレビューを見る',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': '話しかけるだけ',
   'setup2.slide1_desc': '自然な日本語で入力すると\nShellyが適切なコマンドに変換します。',

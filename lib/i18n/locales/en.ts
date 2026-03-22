@@ -345,6 +345,15 @@ const en: Record<string, string> = {
   'bridge.auto_recovery_failed': 'Auto-recovery failed. Please restart manually.',
   'bridge.session_resume_prompt': 'Resume previous Claude session?',
   'bridge.session_resume_yes': 'Resume',
+  // Auto savepoint
+  'savepoint.files_changed': '{{count}} file(s) changed',
+  'savepoint.undo': 'Undo',
+  'savepoint.reverted': 'Undone',
+  'savepoint.view_changes': 'View changes',
+  'savepoint.revert_failed': 'Could not undo the changes.',
+  // Web preview
+  'preview.title': 'Preview',
+  'preview.open': 'Preview',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': 'Just Talk to It',
   'setup2.slide1_desc': 'Type in natural language.\nShelly converts it to the right command.',

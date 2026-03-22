@@ -17,6 +17,10 @@ import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation } from '@/lib/i18n';
 import type { ChatMessage, ChatAgent } from '@/store/chat-store';
 import type { ThemeColorPalette } from '@/lib/theme';
+import { SavepointBubble } from '@/components/SavepointBubble';
+import { WebPreviewModal } from '@/components/WebPreviewModal';
+import { useSavepointStore } from '@/store/savepoint-store';
+import { useTerminalStore } from '@/store/terminal-store';
 
 // ─── Agent Colors ────────────────────────────────────────────────────────────
 
@@ -61,14 +65,18 @@ type Props = {
   onRegenerate?: (messageId: string) => void;
   onEdit?: (messageId: string, content: string) => void;
   onDelete?: (messageId: string) => void;
+  projectDir?: string;
+  runCommand?: (cmd: string) => Promise<{ stdout: string; exitCode: number }>;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete }: Props) {
+export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const savepointInfo = useSavepointStore((s) => s.messageSavepoints[message.id]);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUser = message.role === 'user';
   const agentColor = getAgentColor(message.agent);
@@ -205,6 +213,40 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
             ))}
           </View>
         )}
+
+        {/* Savepoint: undo + view changes */}
+        {savepointInfo && projectDir && runCommand && (
+          <SavepointBubble
+            messageId={message.id}
+            projectDir={projectDir}
+            runCommand={runCommand}
+          />
+        )}
+
+        {/* HTML Preview button */}
+        {(() => {
+          const content = message.content ?? '';
+          const htmlMatch = content.match(/```html\n([\s\S]*?)```/);
+          if (!htmlMatch || isUser) return null;
+          return (
+            <>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, marginTop: 4 }}
+                onPress={() => setShowPreview(true)}
+              >
+                <MaterialIcons name="visibility" size={14} color={colors.accent} />
+                <Text style={{ color: colors.accent, fontFamily: 'monospace', fontSize: 11, fontWeight: '600' }}>
+                  {t('preview.open')}
+                </Text>
+              </TouchableOpacity>
+              <WebPreviewModal
+                visible={showPreview}
+                html={htmlMatch[1]}
+                onClose={() => setShowPreview(false)}
+              />
+            </>
+          );
+        })()}
 
         {/* Citations */}
         {message.citations && message.citations.length > 0 && (
