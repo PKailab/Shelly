@@ -810,6 +810,24 @@ export default function SettingsScreen() {
           </View>
         </SettingRow>
 
+        <SettingRow label={t('settings.llm_interpreter_label')} description={t('settings.llm_interpreter_desc')}>
+          <Switch
+            value={settings.llmInterpreterEnabled ?? false}
+            onValueChange={(v) => updateSettings({ llmInterpreterEnabled: v })}
+            trackColor={{ false: '#2D2D2D', true: '#8B5CF650' }}
+            thumbColor={(settings.llmInterpreterEnabled ?? false) ? '#8B5CF6' : '#6B7280'}
+          />
+        </SettingRow>
+
+        <SettingRow label={t('settings.external_keyboard_label')} description={t('settings.external_keyboard_desc')}>
+          <Switch
+            value={settings.externalKeyboardShortcuts ?? false}
+            onValueChange={(v) => updateSettings({ externalKeyboardShortcuts: v })}
+            trackColor={{ false: '#2D2D2D', true: '#00D4AA50' }}
+            thumbColor={(settings.externalKeyboardShortcuts ?? false) ? '#00D4AA' : '#6B7280'}
+          />
+        </SettingRow>
+
         {/* ── Sound & Effects ─────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.sound_title')} />
 

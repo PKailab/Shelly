@@ -188,6 +188,7 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
   const runCommand = useTerminalStore((s) => s.runCommand);
   const hapticFeedback = useTerminalStore((s) => s.settings.hapticFeedback);
   const highContrastSetting = useTerminalStore((s) => s.settings.highContrastOutput);
+  const llmInterpreterEnabled = useTerminalStore((s) => s.settings.llmInterpreterEnabled ?? false);
   const { addSnippet: saveSnippet, findByCommand, updateSnippet } = useSnippetStore();
   const router = useRouter();
 
@@ -657,8 +658,8 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
         </View>
       )}
 
-      {/* LLM interpret area */}
-      {isTermuxBlock && (block.isInterpreting || block.llmInterpretation || block.llmInterpretationStreaming) && (
+      {/* LLM interpret area — only shown when learning mode is enabled */}
+      {llmInterpreterEnabled && isTermuxBlock && (block.isInterpreting || block.llmInterpretation || block.llmInterpretationStreaming) && (
         <Animated.View
           entering={FadeInDown.duration(200).delay(100).springify().damping(18)}
           style={styles.interpretRow}

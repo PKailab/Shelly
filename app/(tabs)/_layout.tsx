@@ -194,8 +194,8 @@ export default function TabLayout() {
       {/* Command Palette (Ctrl+Shift+P) */}
       <CommandPalette />
 
-      {/* Quick Terminal (drop-down overlay) */}
-      <QuickTerminal />
+      {/* Quick Terminal (drop-down overlay) — hidden on wide screens where Terminal pane is always visible */}
+      {!layout.isWide && <QuickTerminal />}
 
       {/* Setup Wizard (first launch — includes welcome screen) */}
       <SetupWizard
