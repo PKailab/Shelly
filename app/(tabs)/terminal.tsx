@@ -23,7 +23,6 @@ import { useTtydConnection } from '@/hooks/use-ttyd-connection';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation, t } from '@/lib/i18n';
-import { ExecutionLogPanel } from '@/components/terminal/ExecutionLogPanel';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -209,9 +208,6 @@ export default function TerminalScreen() {
           </TouchableOpacity>
         </View>
       )}
-
-      {/* Execution Log Panel — shows commands executed from Chat tab */}
-      {status === 'connected' && <ExecutionLogPanel colors={c} />}
 
       {/* Error: Setup Guide */}
       {status === 'error' && <SetupGuide url={ttyUrl} onRetry={retry} colors={c} />}
