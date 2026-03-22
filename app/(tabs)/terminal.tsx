@@ -23,6 +23,8 @@ import { useTtydConnection } from '@/hooks/use-ttyd-connection';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation, t } from '@/lib/i18n';
+import { useExecutionLogStore } from '@/store/execution-log-store';
+import { stripAnsi } from '@/lib/strip-ansi';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,62 @@ echo "Setup complete! Restart Termux to activate."`;
 
 type ConnectionState = 'connecting' | 'connected' | 'error';
 
+// ─── Terminal Output Capture ───────────────────────────────────────────────────
+
+const CAPTURE_INJECT_JS = `
+(function() {
+  if (window.__shellyCaptureActive) return;
+  window.__shellyCaptureActive = true;
+
+  function hookXterm() {
+    var term = window.term || document.querySelector('.xterm')?.xterm;
+    if (!term) {
+      setTimeout(hookXterm, 500);
+      return;
+    }
+
+    var buf = term.buffer;
+    if (!buf || !buf.active) {
+      setTimeout(hookXterm, 500);
+      return;
+    }
+
+    // Track absolute line position (baseY + cursorY)
+    var lastAbsLine = buf.active.baseY + buf.active.cursorY;
+
+    setInterval(function() {
+      try {
+        var active = term.buffer.active;
+        var currentAbsLine = active.baseY + active.cursorY;
+        if (currentAbsLine <= lastAbsLine) return;
+
+        // Read only the new lines since last check
+        var lines = [];
+        var start = Math.max(0, lastAbsLine);
+        var end = Math.min(currentAbsLine, active.length - 1);
+        for (var i = start; i <= end; i++) {
+          var line = active.getLine(i);
+          if (line) {
+            var text = line.translateToString(true);
+            if (text.trim()) lines.push(text);
+          }
+        }
+        lastAbsLine = currentAbsLine;
+
+        if (lines.length > 0) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'terminal-output',
+            text: lines.join('\\n')
+          }));
+        }
+      } catch(e) {}
+    }, 500);
+  }
+  hookXterm();
+})();
+true;
+`;
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function TerminalScreen() {
@@ -60,6 +118,8 @@ export default function TerminalScreen() {
     onWebViewError,
     ttyUrl,
   } = useTtydConnection();
+
+  const addTerminalOutput = useExecutionLogStore((s) => s.addTerminalOutput);
 
   // Japanese input proxy state
   const [jpInput, setJpInput] = useState('');
@@ -123,6 +183,28 @@ export default function TerminalScreen() {
     }
   }, [showJpInput]);
 
+  const handleWebViewMessage = useCallback((event: { nativeEvent: { data: string } }) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'terminal-output' && data.text) {
+        const lines = stripAnsi(data.text).split('\n').filter((l: string) => l.trim());
+        for (const line of lines) {
+          addTerminalOutput(line);
+        }
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, [addTerminalOutput]);
+
+  const handleWebViewLoad = useCallback(() => {
+    onWebViewLoad();
+    // Inject terminal output capture after xterm.js initializes
+    setTimeout(() => {
+      webViewRef.current?.injectJavaScript(CAPTURE_INJECT_JS);
+    }, 1000);
+  }, [onWebViewLoad]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: c.background }]}>
       {/* Status Bar */}
@@ -170,9 +252,10 @@ export default function TerminalScreen() {
         style={[styles.webView, status !== 'connected' && { height: 0, opacity: 0 }]}
         javaScriptEnabled
         domStorageEnabled
-        onLoadEnd={onWebViewLoad}
+        onLoadEnd={handleWebViewLoad}
         onError={onWebViewError}
         onHttpError={onWebViewError}
+        onMessage={handleWebViewMessage}
       />
 
       {/* Japanese Input Proxy */}
