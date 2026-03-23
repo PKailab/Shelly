@@ -102,13 +102,14 @@ fi
 
 export function buildSetupCommand(): string {
   return [
-    'pkg install -y nodejs-lts ttyd',
+    'pkg update -y',                    // Fresh Termux needs package list update
+    'pkg install -y nodejs-lts ttyd',   // Node.js (includes npm) + ttyd terminal server
     'mkdir -p ~/shelly-bridge',
     'cd ~/shelly-bridge',
     'npm init -y 2>/dev/null',
     'npm install ws 2>&1',
     `cat << 'SHELLY_BRIDGE_EOF' > server.js\n${BRIDGE_SERVER_JS}\nSHELLY_BRIDGE_EOF`,
-    'ttyd -p 7681 -W bash &',  // Start ttyd in background before bridge
+    'ttyd -p 7681 -W bash &',          // Start ttyd in background before bridge
     'node server.js',
   ].join(' && ');
 }
