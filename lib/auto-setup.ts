@@ -101,15 +101,32 @@ fi
 // ── Setup command builder (exported for copy button in SetupWizard) ──────
 
 export function buildSetupCommand(): string {
+  // All packages a fresh Termux needs for full Shelly functionality:
+  // - nodejs-lts: Node.js + npm (bridge server, CLI tools)
+  // - ttyd: WebSocket terminal server for Terminal tab
+  // - git: SavePoint, version control, Claude Code/Gemini CLI
+  // - python: project templates, MCP plugins, scripting
+  // - openssh: GitHub SSH auth, remote connections
+  // - curl/wget: API calls, model downloads, health checks
+  // - jq: JSON parsing for CLI output processing
+  // - tree: directory visualization
+  // - vim/nano: fallback editors (Claude Code may invoke)
+  const packages = [
+    'nodejs-lts', 'ttyd', 'git', 'python',
+    'openssh', 'curl', 'wget', 'jq', 'tree',
+    'vim-python', 'nano',
+  ].join(' ');
+
   return [
-    'pkg update -y',                    // Fresh Termux needs package list update
-    'pkg install -y nodejs-lts ttyd',   // Node.js (includes npm) + ttyd terminal server
+    'pkg update -y',
+    `pkg install -y ${packages}`,
+    'termux-setup-storage < /dev/null || true',  // Shared storage access (non-fatal)
     'mkdir -p ~/shelly-bridge',
     'cd ~/shelly-bridge',
     'npm init -y 2>/dev/null',
     'npm install ws 2>&1',
     `cat << 'SHELLY_BRIDGE_EOF' > server.js\n${BRIDGE_SERVER_JS}\nSHELLY_BRIDGE_EOF`,
-    'ttyd -p 7681 -W bash &',          // Start ttyd in background before bridge
+    'ttyd -p 7681 -W bash &',
     'node server.js',
   ].join(' && ');
 }
