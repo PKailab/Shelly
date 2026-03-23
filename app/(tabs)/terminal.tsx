@@ -202,53 +202,77 @@ export default function TerminalScreen() {
   // Track actual WebView render success (distinct from HTTP HEAD check)
   const [webViewFailed, setWebViewFailed] = useState(false);
 
-  // Adaptive terminal font size for small screens (Z Fold6 cover = compact)
-  const termFontSize = layout.isCompact ? 16 : layout.isWide ? 14 : 15;
+  // Adaptive terminal font size for small screens (Z Fold6 cover ≈ 373dp)
+  const termFontSize = layout.isCompact ? 18 : layout.isWide ? 14 : 15;
+
+  // Build font injection JS that tries multiple approaches
+  const FONT_INJECT_JS = `
+    (function() {
+      var TARGET_SIZE = ${termFontSize};
+      var attempts = 0;
+      function apply() {
+        // Approach 1: ttyd stores terminal on window.term (older ttyd)
+        // Approach 2: ttyd 1.7+ stores on lib.terminal or window.tty
+        var term = window.term || (window.lib && window.lib.terminal) || window.tty;
+        // Approach 3: find xterm instance via DOM
+        if (!term) {
+          var xtermEl = document.querySelector('.xterm');
+          if (xtermEl) {
+            // xterm.js 4.x+ stores instance in _core
+            term = xtermEl._xterm || xtermEl.xterm;
+            if (!term) {
+              // Walk up to find Terminal instance
+              var keys = Object.keys(xtermEl);
+              for (var i = 0; i < keys.length; i++) {
+                var val = xtermEl[keys[i]];
+                if (val && val.options && typeof val.options.fontSize === 'number') {
+                  term = val; break;
+                }
+              }
+            }
+          }
+        }
+        if (term && term.options) {
+          term.options.fontSize = TARGET_SIZE;
+          // Force re-render
+          try { term.refresh(0, term.rows - 1); } catch(e) {}
+          try {
+            // FitAddon — multiple possible locations
+            var fit = window.fitAddon || (term._addonManager && term._addonManager._addons);
+            if (window.fitAddon && window.fitAddon.fit) { window.fitAddon.fit(); }
+            else if (fit) {
+              fit.forEach(function(a) { if (a.instance && a.instance.fit) a.instance.fit(); });
+            }
+          } catch(e) {}
+          return;
+        }
+        // Approach 4: CSS fallback — force font-size on xterm canvas/rows
+        var xtermScreen = document.querySelector('.xterm-screen');
+        if (xtermScreen) {
+          var style = document.createElement('style');
+          style.textContent = '.xterm-rows { font-size: ' + TARGET_SIZE + 'px !important; } .xterm { font-size: ' + TARGET_SIZE + 'px !important; }';
+          document.head.appendChild(style);
+          return;
+        }
+        if (attempts++ < 20) setTimeout(apply, 500);
+      }
+      apply();
+    })();
+    true;
+  `;
 
   const handleWebViewLoad = useCallback(() => {
     setWebViewFailed(false);
     onWebViewLoad();
-    // Inject terminal output capture + font size after xterm.js initializes
+    // Inject terminal output capture after xterm.js initializes
     setTimeout(() => {
       webViewRef.current?.injectJavaScript(CAPTURE_INJECT_JS);
     }, 1000);
-    // Font size injection — retry with polling since xterm.js may init late
-    const fontJs = `
-      (function() {
-        var attempts = 0;
-        function applyFontSize() {
-          // ttyd exposes terminal as window.term or via .xterm element
-          var term = window.term;
-          if (!term) {
-            var el = document.querySelector('.xterm');
-            if (el && el.xterm) term = el.xterm;
-          }
-          if (term && term.options) {
-            term.options.fontSize = ${termFontSize};
-            // Force xterm.js to re-render with new font size
-            if (typeof term.refresh === 'function') {
-              term.refresh(0, term.rows - 1);
-            }
-            // fit addon recalculates cols/rows for new font size
-            if (window.fitAddon && typeof window.fitAddon.fit === 'function') {
-              window.fitAddon.fit();
-            } else if (term._addonManager) {
-              // Try to find fit addon in addon manager
-              try { term._addonManager._addons.forEach(function(a) { if (a.instance && a.instance.fit) a.instance.fit(); }); } catch(e) {}
-            }
-          } else if (attempts < 10) {
-            attempts++;
-            setTimeout(applyFontSize, 500);
-          }
-        }
-        applyFontSize();
-      })();
-      true;
-    `;
+    // Font size injection — delayed + retrying to catch late xterm.js init
     setTimeout(() => {
-      webViewRef.current?.injectJavaScript(fontJs);
-    }, 1500);
-  }, [onWebViewLoad, termFontSize]);
+      webViewRef.current?.injectJavaScript(FONT_INJECT_JS);
+    }, 2000);
+  }, [onWebViewLoad, FONT_INJECT_JS]);
 
   const handleWebViewError2 = useCallback(() => {
     setWebViewFailed(true);
@@ -302,6 +326,7 @@ export default function TerminalScreen() {
         style={[styles.webView, status !== 'connected' && { height: 0, opacity: 0 }]}
         javaScriptEnabled
         domStorageEnabled
+        textZoom={layout.isCompact ? 130 : 100}
         onLoadEnd={handleWebViewLoad}
         onError={handleWebViewError2}
         onHttpError={handleWebViewError2}
