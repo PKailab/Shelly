@@ -229,17 +229,51 @@ Shelly/
 8. **設計書**: `docs/superpowers/specs/2026-03-21-setup-wizard-bridge-fix-design.md`
 9. **実装計画**: `docs/superpowers/plans/2026-03-21-setup-wizard-bridge-fix.md`
 
+### 2026-03-25 整理セッション
+
+1. **キーボード修正**: edge-to-edgeモードでKeyboardAvoidingViewが効かない問題を修正。Keyboardイベントで手動paddingBottom適用。windowSoftInputMode=adjustResizeも明示設定。実機確認済み
+2. **死コード削除（-3,029行）**: 隠しタブ4つ（creator/snippets/obsidian/search）のファイル削除。_layout.tsx、pane-registry、CommandPaletteからの参照も除去
+3. **設定画面整理**: MCP設定削除（Excluded by Designとの矛盾解消）、ガラス背景を高度な設定に移動、テーマ統合（Engine themes 1箇所に）、snippet/creator export/import削除。Obsidian設定は高度な設定内に残した（ユーザー要望）
+4. **README修正**: Cross-Pane Intelligence → Coming Soon、Creator engine/Obsidian RAG/Snippets をfeatureから除外
+5. **TerminalBlock修正**: Browser廃止に伴いLinkingでシステムブラウザに遷移するよう修正
+
 ### 未完了・リマインド
 
-1. **実機テスト**: Maestro（E2Eテスト）をWindows PCに導入予定。SetupWizard → Chat → コマンド実行の一連フローを自動テスト
+1. **★ Cross-Pane Intelligence実装**: 最優先。仕様書完成済み。→ 下記「次期開発」セクション参照
+2. **実機テスト**: ワイヤレスADB方式でTermux完結。スプリットビュー（左Shelly、右Termux）で自律デバッグ可能
+3. **スクショ・PR動画**: アプリ安定後に撮影
+4. **i18n構造の単純化**: en.tsをベース、ja.tsは差分のみに
 
-2. **スクショ・PR動画**: ワイヤレスADB方式でTermux完結。アプリ安定後に撮影
+---
 
-3. **README**: OSS公開用。「I can't write code.」の物語 → 済（README.md作成済み）
+## ★ 次期開発: Cross-Pane Intelligence
 
-4. **隠しタブ整理**: creator/snippets/obsidian/search が `href: null` で非表示だがコード残存。死んだコードの削除検討
+**仕様書**: `docs/superpowers/specs/2026-03-23-cross-pane-intelligence-design.md`
+**実装計画**: `docs/superpowers/plans/2026-03-23-cross-pane-intelligence-phase1-3.md`
 
-5. **i18n構造の単純化**: en.tsをベース、ja.tsは差分のみに。現在は両方に全キー定義されているが、フォールバック機構は既に動作している
+### 概要
+ChatがTerminalの出力を「見て」、コピペ不要でエラー修正・コマンド実行できる機能。
+「右のエラー直して」→ AI がTerminal出力を読み→修正コマンド生成→[▶ 実行]でTerminalに送信。
+
+### Phase一覧（全8フェーズ）
+
+| Phase | 内容 | 主要ファイル |
+|-------|------|------------|
+| 1 | Terminal整理（純粋TTYのみに） | `app/(tabs)/terminal.tsx` |
+| 2 | 出力キャプチャ（ttyd WebView → FIFO 100行） | `store/execution-log-store.ts`, `terminal.tsx` |
+| 3 | クロスペイン参照検出（「右のエラー」等のパターンマッチ） | `lib/input-router.ts` |
+| 4 | ActionBlock（コードブロックに[▶ 実行]ボタン） | `components/chat/ChatBubble.tsx`, 新規: `parse-code-blocks.ts`, `ActionBlock.tsx` |
+| 5 | CLI Co-Pilot（リアルタイム翻訳・承認プロンプト・セカンドオピニオン） | 新規: `components/TranslateOverlay.tsx`, `lib/realtime-translate.ts` |
+| 6 | 「Terminalで開く」ボタン | `components/chat/CommandExecBubble.tsx` |
+| 7 | 機能整理（Quick Terminal非表示等） | `_layout.tsx` |
+| 8 | ドキュメント更新 | `README.md`, `CLAUDE.md` |
+
+### 実装ガイドライン
+- セッション1: Phase 1-3（Terminal整理+出力キャプチャ+クロスペイン基盤）
+- セッション2: Phase 4-5（ActionBlock+CLI Co-Pilot）
+- セッション3: Phase 6-8（仕上げ）
+- 各Phase完了ごとにコミット。Termuxが落ちても引き継げるように
+- ADBデバッグ活用可能: `adb shell screencap` + `ffmpeg resize` + `Read tool`
 
 ---
 
