@@ -203,7 +203,11 @@ export default function TerminalScreen() {
   const [webViewFailed, setWebViewFailed] = useState(false);
 
   // Adaptive terminal font size for small screens (Z Fold6 cover ≈ 373dp)
-  const termFontSize = layout.isCompact ? 18 : layout.isWide ? 14 : 15;
+  // Adaptive font size: compact cover screen needs bigger text due to high DPI
+  // Note: Z Fold6 cover (968px @ 464dpi ≈ 333dp) may report as Wide due to
+  // configChanges preventing Activity recreation on fold/unfold, so we also
+  // check actual pixel width via PixelRatio for a secondary compact detection.
+  const termFontSize = layout.isCompact ? 20 : layout.width < 500 ? 18 : layout.isWide ? 14 : 16;
 
   // Build font injection JS that tries multiple approaches
   const FONT_INJECT_JS = `
@@ -326,7 +330,7 @@ export default function TerminalScreen() {
         style={[styles.webView, status !== 'connected' && { height: 0, opacity: 0 }]}
         javaScriptEnabled
         domStorageEnabled
-        textZoom={layout.isCompact ? 130 : 100}
+        textZoom={layout.isCompact || layout.width < 500 ? 140 : 100}
         onLoadEnd={handleWebViewLoad}
         onError={handleWebViewError2}
         onHttpError={handleWebViewError2}
