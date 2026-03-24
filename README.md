@@ -77,18 +77,19 @@ This works because Shelly's Chat pane is aware of what's happening in the Termin
 
 ## Features
 
-### Cross-Pane Intelligence
+### Cross-Pane Intelligence *(Coming Soon)*
 - **"Fix the error on the right"** — AI reads terminal output and responds with executable fixes
 - **ActionBlock** — Code blocks in AI responses have [▶ Run] buttons that execute directly in Terminal
-- **Real-time terminal awareness** — Chat AI always knows what's happening in Terminal (wide mode: automatic, single pane: on reference)
-- **CLI Co-Pilot** — Real-time translation of terminal output, approval prompt explanations, second opinions, session summaries
+- **Real-time terminal awareness** — Chat AI always knows what's happening in Terminal
+- **CLI Co-Pilot** — Real-time translation of terminal output, approval prompt explanations
+
+### Implemented Now
 - **Auto-savepoint timeline** — Game-like save/load system. Every change is auto-committed. Revert to any point with one tap.
 
 ### Chat-First Development
 - **Natural language execution** — Talk naturally, get real execution. Commands run behind the scenes in Termux.
 - **Multi-agent AI routing** — Automatically selects Claude Code, Gemini, Perplexity, Cerebras, Groq, or local LLM based on the task.
 - **@mention routing** — `@claude`, `@gemini`, `@local`, `@perplexity`, `@cerebras`, `@team` for direct control.
-- **Creator engine** — "Build me an app" → full project scaffolding from natural language.
 - **Voice input** — Speak commands and hear AI responses.
 
 ### Safety & Learning
@@ -102,9 +103,7 @@ This works because Shelly's Chat pane is aware of what's happening in the Termin
 - **Terminal tab** — Full TTY access with Japanese input support (something Termux alone can't do).
 - **Multi-pane layout** — Split view on foldable/wide screens.
 - **Project management** — Chat history tied to project folders, with savepoint timeline.
-- **Obsidian RAG** — Search your Obsidian vault from the terminal.
-- **Snippet manager** — Save and reuse code snippets.
-- **Theme engine** — 30+ customizable tokens.
+- **Theme engine** — 30+ customizable themes.
 - **i18n** — English and Japanese.
 
 ---

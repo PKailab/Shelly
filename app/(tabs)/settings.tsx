@@ -19,16 +19,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useObsidianStore } from '@/store/obsidian-store';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
-import { useSnippetStore } from '@/store/snippet-store';
-import { exportSnippets } from '@/lib/snippet-io';
-import { ImportModal } from '@/components/snippets/ImportModal';
-import { exportProjects } from '@/lib/project-io';
-import { ImportProjectsModal } from '@/components/creator/ImportProjectsModal';
-import { useCreatorStore } from '@/store/creator-store';
 import { BRIDGE_SERVER_JS, BRIDGE_SERVER_VERSION } from '@/lib/bridge-bundle';
-import { CursorShape, ThemeVariant, BridgeStatus } from '@/store/types';
+import { CursorShape, BridgeStatus } from '@/store/types';
 import { LlamaCppSection } from '@/components/settings/LlamaCppSection';
-import { McpSection } from '@/components/settings/McpSection';
 import { LlamaCppModel, MODEL_CATALOG, buildStartAllScript, getRecommendedModel } from '@/lib/llamacpp-setup';
 import { useTranslation, t } from '@/lib/i18n';
 import { useI18n, AVAILABLE_LOCALES } from '@/lib/i18n';
@@ -40,11 +33,6 @@ import { saveCustomContext, loadCustomContext, DEFAULT_CUSTOM_CONTEXT } from '@/
 import { AuthWizard } from '@/components/AuthWizard';
 import { isPro, SPONSOR_URL } from '@/lib/pro';
 
-const THEME_OPTIONS: { value: ThemeVariant; label: string; bg: string }[] = [
-  { value: 'black', label: 'Black', bg: '#0D0D0D' },
-  { value: 'navy',  label: 'Navy', bg: '#0A0E1A' },
-  { value: 'gray',  label: 'Gray', bg: '#1C1C1E' },
-];
 
 const CURSOR_OPTIONS: { value: CursorShape; label: string; preview: string }[] = [
   { value: 'block',     label: 'Block',       preview: '█' },
@@ -170,8 +158,6 @@ export default function SettingsScreen() {
   const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
   const [wsUrlInput, setWsUrlInput] = useState(termuxSettings.wsUrl);
   const [ttyUrlInput, setTtyUrlInput] = useState(termuxSettings.ttyUrl || 'http://localhost:7681');
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showImportProjectsModal, setShowImportProjectsModal] = useState(false);
   const [isUpdatingBridge, setIsUpdatingBridge] = useState(false);
   const [bridgeUpdateResult, setBridgeUpdateResult] = useState<'success' | 'fail' | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
@@ -331,8 +317,6 @@ export default function SettingsScreen() {
     setLlmUrlInput(url);
     updateSettings({ localLlmUrl: url });
   };
-  const { snippets } = useSnippetStore();
-  const { projects } = useCreatorStore();
 
   const handleFontSizeChange = (delta: number) => {
     const newSize = Math.min(24, Math.max(10, settings.fontSize + delta));
@@ -521,27 +505,6 @@ export default function SettingsScreen() {
     }
   }, [bridgeStatus, writeFile]);
 
-  const handleExportProjects = useCallback(async () => {
-    if (projects.length === 0) {
-      Alert.alert(t('settings.export'), t('settings.export_empty'));
-      return;
-    }
-    const ok = await exportProjects(projects);
-    if (!ok) {
-      Alert.alert(t('settings.error_label'), t('settings.export_failed'));
-    }
-  }, [projects]);
-
-  const handleExportSnippets = useCallback(async () => {
-    if (snippets.length === 0) {
-      Alert.alert(t('settings.export'), t('settings.export_no_snippets'));
-      return;
-    }
-    const ok = await exportSnippets(snippets);
-    if (!ok) {
-      Alert.alert(t('settings.export'), t('settings.export_cancelled'));
-    }
-  }, [snippets]);
 
   const handleExportLog = useCallback(async () => {
     const allBlocks = sessions.flatMap((s) =>
@@ -624,107 +587,6 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </SettingRow>
-
-              {/* ── Glass Background ────────────────────────────────────── */}
-        <SectionHeader title={t('settings.glass_title')} subtitle={t('settings.glass_subtitle')} />
-        {/* 壁紙選択 */}
-        <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Wallpaper</Text>
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-            <Pressable
-              onPress={async () => {
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ['images'],
-                  allowsEditing: false,
-                  quality: 0.8,
-                });
-                if (!result.canceled && result.assets[0]) {
-                  updateSettings({ wallpaperUri: result.assets[0].uri });
-                }
-              }}
-              style={[styles.actionButton, { borderColor: '#4ADE8033', flex: 1 }]}
-            >
-              <MaterialIcons name="image" size={18} color="#4ADE80" />
-              <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
-                {settings.wallpaperUri ? 'Change wallpaper' : 'Select wallpaper'}
-              </Text>
-            </Pressable>
-            {settings.wallpaperUri ? (
-              <Pressable
-                onPress={() => updateSettings({ wallpaperUri: undefined })}
-                style={[styles.actionButton, { borderColor: '#F8717133', flex: 0 }]}
-              >
-                <MaterialIcons name="delete" size={18} color="#F87171" />
-              </Pressable>
-            ) : null}
-          </View>
-          <Text style={styles.wsUrlHint}>
-            {settings.wallpaperUri ? 'Wallpaper set — adjust opacity below' : 'Select an image from your photo library'}
-          </Text>
-        </View>
-        {/* 背景透明度 */}
-        <SettingRow
-          label={t('settings.bg_opacity_label')}
-          description={`Terminal background opacity: ${Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%`}
-        >
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => updateSettings({ backgroundOpacity: Math.max(0.1, Math.round(((settings.backgroundOpacity ?? 1.0) - 0.1) * 10) / 10) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%</Text>
-            <Pressable
-              onPress={() => updateSettings({ backgroundOpacity: Math.min(1.0, Math.round(((settings.backgroundOpacity ?? 1.0) + 0.1) * 10) / 10) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-        {/* ブラー強度 */}
-        <SettingRow
-          label={t('settings.blur_label')}
-          description={`Wallpaper blur amount: ${settings.blurIntensity ?? 0}`}
-        >
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => updateSettings({ blurIntensity: Math.max(0, (settings.blurIntensity ?? 0) - 5) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{settings.blurIntensity ?? 0}</Text>
-            <Pressable
-              onPress={() => updateSettings({ blurIntensity: Math.min(100, (settings.blurIntensity ?? 0) + 5) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-        {/* ── Theme ──────────────────────────────────────────────────── */}
-        <SectionHeader title={t('settings.theme_title')} />
-        <View style={styles.themeOptions}>
-          {THEME_OPTIONS.map((theme) => (
-            <Pressable
-              key={theme.value}
-              onPress={() => updateSettings({ themeVariant: theme.value })}
-              style={[
-                styles.themeOption,
-                { backgroundColor: theme.bg },
-                settings.themeVariant === theme.value && styles.themeOptionActive,
-              ]}
-            >
-              <Text style={styles.themePreview}>{'> _'}</Text>
-              <Text style={styles.themeLabel}>{theme.label}</Text>
-              {settings.themeVariant === theme.value && (
-                <MaterialIcons name="check-circle" size={16} color="#00D4AA" style={styles.themeCheck} />
-              )}
-            </Pressable>
-          ))}
-        </View>
 
         {/* ── Cursor ───────────────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.cursor_title')} />
@@ -1071,6 +933,86 @@ export default function SettingsScreen() {
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
+        {/* ── Glass Background ────────────────────────────────────── */}
+        <SectionHeader title={t('settings.glass_title')} subtitle={t('settings.glass_subtitle')} />
+        {/* 壁紙選択 */}
+        <View style={styles.wsUrlRow}>
+          <Text style={styles.wsUrlLabel}>Wallpaper</Text>
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <Pressable
+              onPress={async () => {
+                const result = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ['images'],
+                  allowsEditing: false,
+                  quality: 0.8,
+                });
+                if (!result.canceled && result.assets[0]) {
+                  updateSettings({ wallpaperUri: result.assets[0].uri });
+                }
+              }}
+              style={[styles.actionButton, { borderColor: '#4ADE8033', flex: 1 }]}
+            >
+              <MaterialIcons name="image" size={18} color="#4ADE80" />
+              <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
+                {settings.wallpaperUri ? 'Change wallpaper' : 'Select wallpaper'}
+              </Text>
+            </Pressable>
+            {settings.wallpaperUri ? (
+              <Pressable
+                onPress={() => updateSettings({ wallpaperUri: undefined })}
+                style={[styles.actionButton, { borderColor: '#F8717133', flex: 0 }]}
+              >
+                <MaterialIcons name="delete" size={18} color="#F87171" />
+              </Pressable>
+            ) : null}
+          </View>
+          <Text style={styles.wsUrlHint}>
+            {settings.wallpaperUri ? 'Wallpaper set — adjust opacity below' : 'Select an image from your photo library'}
+          </Text>
+        </View>
+        {/* 背景透明度 */}
+        <SettingRow
+          label={t('settings.bg_opacity_label')}
+          description={`Terminal background opacity: ${Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%`}
+        >
+          <View style={styles.stepper}>
+            <Pressable
+              onPress={() => updateSettings({ backgroundOpacity: Math.max(0.1, Math.round(((settings.backgroundOpacity ?? 1.0) - 0.1) * 10) / 10) })}
+              style={styles.stepBtn}
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepValue}>{Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%</Text>
+            <Pressable
+              onPress={() => updateSettings({ backgroundOpacity: Math.min(1.0, Math.round(((settings.backgroundOpacity ?? 1.0) + 0.1) * 10) / 10) })}
+              style={styles.stepBtn}
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </Pressable>
+          </View>
+        </SettingRow>
+        {/* ブラー強度 */}
+        <SettingRow
+          label={t('settings.blur_label')}
+          description={`Wallpaper blur amount: ${settings.blurIntensity ?? 0}`}
+        >
+          <View style={styles.stepper}>
+            <Pressable
+              onPress={() => updateSettings({ blurIntensity: Math.max(0, (settings.blurIntensity ?? 0) - 5) })}
+              style={styles.stepBtn}
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </Pressable>
+            <Text style={styles.stepValue}>{settings.blurIntensity ?? 0}</Text>
+            <Pressable
+              onPress={() => updateSettings({ blurIntensity: Math.min(100, (settings.blurIntensity ?? 0) + 5) })}
+              style={styles.stepBtn}
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </Pressable>
+          </View>
+        </SettingRow>
+
         {/* ── Pro Features Block 1: Local LLM + LlamaCpp + MCP + System Prompt ── */}
         <ProGate>
         {/* ── Local LLM (Ollama) ─────────────────────────────────────────── */}
@@ -1183,15 +1125,6 @@ export default function SettingsScreen() {
           onUpdateLocalLlmUrl={handleUpdateLocalLlmUrl}
         />
 
-        {/* ── MCP Servers ─────────────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('settings.mcp_title')}
-          subtitle={t('settings.mcp_subtitle')}
-        />
-        <McpSection
-          isConnected={bridgeStatus === 'connected'}
-          onRunCommand={handleRunCommandForSetup}
-        />
 
         {/* ── Custom Context ────────────────────────────────────────────── */}
         <SectionHeader
@@ -1614,80 +1547,6 @@ export default function SettingsScreen() {
         )}
         </ProGate>
 
-        {/* ── Snippets ────────────────────────────────────────────────── */}
-        <SectionHeader title={t('settings.snippets_title')} subtitle={t('settings.snippets_subtitle')} />
-
-        <SettingRow
-          label={t('settings.run_mode_label')}
-          description={settings.snippetRunMode === 'insertAndRun' ? 'Tap to run immediately' : 'Insert into input only'}
-        >
-          <View style={styles.segmentRow}>
-            {(['insertAndRun', 'insertOnly'] as const).map((mode) => (
-              <Pressable
-                key={mode}
-                style={[styles.segmentBtn, settings.snippetRunMode === mode && styles.segmentBtnActive]}
-                onPress={() => updateSettings({ snippetRunMode: mode })}
-              >
-                <Text style={[styles.segmentBtnText, settings.snippetRunMode === mode && styles.segmentBtnTextActive]}>
-                  {mode === 'insertAndRun' ? 'Run' : 'Insert'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </SettingRow>
-
-        <SettingRow label={t('settings.return_terminal_label')} description={t('settings.return_terminal_desc')}>
-          <Switch
-            value={settings.snippetAutoReturn}
-            onValueChange={(v) => updateSettings({ snippetAutoReturn: v })}
-            trackColor={{ false: '#2D2D2D', true: '#00D4AA44' }}
-            thumbColor={settings.snippetAutoReturn ? '#00D4AA' : '#6B7280'}
-          />
-        </SettingRow>
-
-        {/* ── Snippets Backup ───────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('settings.snippet_backup_title')}
-          subtitle={`${snippets.length} snippets`}
-        />
-
-        <Pressable onPress={handleExportSnippets} style={styles.actionButton}>
-          <MaterialIcons name="upload" size={18} color="#00D4AA" />
-          <Text style={styles.actionButtonText}>
-            Export snippets (share as JSON)
-          </Text>
-          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
-        </Pressable>
-
-        <Pressable onPress={() => setShowImportModal(true)} style={styles.actionButton}>
-          <MaterialIcons name="download" size={18} color="#60A5FA" />
-          <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
-            Import snippets (from JSON)
-          </Text>
-          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
-        </Pressable>
-
-        {/* ── Projects Backup ──────────────────────────────────────────── */}
-        <SectionHeader
-          title={t('settings.project_backup_title')}
-          subtitle={`${projects.length} projects`}
-        />
-
-        <Pressable onPress={handleExportProjects} style={styles.actionButton}>
-          <MaterialIcons name="upload" size={18} color="#00D4AA" />
-          <Text style={styles.actionButtonText}>
-            Export projects (share as JSON)
-          </Text>
-          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
-        </Pressable>
-
-        <Pressable onPress={() => setShowImportProjectsModal(true)} style={styles.actionButton}>
-          <MaterialIcons name="download" size={18} color="#60A5FA" />
-          <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
-            Import projects (from JSON)
-          </Text>
-          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
-        </Pressable>
 
         </>)}
 
@@ -1918,15 +1777,6 @@ export default function SettingsScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Import Modal */}
-      <ImportModal
-        visible={showImportModal}
-        onClose={() => setShowImportModal(false)}
-      />
-      <ImportProjectsModal
-        visible={showImportProjectsModal}
-        onClose={() => setShowImportProjectsModal(false)}
-      />
       {/* Package Manager */}
       {showPkgManager && (
         <PackageManagerModal

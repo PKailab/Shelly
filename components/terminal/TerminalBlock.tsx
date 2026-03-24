@@ -7,6 +7,7 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  Linking,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -227,8 +228,7 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
   const handleLinkPress = useCallback((linkText: string, linkType: 'url' | 'filepath') => {
     if (linkType === 'url') {
       const url = linkText.startsWith('www.') ? `https://${linkText}` : linkText;
-      useTerminalStore.setState({ pendingBrowserUrl: url } as any);
-      router.push('/(tabs)/browser' as any);
+      Linking.openURL(url).catch(() => {});
     } else {
       if (onRerun) onRerun(`cat ${linkText}`);
     }

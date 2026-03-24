@@ -172,23 +172,6 @@ export default function TabLayout() {
             ),
           }}
         />
-        {/* ── Hidden tabs (legacy, accessible via navigation only) ── */}
-        <Tabs.Screen
-          name="creator"
-          options={{ href: null }}
-        />
-        <Tabs.Screen
-          name="snippets"
-          options={{ href: null }}
-        />
-<Tabs.Screen
-          name="obsidian"
-          options={{ href: null }}
-        />
-        <Tabs.Screen
-          name="search"
-          options={{ href: null }}
-        />
       </Tabs>
 
       {/* Multi-pane overlay (covers entire screen when active) */}

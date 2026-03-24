@@ -6,10 +6,6 @@ export type PaneTab =
   | 'index'
   | 'terminal'
   | 'projects'
-  | 'snippets'
-  | 'creator'
-  | 'obsidian'
-  | 'search'
   | 'settings';
 
 export type SplitDirection = 'horizontal' | 'vertical';
