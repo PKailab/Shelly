@@ -27,6 +27,9 @@ function withMultiWindow(config) {
       // Enable resizable activity for multi-window
       mainActivity.$["android:resizeableActivity"] = "true";
 
+      // Force adjustResize so keyboard pushes content up (edge-to-edge compatible)
+      mainActivity.$["android:windowSoftInputMode"] = "adjustResize";
+
       // Ensure configChanges includes multi-window related values
       const existing = mainActivity.$["android:configChanges"] || "";
       const existingSet = new Set(existing.split("|").filter(Boolean));

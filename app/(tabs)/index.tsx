@@ -90,6 +90,19 @@ export default function ChatScreen() {
     s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null
   );
 
+  // ── Keyboard height for Android edge-to-edge ──
+  const [kbHeight, setKbHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKbHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKbHeight(0);
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   // ── Onboarding ──
   const [onboardingStep, setOnboardingStepState] = useState<OnboardingStep>('complete');
   const onboardingChecked = useRef(false);
@@ -844,9 +857,9 @@ export default function ChatScreen() {
 
       <KeyboardAvoidingView
         key={`kav-${layoutKey}`}
-        style={styles.flex}
-        behavior="padding"
-        keyboardVerticalOffset={Platform.OS === 'android' ? 56 : 0}
+        style={[styles.flex, Platform.OS === 'android' && kbHeight > 0 && { paddingBottom: kbHeight }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.chatArea}>
           <TranslateOverlay />
