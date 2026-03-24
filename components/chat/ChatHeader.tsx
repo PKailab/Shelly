@@ -23,8 +23,10 @@ type ChatHeaderProps = {
 export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
   const { colors } = useTheme();
   const { isConnected } = useTermuxBridge();
-  const { getActiveSession, createSession } = useChatStore();
-  const session = getActiveSession();
+  const { createSession } = useChatStore();
+  const session = useChatStore((s) =>
+    s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null
+  );
   const layout = useDeviceLayout();
   const { isMultiPane, toggleMultiPane } = useMultiPaneStore();
 
