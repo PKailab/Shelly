@@ -277,6 +277,26 @@ export function getTerminalIntent(input: string): TerminalIntent | null {
   return null;
 }
 
+// ─── GitHub Actions インテント検出 ────────────────────────────────────────────
+
+const GITHUB_ACTIONS_PATTERNS = [
+  /ビルド(して|を実行|走らせて)/,
+  /テスト(を|)(実行|走らせて|回して)/,
+  /デプロイ(して|を実行)/,
+  /CI(を|)(設定|セットアップ)/,
+  /build (this|the|my) (app|project)/i,
+  /run (the |my )?(tests?|test suite)/i,
+  /set ?up CI/i,
+];
+
+/**
+ * Check if the input expresses intent to use GitHub Actions
+ * (build, test, deploy, CI setup).
+ */
+export function hasGitHubActionsIntent(input: string): boolean {
+  return GITHUB_ACTIONS_PATTERNS.some((p) => p.test(input));
+}
+
 // ─── 自然言語タスク分類（ツール提案用） ──────────────────────────────────────
 
 /**
