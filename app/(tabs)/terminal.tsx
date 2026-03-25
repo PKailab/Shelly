@@ -276,6 +276,46 @@ export default function TerminalScreen() {
     setTimeout(() => {
       webViewRef.current?.injectJavaScript(FONT_INJECT_JS);
     }, 2000);
+    // Restore previous terminal output after reconnect
+    setTimeout(() => {
+      const sessionLines = useExecutionLogStore.getState().sessionBuffer;
+      if (sessionLines.length > 0) {
+        const lines = sessionLines
+          .slice(-50)
+          .map(l => l.text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n'))
+          .join('\\r\\n');
+        const restoreJS = `
+          (function() {
+            function restore() {
+              var term = window.term || (window.lib && window.lib.terminal) || window.tty;
+              if (!term) {
+                var xtermEl = document.querySelector('.xterm');
+                if (xtermEl) {
+                  term = xtermEl._xterm || xtermEl.xterm;
+                  if (!term) {
+                    var keys = Object.keys(xtermEl);
+                    for (var i = 0; i < keys.length; i++) {
+                      var val = xtermEl[keys[i]];
+                      if (val && val.write) { term = val; break; }
+                    }
+                  }
+                }
+              }
+              if (term && term.write) {
+                term.write('\\x1b[90m--- Previous session output ---\\x1b[0m\\r\\n');
+                term.write('\\x1b[90m${lines}\\x1b[0m\\r\\n');
+                term.write('\\x1b[90m--- End of previous output ---\\x1b[0m\\r\\n\\r\\n');
+              } else {
+                setTimeout(restore, 500);
+              }
+            }
+            restore();
+          })();
+          true;
+        `;
+        webViewRef.current?.injectJavaScript(restoreJS);
+      }
+    }, 3000);
   }, [onWebViewLoad, FONT_INJECT_JS]);
 
   const handleWebViewError2 = useCallback(() => {

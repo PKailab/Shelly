@@ -10,8 +10,8 @@
 ## Table of Contents
 
 1. [Core Architecture](#core-architecture)
-2. [Implemented Features (v0.9)](#implemented-features)
-3. [Next Implementation: Cross-Pane Intelligence (v1.0)](#cross-pane-intelligence)
+2. [Implemented Features (v1.0)](#implemented-features)
+3. [Cross-Pane Intelligence (v1.0) — Implemented](#cross-pane-intelligence)
 4. [Future Design (v2.0+)](#future-design)
 5. [Excluded by Design](#excluded-by-design)
 6. [Design Philosophy](#design-philosophy)
@@ -47,7 +47,7 @@
 
 ---
 
-## Implemented Features (v0.9)
+## Implemented Features (v1.0)
 
 ### AI Multi-Agent Routing
 - **Input Router** (`lib/input-router.ts`): Analyzes natural language input and routes to appropriate AI
@@ -107,7 +107,7 @@ Game-like auto-save. Users never see Git terminology.
 
 ---
 
-## Cross-Pane Intelligence (v1.0) — Next Implementation
+## Cross-Pane Intelligence (v1.0) — Implemented
 
 **Full spec:** `docs/superpowers/specs/2026-03-23-cross-pane-intelligence-design.md`
 
@@ -115,67 +115,74 @@ Game-like auto-save. Users never see Git terminology.
 Every developer using CLI AI tools repeats this daily:
 1. Error in terminal → 2. Copy → 3. Switch to chat → 4. Paste → 5. Read answer → 6. Copy fix → 7. Switch back → 8. Paste and run
 
-### The Solution
+### The Solution (Implemented)
 Say "fix the error on the right" — AI reads terminal output, explains, generates executable command, one-tap to run.
 
-### Phase 1: Terminal Cleanup
-- Remove Activity Log from Terminal tab
-- Terminal = pure TTY only (ttyd WebView + ShortcutBar + Header)
+**All 8 phases implemented and verified on device (2026-03-25).**
 
-### Phase 2: Terminal Output Capture
-- Capture terminal output from ttyd WebView via WebSocket/onMessage
-- Store in `execution-log-store` as plain text (ANSI stripped)
-- FIFO buffer: 100 lines max
+### Terminal Output Capture
+- xterm.js buffer observation via injected JS (baseY + cursorY tracking, 500ms polling)
+- ANSI escape code stripping via `lib/strip-ansi.ts`
+- Dual buffer: hotBuffer (100 lines for realtime UI) + sessionBuffer (1000 lines with error prioritization)
+- `store/execution-log-store.ts`: addTerminalOutput, getRecentOutput, clearTerminalOutput
 
-### Phase 3: Cross-Pane Patterns
-- Pattern matching in `input-router.ts` for terminal references:
-  - Japanese: 「右のエラー直して」「ターミナルの出力を見て」
-  - English: "fix the error on the right", "look at the terminal"
-- Inject terminal output into AI system prompt
-- Works in multi-pane (always) and single-pane (when output exists)
+### Cross-Pane Pattern Detection
+- `lib/input-router.ts`: `hasTerminalReference()` and `getTerminalIntent()`
+- 3 intents: `reference` / `second-opinion` / `session-summary`
+- Japanese patterns: 「右のエラー直して」「ターミナルの出力を見て」「さっきのエラー」
+- English patterns: "fix the error on the right", "terminal output", "review what's happening"
+- Wide mode: always inject terminal context. Single pane: only on pattern match
 
-### Phase 4: ActionBlock
-- Parse AI responses: separate natural language from code blocks
-- Each code block becomes an ActionBlock with [▶ Execute] [Copy] buttons
-- Execute: sends command to Terminal pane (multi-pane) or runs via bridge (single-pane)
+### AI Context Injection
+- `hooks/use-ai-dispatch.ts`: `getTerminalContextForPrompt()` with intent-based suffixes
+- Injected into all providers: Local LLM, Cerebras, Groq, Gemini (API+CLI), Perplexity
+- Empty output: graceful fallback to normal response
+
+### ActionBlock
+- `lib/parse-code-blocks.ts`: Parse AI responses, separate text from fenced code blocks
+- `components/chat/ActionBlock.tsx`: [▶ Run] + [Copy] buttons per code block
+- Run: Wide = send to Terminal pane, Single = execute via bridge
 - Safety check via `command-safety.ts` before execution
+- Language hints (```bash etc.) displayed
 
-### Phase 5: CLI Real-Time Assist
+### CLI Real-Time Assist
+- `lib/realtime-translate.ts`: Cerebras → Groq → Local LLM fallback (Gemini CLI intentionally excluded — CLI process spawn latency too high for realtime use. Could be added as final fallback for users without API keys in future)
+- `components/chat/TranslateOverlay.tsx`: Semi-transparent overlay, 1s debounce, 10s auto-hide
+- Approval prompt detection (Y/n, y/N patterns) with warning icon
+- Second opinion: "review what Claude is doing" → different AI reviews terminal
+- Session summary: "summarize what we did" → structured summary
 
-**5-1. Real-Time Translation & Explanation**
-- Settings toggle (default: OFF)
-- Translates + explains CLI output in real-time
-- Displayed as semi-transparent overlay on Chat pane (not in chat history)
-- **Fallback order: Cerebras API → Groq API → `gemini -p` (Gemini CLI) → Local LLM**
-- Gemini CLI chosen because: recommended CLI for all Shelly users, no API key needed, acts as implicit second opinion when Claude Code is running in Terminal
+### "Open in Terminal" Button
+- `components/chat/ChatBubble.tsx`: "Open in Terminal" link on command results
+- Switches to Terminal tab
 
-**5-2. Approval Prompt Translation**
-- Detects CLI approval patterns: "Allow? (Y/n)", "[y/N]", etc.
-- Translates context + assesses risk level
-- Shows alert bubble in Chat with risk indicator
-
-**5-3. Second Opinion**
-- User-initiated: "What does @gemini think about what Claude is doing?"
-- Sends terminal output to different AI for review
-
-**5-4. Session Summary**
-- User-initiated: "Summarize what we did"
-- Sends full terminal buffer to AI for structured summary
-
-### Phase 6: "Open in Terminal" Button
-- CommandExecBubble gets "Open in Terminal" link
-- Switches to Terminal tab + cd to working directory
-
-### Phase 7: Feature Cleanup
-- Quick Terminal hidden on wide screens (multi-pane replaces it)
-- LLM interpreter default OFF (cross-pane replaces it)
+### Feature Cleanup (Done)
+- Quick Terminal hidden on wide screens (`!layout.isWide && <QuickTerminal />`)
+- LLM interpreter toggle in Settings (default OFF)
 - ShortcutBar toggle for external keyboard users
 
-### Phase 8: Documentation Overhaul
-- README rewrite: lead with pain (copy-paste hell), show solution
-- Hero subtitle: "Chat and Terminal, side by side. Connected by AI."
-- Architecture diagrams for cross-pane data flow
-- CLAUDE.md decision table update
+### Codebase Cleanup (2026-03-25)
+- Removed 4 hidden tabs: creator, snippets, obsidian, search (-2,740 lines)
+- Removed MCP settings (contradicted Excluded by Design)
+- Moved Glass Background to Advanced Settings
+- Consolidated duplicate theme sections
+- Tab structure: Projects / Chat / Terminal / Settings (4 tabs only)
+
+---
+
+## Known Limitations (v1.0)
+
+| Item | Detail |
+|------|--------|
+| **Gemini CLI excluded from realtime translate** | CLI process spawn latency (1-2s) too high for realtime use. Cerebras → Groq → Local LLM provides sub-500ms responses. Intentional design decision. |
+| **Terminal history display on reconnect** | Previous session output is re-injected as dimmed text on WebView reload. Not a true scrollback buffer restore, but functionally equivalent for user reference. |
+
+### Timeline View (Implemented)
+- Projects tab: accordion under each git project, toggle with 🕒 button
+- `components/ProjectTimeline.tsx`: vertical timeline with dots, messages, relative timestamps
+- Tap any savepoint → "View diff" or "Revert to this point"
+- Backend: `git log --oneline --format='%h|%s|%cr'` + `git diff` + `git checkout`
+- 20 savepoints shown by default, "Show more" button for additional entries
 
 ---
 
@@ -186,12 +193,6 @@ Say "fix the error on the right" — AI reads terminal output, explains, generat
 - First time: GitHub PAT setup → repo creation → push
 - Subsequent: one-tap push with progress in Chat
 - No git terminology exposed to user
-
-### Timeline View
-- Projects tab: visual timeline of savepoints
-- Each savepoint: timestamp, auto-generated description
-- Tap to: "Restore to this point" or "View diff from here"
-- Backend: `git log --oneline` + `git diff` + `git checkout`
 
 ### A2A (Agent-to-Agent Protocol) Interface
 - Define external agent registration interface in `plugin-api.ts`
@@ -217,7 +218,7 @@ Say "fix the error on the right" — AI reads terminal output, explains, generat
 
 | Feature | Reason |
 |---------|--------|
-| **MCP Protocol** | Shelly's @mention + input router achieves the same tool selection without MCP's overhead. Perplexity's CTO noted MCP tool descriptions consume 40-50% of context window. |
+| **MCP Protocol** | Shelly's @mention + input router achieves the same tool selection without MCP's overhead. Perplexity's CTO noted MCP tool descriptions consume 40-50% of context window. Settings UI for MCP was removed in v1.0 cleanup to resolve this contradiction. |
 | **Autonomous Agent Mode** | Contradicts Shelly's design: "user chats and builds interactively." Autonomous agents work when user walks away — opposite philosophy. |
 | **Cloud Execution** | Shelly's value is "everything on one phone." Sending code to cloud breaks the privacy-first, offline-capable design. |
 | **Browser Tab** | Replaced by WebPreviewModal in chat bubbles. Purpose-built preview is better than a general browser. |
@@ -255,32 +256,22 @@ Every feature started as a limitation of being a non-engineer on a phone:
 
 ---
 
-## Review Questions for AI Reviewers
+## Open Questions
 
-Please review this specification and provide your assessment on:
+Areas where community feedback and contributions are especially welcome:
 
-### Architecture & Design
-1. Are there architectural risks or blind spots in the cross-pane intelligence design?
-2. Is the terminal output capture approach (WebSocket interception + ANSI stripping + 100-line FIFO) sufficient, or are there edge cases that could break it?
-3. Is the ActionBlock design (parse code blocks → separate display → one-tap execute) the right approach, or is there a better UX pattern?
+### Architecture
+- Terminal output capture uses xterm.js buffer polling (500ms). Are there more efficient approaches (MutationObserver, xterm.js onData event)?
+- The dual-buffer design (hotBuffer 100 + sessionBuffer 1000) works but may need tuning for long-running CLI sessions.
 
-### Priority & Scope
-4. **Of the Future Design items (GitHub integration, Timeline, A2A, Parallel Tasks), which should be implemented immediately for v1.0 launch?** What would maximize user adoption?
-5. Is there a critical feature missing from this spec that competitors have?
+### UX
+- ActionBlock safety check shows a dialog for HIGH-risk commands. Is this the right threshold, or should MEDIUM also prompt?
+- Realtime translation overlay auto-hides after 10s. Should this be configurable?
 
-### Real-Time Translation Fallback
-6. The fallback order is: Cerebras API → Groq API → `gemini -p` (CLI) → Local LLM. Is this the right order? Are there better options?
-7. Using Gemini CLI as a fallback (no API key needed, acts as implicit second opinion) — is this clever or problematic?
+### Ecosystem
+- How should Shelly interact with VS Code Server / Code-Server when both are running on the same device?
+- Is A2A protocol integration worth pursuing, or does the @mention system already cover multi-agent needs?
 
-### OSS Impact Assessment
-8. **What impact would Shelly's open-source release have on the developer community?** Consider:
-   - A mobile-first dev environment built entirely by a non-engineer using AI
-   - Cross-pane intelligence (Chat ↔ Terminal) as a new paradigm
-   - The "I can't write code" narrative as a README opener
-   - Competition: Termux alone, VS Code Server, Code-Server, GitHub Codespaces
-9. **What would the community reception look like?** Which communities (HN, Reddit, Product Hunt, Japanese dev community) would respond most strongly?
-10. **Is "built by a non-engineer on a phone" a strength or a liability** in terms of developer trust and adoption?
-
-### Risk Assessment
-11. What are the top 3 risks that could prevent Shelly from gaining traction?
-12. Is there anything in this design that experienced developers would immediately reject or distrust?
+### Demo Script for OSS Launch
+- Looking for community input on the best demo scenario to showcase Cross-Pane Intelligence
+- Target: 30-60 second video showing the "7-step problem → 0-step solution" narrative
