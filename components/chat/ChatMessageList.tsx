@@ -11,7 +11,7 @@ import { ChatBubble } from './ChatBubble';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation } from '@/lib/i18n';
-import type { ChatMessage } from '@/store/chat-store';
+import type { ChatMessage, ActionsWizardData } from '@/store/chat-store';
 
 type Props = {
   messages: ChatMessage[];
@@ -26,9 +26,13 @@ type Props = {
   runCommand?: (cmd: string) => Promise<{ stdout: string; exitCode: number }>;
   sendToTerminal?: (text: string) => void;
   runCommandInBackground?: (command: string) => Promise<{ stdout: string; exitCode: number | null }>;
+  onWizardUpdate?: (messageId: string, data: ActionsWizardData) => void;
+  onWizardComplete?: (messageId: string, data: ActionsWizardData) => void;
+  onAutoCheckEnable?: (messageId: string) => void;
+  onAutoCheckDismiss?: (messageId: string) => void;
 };
 
-export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate, onEdit, onDelete, onStopGenerating, isStreaming, projectDir, runCommand, sendToTerminal, runCommandInBackground }: Props) {
+export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate, onEdit, onDelete, onStopGenerating, isStreaming, projectDir, runCommand, sendToTerminal, runCommandInBackground, onWizardUpdate, onWizardComplete, onAutoCheckEnable, onAutoCheckDismiss }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
@@ -65,8 +69,12 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
       runCommand={runCommand}
       sendToTerminal={sendToTerminal}
       runCommandInBackground={runCommandInBackground}
+      onWizardUpdate={onWizardUpdate}
+      onWizardComplete={onWizardComplete}
+      onAutoCheckEnable={onAutoCheckEnable}
+      onAutoCheckDismiss={onAutoCheckDismiss}
     />
-  ), [fontSize, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground]);
+  ), [fontSize, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground, onWizardUpdate, onWizardComplete, onAutoCheckEnable, onAutoCheckDismiss]);
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
 

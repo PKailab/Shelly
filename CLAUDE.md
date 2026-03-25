@@ -239,7 +239,7 @@ Shelly/
 
 ### 未完了・リマインド
 
-1. **★ GitHub Actions設定ウィザード**: チャット内対話形式でCI設定。下記「次期開発」セクション参照
+1. **Settings画面から上級者向けCI設定**: ActionsWizardBubbleをSettings内から起動可能にする
 2. **OSS用デモスクショ・動画撮影**: 英語UI、全修正ビルドで撮影。台本はClaude別セッションで作成予定
 3. **i18n構造の単純化**: en.tsをベース、ja.tsは差分のみに
 
@@ -262,48 +262,44 @@ Shelly/
 | 7 | 機能整理（Quick Terminal非表示、LLM interpreter/ShortcutBarトグル） | ✅ | `app/(tabs)/_layout.tsx`, `settings.tsx` |
 | 8 | ドキュメント更新 | ✅ | `README.md`, `CLAUDE.md` |
 
-### GitHub連携（実装済み: Phase 1-3, 5。Phase 4ウィザードは未実装）
+### GitHub連携（Phase 1-5 実装済み）
 
 | Phase | 内容 | 状態 | 主要ファイル |
 |-------|------|------|------------|
 | 1 | Git Advisor（push提案ロジック） | ✅ | `lib/git-advisor.ts` |
 | 2 | PAT認証（SecureStore保存） | ✅ | `lib/github-auth.ts` |
 | 3 | Push処理（リポジトリ作成+push） | ✅ | `lib/github-push.ts` |
-| 4 | Actions設定ウィザード | **未実装** | `lib/github-actions.ts`（ロジックのみ）|
-| 5 | i18n（32キー） | ✅ | `en.ts`, `ja.ts` |
+| 4 | 自動チェック提案 + 上級者ウィザード | ✅ | 下記参照 |
+| 5 | i18n | ✅ | `en.ts`, `ja.ts` |
 
-### ★ 次期開発: GitHub Actions設定ウィザード
+### Phase 4: 自動チェック（GitHub Actions）
 
-**現状**: `lib/github-actions.ts`にワークフロー生成ロジック + `input-router.ts`にインテント検出あり。
-**不足**: Chat内の対話型ウィザードUI。
+**設計思想**: 「CI」「ビルド」「ワークフロー」等の用語は使わない。ゼロ状態ユーザーにも自然に理解できる言葉で案内。
 
-**仕様（ユーザー確定済み）:**
+**2層構造:**
+- **初心者向け**: `AutoCheckProposalBubble` — push成功後にワンタップ提案（デフォルトbuild+test on push）
+- **上級者向け**: `ActionsWizardBubble` — 3ステップウィザード（Settings画面から起動、未統合）
+
+**フロー（ゼロ状態ユーザー）:**
 ```
-ユーザー: 「CIをセットアップして」
-
-AI: 「どの自動化を設定しますか？（複数選択OK）」
-    [✅ ビルド確認]  [✅ テスト実行]  [デプロイ]  [リリース作成]
-
-AI: 「いつ実行しますか？」
-    [● pushするたび]  [○ 1日1回]  [○ 手動のみ]
-
-AI: 「確認です:
-     ・pushするたびにビルドとテストを自動実行
-     ・結果はShellyのチャットに通知
-     [設定する]  [やり直す]」
+git push 成功
+  → 800ms後にプロアクティブ提案バブル表示
+  → 「コードを自動チェックする機能、つける？」
+     [つける]  [あとで]
+  → ワンタップでbuild+test workflow生成 → commit+push
+  → 「自動チェックをオンにしました！」
+  → 以後、push時にGitHub Actionsが実行される
 ```
 
-**実装ポイント:**
-- 選択肢はボタンUI（ChatBubble内にインラインレンダリング）
-- YAMLの中身はユーザーに見せない
-- マルチステップ状態管理（what → when → confirm）
-- `generateWorkflow()`の引数を対話結果から構築
-- 生成後: git add + commit + push まで自動
-- 結果取得: `getLatestWorkflowRun()` → Chat表示
+**主要ファイル:**
+- `components/chat/AutoCheckProposalBubble.tsx` — ワンタップ提案UI
+- `components/chat/ActionsWizardBubble.tsx` — 上級者向け3ステップUI
+- `lib/github-actions.ts` — `generateWorkflowFromWizard()`, `commitAndPushWorkflow()`, `detectProjectTypeFromDir()`
+- `store/chat-store.ts` — `AutoCheckState`, `ActionsWizardData`, `WizardType` 型定義
+- `app/(tabs)/index.tsx` — push成功検出、提案挿入、Enable/Dismissハンドラ
 
-**新規コンポーネント案:**
-- `components/chat/ActionsWizardBubble.tsx` — 3ステップウィザード（what/when/confirm）
-- Chat store にウィザード状態を持たせるか、コンポーネントローカルstateか要判断
+**未実装（次期）:**
+- `getLatestWorkflowRun()` 結果のチャット内表示（push後に自動ポーリング → 結果通知）
 
 ### アーキテクチャ（Cross-Pane）
 - **出力キャプチャ**: WebView onMessage + xterm.js buffer観察 (baseY+cursorY)、500msポーリング

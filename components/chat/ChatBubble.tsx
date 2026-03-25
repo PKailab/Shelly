@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation } from '@/lib/i18n';
-import type { ChatMessage, ChatAgent } from '@/store/chat-store';
+import type { ChatMessage, ChatAgent, ActionsWizardData, AutoCheckState } from '@/store/chat-store';
 import type { ThemeColorPalette } from '@/lib/theme';
 import { SavepointBubble } from '@/components/SavepointBubble';
 import { WebPreviewModal } from '@/components/WebPreviewModal';
@@ -24,6 +24,8 @@ import { useSavepointStore } from '@/store/savepoint-store';
 import { useTerminalStore } from '@/store/terminal-store';
 import { parseCodeBlocks, hasCodeBlocks } from '@/lib/parse-code-blocks';
 import { ActionBlock } from '@/components/chat/ActionBlock';
+import { ActionsWizardBubble } from '@/components/chat/ActionsWizardBubble';
+import { AutoCheckProposalBubble } from '@/components/chat/AutoCheckProposalBubble';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 // ─── Agent Colors ────────────────────────────────────────────────────────────
@@ -73,11 +75,15 @@ type Props = {
   runCommand?: (cmd: string) => Promise<{ stdout: string; exitCode: number }>;
   sendToTerminal?: (text: string) => void;
   runCommandInBackground?: (command: string) => Promise<{ stdout: string; exitCode: number | null }>;
+  onWizardUpdate?: (messageId: string, data: ActionsWizardData) => void;
+  onWizardComplete?: (messageId: string, data: ActionsWizardData) => void;
+  onAutoCheckEnable?: (messageId: string) => void;
+  onAutoCheckDismiss?: (messageId: string) => void;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground }: Props) {
+export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground, onWizardUpdate, onWizardComplete, onAutoCheckEnable, onAutoCheckDismiss }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { isWide } = useDeviceLayout();
@@ -187,6 +193,29 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
             {message.isStreaming && (
               <ActivityIndicator size="small" color={agentColor} style={{ marginLeft: 4 }} />
             )}
+          </View>
+        )}
+
+        {/* Auto-check proposal (after push) */}
+        {message.autoCheckState && message.autoCheckState !== 'dismissed' && (
+          <View style={styles.markdownWrap}>
+            <AutoCheckProposalBubble
+              state={message.autoCheckState}
+              error={message.error}
+              onEnable={() => onAutoCheckEnable?.(message.id)}
+              onDismiss={() => onAutoCheckDismiss?.(message.id)}
+            />
+          </View>
+        )}
+
+        {/* Actions Wizard inline UI */}
+        {message.wizardType === 'actions' && message.wizardData && (
+          <View style={styles.markdownWrap}>
+            <ActionsWizardBubble
+              wizardData={message.wizardData}
+              onUpdate={(data) => onWizardUpdate?.(message.id, data)}
+              onComplete={(data) => onWizardComplete?.(message.id, data)}
+            />
           </View>
         )}
 

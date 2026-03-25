@@ -13,6 +13,7 @@ import {
   TextInput,
   ActivityIndicator,
   Linking,
+  Modal,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +33,12 @@ import { PackageManager as PackageManagerModal } from '@/components/PackageManag
 import { saveCustomContext, loadCustomContext, DEFAULT_CUSTOM_CONTEXT } from '@/lib/shelly-system-prompt';
 import { AuthWizard } from '@/components/AuthWizard';
 import { isPro, SPONSOR_URL } from '@/lib/pro';
+import { ActionsWizardBubble } from '@/components/chat/ActionsWizardBubble';
+import { generateWorkflowFromWizard, commitAndPushWorkflow, detectProjectTypeFromDir } from '@/lib/github-actions';
+import { isGitHubConfigured } from '@/lib/github-auth';
+import { hasRemoteOrigin } from '@/lib/github-push';
+import type { ActionsWizardData } from '@/store/chat-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const CURSOR_OPTIONS: { value: CursorShape; label: string; preview: string }[] = [
@@ -164,6 +171,12 @@ export default function SettingsScreen() {
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showAuthWizard, setShowAuthWizard] = useState(false);
   const [showAllThemes, setShowAllThemes] = useState(false);
+  const [showAutoCheckWizard, setShowAutoCheckWizard] = useState(false);
+  const [wizardData, setWizardData] = useState<ActionsWizardData>({
+    step: 'what', actions: ['build', 'test'], trigger: null, projectType: 'unknown',
+  });
+  const [wizardStatus, setWizardStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
+  const [wizardError, setWizardError] = useState('');
 
   // Local LLM state
   const [llmUrlInput, setLlmUrlInput] = useState(settings.localLlmUrl);
@@ -381,6 +394,62 @@ export default function SettingsScreen() {
     if (match) setActiveModelId(match.id);
     Alert.alert(t('settings.saved'), t('settings.model_updated', { model: trimmed }));
   };
+
+  const handleOpenAutoCheckWizard = useCallback(async () => {
+    // Pre-checks
+    const hasToken = await isGitHubConfigured();
+    if (!hasToken) {
+      Alert.alert(t('wizard.actions_title'), t('wizard.no_pat'));
+      return;
+    }
+    // Detect project type
+    let projectType = 'unknown';
+    try {
+      const sessions = useTerminalStore.getState().sessions;
+      const active = sessions[useTerminalStore.getState().activeSessionId ?? ''];
+      const cwd = active?.currentDir || '';
+      if (cwd) {
+        projectType = await detectProjectTypeFromDir(cwd, async (cmd) => {
+          const res = await runCommand(cmd);
+          return { stdout: res.stdout, exitCode: res.exitCode };
+        });
+      }
+    } catch { /* ignore */ }
+    setWizardData({ step: 'what', actions: ['build', 'test'], trigger: null, projectType });
+    setWizardStatus('idle');
+    setShowAutoCheckWizard(true);
+  }, [t, runCommand]);
+
+  const handleWizardComplete = useCallback(async (data: ActionsWizardData) => {
+    setWizardStatus('working');
+    try {
+      const yaml = generateWorkflowFromWizard(data);
+      const sessions = useTerminalStore.getState().sessions;
+      const active = sessions[useTerminalStore.getState().activeSessionId ?? ''];
+      const cwd = active?.currentDir || '';
+
+      const result = await commitAndPushWorkflow({
+        projectDir: cwd,
+        yaml,
+        runCommand: async (cmd) => {
+          const res = await runCommand(cmd);
+          return { stdout: res.stdout, exitCode: res.exitCode };
+        },
+      });
+
+      if (result.success) {
+        setWizardStatus('done');
+        setWizardData({ ...data, step: 'done' });
+        await AsyncStorage.setItem('shelly_autocheck_offered', 'true');
+      } else {
+        setWizardStatus('error');
+        setWizardError(result.error || 'Unknown error');
+      }
+    } catch (err) {
+      setWizardStatus('error');
+      setWizardError(err instanceof Error ? err.message : String(err));
+    }
+  }, [runCommand]);
 
   const handleTestLlm = useCallback(async () => {
     setIsTestingLlm(true);
@@ -1672,6 +1741,78 @@ export default function SettingsScreen() {
             ? t('dotfiles.last_sync', { time: new Date(dotfiles.lastSync).toLocaleString() })
             : t('dotfiles.never_synced')}
         </Text>
+
+        {/* ── Auto-check (GitHub Actions) ───────────────────────────────── */}
+        <SectionHeader title={t('wizard.actions_title')} />
+        <Pressable
+          onPress={handleOpenAutoCheckWizard}
+          style={[styles.actionButton, { borderColor: '#F9731633' }]}
+        >
+          <MaterialIcons name="verified" size={18} color="#F97316" />
+          <Text style={[styles.actionButtonText, { color: '#F97316' }]}>
+            {t('wizard.step1_title')}
+          </Text>
+          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
+        </Pressable>
+
+        {/* Auto-check wizard modal */}
+        <Modal
+          visible={showAutoCheckWizard}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowAutoCheckWizard(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 16 }}>
+            <View style={{ backgroundColor: '#1A1A1A', borderRadius: 16, padding: 4 }}>
+              {wizardStatus === 'working' ? (
+                <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
+                  <ActivityIndicator size="large" color="#F97316" />
+                  <Text style={{ color: '#9CA3AF', fontFamily: 'monospace', fontSize: 12 }}>{t('wizard.setting_up')}</Text>
+                </View>
+              ) : wizardStatus === 'done' ? (
+                <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
+                  <MaterialIcons name="check-circle" size={40} color="#4ADE80" />
+                  <Text style={{ color: '#E8E8E8', fontFamily: 'monospace', fontSize: 13, textAlign: 'center' }}>
+                    {t('wizard.done', { trigger: t(`wizard.done_${wizardData.trigger || 'push'}`) })}
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowAutoCheckWizard(false)}
+                    style={{ marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#4ADE80', borderRadius: 20 }}
+                  >
+                    <Text style={{ color: '#000', fontFamily: 'monospace', fontWeight: '700', fontSize: 13 }}>OK</Text>
+                  </Pressable>
+                </View>
+              ) : wizardStatus === 'error' ? (
+                <View style={{ padding: 20, alignItems: 'center', gap: 8 }}>
+                  <MaterialIcons name="error-outline" size={40} color="#F87171" />
+                  <Text style={{ color: '#F87171', fontFamily: 'monospace', fontSize: 12, textAlign: 'center' }}>
+                    {t('wizard.error', { error: wizardError })}
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowAutoCheckWizard(false)}
+                    style={{ marginTop: 8, paddingHorizontal: 20, paddingVertical: 10, borderWidth: 1, borderColor: '#6B7280', borderRadius: 20 }}
+                  >
+                    <Text style={{ color: '#9CA3AF', fontFamily: 'monospace', fontWeight: '600', fontSize: 12 }}>{t('wizard.btn_back')}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <>
+                  <ActionsWizardBubble
+                    wizardData={wizardData}
+                    onUpdate={setWizardData}
+                    onComplete={handleWizardComplete}
+                  />
+                  <Pressable
+                    onPress={() => setShowAutoCheckWizard(false)}
+                    style={{ alignItems: 'center', paddingVertical: 10 }}
+                  >
+                    <Text style={{ color: '#6B7280', fontFamily: 'monospace', fontSize: 12 }}>{t('wizard.btn_back')}</Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          </View>
+        </Modal>
 
         {/* ── Package Manager ─────────────────────────────────────────────── */}
         <SectionHeader title={t('pkg.title')} subtitle="Termux pkg GUI" />

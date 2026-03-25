@@ -5,6 +5,13 @@
  * and queries workflow run status via the GitHub API.
  */
 
+import type { ActionsWizardData } from '@/store/chat-store';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type ActionKind = 'build' | 'test' | 'deploy' | 'release';
+export type TriggerKind = 'push' | 'daily' | 'manual';
+
 /**
  * Detect the project type from package.json contents.
  */
@@ -26,7 +33,182 @@ export function detectProjectType(
 }
 
 /**
- * Generate a GitHub Actions workflow YAML string.
+ * Detect project type by reading package.json via shell.
+ */
+export async function detectProjectTypeFromDir(
+  projectDir: string,
+  runCommand: (cmd: string) => Promise<{ stdout: string; exitCode: number | null }>,
+): Promise<string> {
+  try {
+    const { stdout, exitCode } = await runCommand(
+      `cat ${JSON.stringify(projectDir + '/package.json')} 2>/dev/null`,
+    );
+    if (exitCode === 0 && stdout.trim()) {
+      const pkg = JSON.parse(stdout);
+      return detectProjectType(pkg);
+    }
+  } catch { /* ignore */ }
+
+  // Check for Python
+  try {
+    const { exitCode } = await runCommand(
+      `test -f ${JSON.stringify(projectDir + '/requirements.txt')} || test -f ${JSON.stringify(projectDir + '/setup.py')} || test -f ${JSON.stringify(projectDir + '/pyproject.toml')}`,
+    );
+    if (exitCode === 0) return 'python';
+  } catch { /* ignore */ }
+
+  return 'unknown';
+}
+
+// ─── Trigger block generation ─────────────────────────────────────────────────
+
+function generateTriggerBlock(trigger: TriggerKind): string {
+  switch (trigger) {
+    case 'push':
+      return `on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]`;
+    case 'daily':
+      return `on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:`;
+    case 'manual':
+      return `on:
+  workflow_dispatch:`;
+  }
+}
+
+// ─── Step generators per action kind ──────────────────────────────────────────
+
+function nodeSetupSteps(): string {
+  return `      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci`;
+}
+
+function pythonSetupSteps(): string {
+  return `      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt 2>/dev/null || true`;
+}
+
+function genericSetupSteps(): string {
+  return `      - uses: actions/checkout@v4`;
+}
+
+function setupStepsForType(projectType: string): string {
+  if (projectType === 'node') return nodeSetupSteps();
+  if (projectType === 'python') return pythonSetupSteps();
+  return genericSetupSteps();
+}
+
+function buildStep(projectType: string): string {
+  const cmd = projectType === 'node' ? 'npm run build' : projectType === 'python' ? 'python setup.py build 2>/dev/null || echo "No build step"' : 'echo "No build step"';
+  return `      - name: Build
+        run: ${cmd}`;
+}
+
+function testStep(projectType: string): string {
+  const cmd = projectType === 'node' ? 'npm test' : projectType === 'python' ? 'python -m pytest 2>/dev/null || echo "No test step"' : 'echo "No test step"';
+  return `      - name: Test
+        run: ${cmd}`;
+}
+
+/**
+ * Generate a GitHub Actions workflow YAML from wizard selections.
+ */
+export function generateWorkflowFromWizard(data: ActionsWizardData): string {
+  const projectType = data.projectType || 'unknown';
+  const trigger = data.trigger || 'push';
+  const actions = data.actions;
+
+  const triggerBlock = generateTriggerBlock(trigger);
+  const setup = setupStepsForType(projectType);
+
+  const steps: string[] = [setup];
+
+  if (actions.includes('build')) {
+    steps.push(buildStep(projectType));
+  }
+  if (actions.includes('test')) {
+    steps.push(testStep(projectType));
+  }
+
+  // Build job name from selected actions
+  const jobActions = actions.filter((a) => a === 'build' || a === 'test');
+  const jobName = jobActions.length > 0
+    ? jobActions.map((a) => a.charAt(0).toUpperCase() + a.slice(1)).join(' & ')
+    : 'CI';
+
+  let yaml = `name: ${jobName}
+
+${triggerBlock}
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+${steps.join('\n\n')}
+`;
+
+  // Deploy job (separate)
+  if (actions.includes('deploy')) {
+    yaml += `
+  deploy:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        run: echo "Add your deploy commands here"
+`;
+  }
+
+  // Release job (separate)
+  if (actions.includes('release')) {
+    yaml += `
+  release:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+`;
+  }
+
+  return yaml;
+}
+
+/**
+ * Generate a GitHub Actions workflow YAML string (legacy API).
  */
 export function generateWorkflow(
   projectType: string,
@@ -132,6 +314,55 @@ jobs:
       - name: Test
         run: ${testCmd}
 `;
+}
+
+/**
+ * Write workflow file and commit+push it.
+ */
+export async function commitAndPushWorkflow(params: {
+  projectDir: string;
+  yaml: string;
+  runCommand: (cmd: string) => Promise<{ stdout: string; exitCode: number | null }>;
+}): Promise<{ success: boolean; error?: string }> {
+  const { projectDir, yaml, runCommand } = params;
+  const dir = JSON.stringify(projectDir);
+  const workflowDir = `${projectDir}/.github/workflows`;
+
+  try {
+    await runCommand(`mkdir -p ${JSON.stringify(workflowDir)}`);
+
+    // Write YAML to file via heredoc
+    const escaped = yaml.replace(/'/g, "'\\''");
+    const writeResult = await runCommand(
+      `cat > ${JSON.stringify(workflowDir + '/ci.yml')} << 'SHELLY_EOF'\n${yaml}SHELLY_EOF`,
+    );
+    if (writeResult.exitCode !== 0) {
+      return { success: false, error: 'Failed to write workflow file' };
+    }
+
+    // git add + commit
+    const addResult = await runCommand(`git -C ${dir} add .github/workflows/ci.yml`);
+    if (addResult.exitCode !== 0) {
+      return { success: false, error: 'git add failed' };
+    }
+
+    const commitResult = await runCommand(
+      `git -C ${dir} commit -m "ci: add GitHub Actions workflow (via Shelly)"`,
+    );
+    if (commitResult.exitCode !== 0) {
+      return { success: false, error: 'git commit failed' };
+    }
+
+    // Push (uses existing remote auth)
+    const pushResult = await runCommand(`git -C ${dir} push origin main`);
+    if (pushResult.exitCode !== 0) {
+      return { success: false, error: 'git push failed — check remote and auth' };
+    }
+
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e?.message || 'Unknown error' };
+  }
 }
 
 /**

@@ -19,6 +19,20 @@ export type CommandExecution = {
   isCollapsed: boolean;
 };
 
+/** Wizard types for interactive chat bubbles */
+export type WizardType = 'actions';
+
+/** GitHub Actions wizard state stored in message */
+export type ActionsWizardData = {
+  step: 'what' | 'when' | 'confirm' | 'done';
+  actions: Array<'build' | 'test' | 'deploy' | 'release'>;
+  trigger: 'push' | 'daily' | 'manual' | null;
+  projectType?: string;
+};
+
+/** Auto-check proposal state (shown after first push) */
+export type AutoCheckState = 'proposal' | 'setting_up' | 'done' | 'dismissed' | 'error';
+
 export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -41,6 +55,12 @@ export type ChatMessage = {
   dangerLevel?: 'CRITICAL' | 'HIGH' | 'MEDIUM';
   /** ローカルLLM応答時のモデル名+ポート (例: "gemma-3-4b-it (:8080)") */
   llmModelLabel?: string;
+  /** Interactive wizard type */
+  wizardType?: WizardType;
+  /** Wizard state data (JSON-serializable) */
+  wizardData?: ActionsWizardData;
+  /** Auto-check proposal state */
+  autoCheckState?: AutoCheckState;
 };
 
 export type ChatSession = {

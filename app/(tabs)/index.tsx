@@ -47,8 +47,11 @@ import { useTranslation } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
 import { ChatOnboarding } from '@/components/ChatOnboarding';
 import { type OnboardingStep, getOnboardingStep, setOnboardingStep, isOnboardingDone } from '@/lib/chat-onboarding';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { checkAndSave, initGitIfNeeded, isFileChangingCommand } from '@/lib/auto-savepoint';
 import { useSavepointStore } from '@/store/savepoint-store';
+import type { ActionsWizardData } from '@/store/chat-store';
+import { detectProjectTypeFromDir, generateWorkflowFromWizard, commitAndPushWorkflow } from '@/lib/github-actions';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -591,6 +594,11 @@ export default function ChatScreen() {
             output: (output + stderr).slice(0, 500),
             exitCode: result.exitCode,
           });
+
+          // ── Auto-check proposal after successful git push ──
+          if (result.exitCode === 0 && /^git\s+push\b/.test(parsed.prompt)) {
+            maybeShowAutoCheckProposal();
+          }
         } catch (err) {
           updateMessage(chatSessionId, msgId, {
             content: '',
@@ -742,6 +750,151 @@ export default function ChatScreen() {
     }
   }, [cancelCurrent, cancelStreaming]);
 
+  // ── Actions Wizard handlers ──
+  const handleWizardUpdate = useCallback((messageId: string, data: ActionsWizardData) => {
+    if (!chatSessionId) return;
+    updateMessage(chatSessionId, messageId, { wizardData: data });
+  }, [chatSessionId, updateMessage]);
+
+  const handleWizardComplete = useCallback(async (messageId: string, data: ActionsWizardData) => {
+    if (!chatSessionId) return;
+
+    // Mark wizard as done
+    updateMessage(chatSessionId, messageId, {
+      wizardData: { ...data, step: 'done' },
+    });
+
+    // Add progress message
+    const progressId = generateId();
+    addMessage(chatSessionId, {
+      id: progressId,
+      role: 'assistant',
+      content: t('wizard.setting_up'),
+      timestamp: Date.now(),
+      agent: 'git',
+      isStreaming: true,
+      streamingText: t('wizard.setting_up'),
+    });
+
+    try {
+      // Generate YAML
+      const yaml = generateWorkflowFromWizard(data);
+      const dir = activeSession.currentDir;
+
+      // Write + commit + push
+      const result = await commitAndPushWorkflow({
+        projectDir: dir,
+        yaml,
+        runCommand: async (cmd) => {
+          const res = await bridgeRunCommand(cmd);
+          return { stdout: res.stdout, exitCode: res.exitCode };
+        },
+      });
+
+      if (result.success) {
+        const triggerKey = data.trigger || 'push';
+        const triggerText = t(`wizard.done_${triggerKey}`);
+        updateMessage(chatSessionId, progressId, {
+          content: t('wizard.done', { trigger: triggerText }),
+          isStreaming: false,
+        });
+      } else {
+        updateMessage(chatSessionId, progressId, {
+          content: '',
+          error: t('wizard.error', { error: result.error || 'Unknown error' }),
+          isStreaming: false,
+        });
+      }
+    } catch (err) {
+      updateMessage(chatSessionId, progressId, {
+        content: '',
+        error: t('wizard.error', { error: err instanceof Error ? err.message : String(err) }),
+        isStreaming: false,
+      });
+    }
+  }, [chatSessionId, addMessage, updateMessage, activeSession.currentDir, bridgeRunCommand, t]);
+
+  // ── Auto-check: show proposal after first push ──
+  const autoCheckShownRef = useRef(false);
+
+  const maybeShowAutoCheckProposal = useCallback(async () => {
+    if (!chatSessionId || autoCheckShownRef.current) return;
+
+    // Check if already shown/configured (one-time per session)
+    try {
+      const flag = await AsyncStorage.getItem('shelly_autocheck_offered');
+      if (flag === 'true') return;
+    } catch { /* ignore */ }
+
+    autoCheckShownRef.current = true;
+
+    // Small delay so the push result message renders first
+    setTimeout(() => {
+      addMessage(chatSessionId, {
+        id: generateId(),
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        agent: 'git',
+        autoCheckState: 'proposal',
+      });
+    }, 800);
+  }, [chatSessionId, addMessage]);
+
+  const handleAutoCheckEnable = useCallback(async (messageId: string) => {
+    if (!chatSessionId) return;
+
+    updateMessage(chatSessionId, messageId, { autoCheckState: 'setting_up' });
+
+    try {
+      // Detect project type
+      const projectType = await detectProjectTypeFromDir(activeSession.currentDir, async (cmd) => {
+        const res = await bridgeRunCommand(cmd);
+        return { stdout: res.stdout, exitCode: res.exitCode };
+      });
+
+      // Generate default workflow (build + test, on push)
+      const data: ActionsWizardData = {
+        step: 'done',
+        actions: ['build', 'test'],
+        trigger: 'push',
+        projectType,
+      };
+      const yaml = generateWorkflowFromWizard(data);
+
+      // Write + commit + push
+      const result = await commitAndPushWorkflow({
+        projectDir: activeSession.currentDir,
+        yaml,
+        runCommand: async (cmd) => {
+          const res = await bridgeRunCommand(cmd);
+          return { stdout: res.stdout, exitCode: res.exitCode };
+        },
+      });
+
+      if (result.success) {
+        updateMessage(chatSessionId, messageId, { autoCheckState: 'done' });
+        await AsyncStorage.setItem('shelly_autocheck_offered', 'true');
+      } else {
+        updateMessage(chatSessionId, messageId, {
+          autoCheckState: 'error',
+          error: result.error,
+        });
+      }
+    } catch (err) {
+      updateMessage(chatSessionId, messageId, {
+        autoCheckState: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, [chatSessionId, updateMessage, activeSession.currentDir, bridgeRunCommand]);
+
+  const handleAutoCheckDismiss = useCallback(async (messageId: string) => {
+    if (!chatSessionId) return;
+    updateMessage(chatSessionId, messageId, { autoCheckState: 'dismissed' });
+    await AsyncStorage.setItem('shelly_autocheck_offered', 'true');
+  }, [chatSessionId, updateMessage]);
+
   const handleHistoryUp = useCallback((): string => {
     return navigateHistory('up');
   }, [navigateHistory]);
@@ -876,6 +1029,10 @@ export default function ChatScreen() {
             runCommand={isBridgeConnected ? savepointExec : undefined}
             sendToTerminal={isBridgeConnected ? sendCommand : undefined}
             runCommandInBackground={isBridgeConnected ? runCommandInBackground : undefined}
+            onWizardUpdate={handleWizardUpdate}
+            onWizardComplete={handleWizardComplete}
+            onAutoCheckEnable={handleAutoCheckEnable}
+            onAutoCheckDismiss={handleAutoCheckDismiss}
           />
         </View>
 
