@@ -90,13 +90,16 @@ export async function cerebrasChatStream(
     };
   }
 
+  const { getCurrentLocale } = await import('@/lib/i18n');
+  const locale = getCurrentLocale();
+  const systemContent = locale === 'ja'
+    ? 'あなたは優秀なAIアシスタントです。日本語で簡潔に回答してください。'
+    : 'You are a helpful AI assistant. Reply concisely in English.';
+
   const messages: CerebrasMessage[] = [
     {
       role: 'system',
-      content:
-        'あなたは優秀なAIアシスタントです。' +
-        '必ず日本語で回答してください。英語や他の言語は使わないでください。' +
-        '回答は簡潔で的確にまとめてください。',
+      content: systemContent,
     },
     ...history.slice(-6),
     { role: 'user', content: prompt },

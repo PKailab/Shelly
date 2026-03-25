@@ -165,10 +165,25 @@ export async function loadCustomContext(): Promise<string> {
 
 // ─── Default Custom Context Template ──────────────────────────────────────────
 
-export const DEFAULT_CUSTOM_CONTEXT = `# カスタムコンテキスト
+export function getDefaultCustomContext(): string {
+  const locale = getCurrentLocale();
+  if (locale === 'ja') {
+    return `# カスタムコンテキスト
 # ここに書いた内容がAIのシステムプロンプトに追加されます。
 # 例:
 # - このプロジェクトではReact + TypeScriptを使っています
-# - 日本語で回答してください
 # - コードにはコメントを多めにつけてください
+`;
+  }
+  return `# Custom Context
+# What you write here is added to the AI system prompt.
+# Examples:
+# - This project uses React + TypeScript
+# - Add plenty of comments to code
+`;
+}
+
+// Legacy export for backwards compatibility
+export const DEFAULT_CUSTOM_CONTEXT = `# Custom Context
+# What you write here is added to the AI system prompt.
 `;

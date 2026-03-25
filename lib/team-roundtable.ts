@@ -267,7 +267,11 @@ export async function runFacilitatorSummary(
     })
     .join('\n\n---\n\n');
 
-  const facilitatorPrompt = `あなたはAIエージェントたちの議論をまとめるファシリテーターです。
+  const { getCurrentLocale } = await import('@/lib/i18n');
+  const isJa = getCurrentLocale() === 'ja';
+
+  const facilitatorPrompt = isJa
+    ? `あなたはAIエージェントたちの議論をまとめるファシリテーターです。
 
 元の質問:
 ${originalPrompt}
@@ -281,7 +285,22 @@ ${memberSummaries}
 3. 意見が分かれている点
 4. あなた自身の総合的な見解と推奨事項
 
-日本語で回答してください。`;
+日本語で回答してください。`
+    : `You are a facilitator summarizing a discussion between AI agents.
+
+Original question:
+${originalPrompt}
+
+Agent responses:
+${memberSummaries}
+
+Based on the above, create an integrated summary in this format:
+1. Summarize each agent's key points in 1-2 sentences
+2. Points of agreement
+3. Points of disagreement
+4. Your overall assessment and recommendation
+
+Reply in English.`;
 
   try {
     if (facilitator.mode === 'local') {

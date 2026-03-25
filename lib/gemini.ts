@@ -6,6 +6,8 @@
  * - API仕様: https://ai.google.dev/api/generate-content
  */
 
+import { getCurrentLocale } from '@/lib/i18n';
+
 export const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 /** デフォルトモデル（高速・コスト効率が良い） */
@@ -169,10 +171,9 @@ export async function geminiChatStream(
   const systemInstruction = {
     parts: [
       {
-        text:
-          'あなたは優秀なAIアシスタントです。' +
-          '必ず日本語で回答してください。英語や他の言語は使わないでください。' +
-          '回答は簡潔で的確にまとめてください。',
+        text: getCurrentLocale() === 'ja'
+          ? 'あなたは優秀なAIアシスタントです。日本語で簡潔に回答してください。'
+          : 'You are a helpful AI assistant. Reply concisely in English.',
       },
     ],
   };
@@ -272,11 +273,9 @@ export async function geminiMultimodalStream(
   const systemInstruction = {
     parts: [
       {
-        text:
-          'あなたは優秀なAIアシスタントです。' +
-          '必ず日本語で回答してください。英語や他の言語は使わないでください。' +
-          '画像が添付されている場合は、画像の内容を分析して回答してください。' +
-          '回答は簡潔で的確にまとめてください。',
+        text: getCurrentLocale() === 'ja'
+          ? 'あなたは優秀なAIアシスタントです。日本語で簡潔に回答してください。画像がある場合は内容を分析してください。'
+          : 'You are a helpful AI assistant. Reply concisely in English. If images are attached, analyze their contents.',
       },
     ],
   };

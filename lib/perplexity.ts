@@ -9,6 +9,8 @@
  * API仕様: https://docs.perplexity.ai/docs/sonar/quickstart
  */
 
+import { getCurrentLocale } from '@/lib/i18n';
+
 export const PERPLEXITY_API_BASE = 'https://api.perplexity.ai';
 
 /** 論文検索に使用するデフォルトモデル */
@@ -69,12 +71,9 @@ export async function perplexitySearchStream(
   const messages: PerplexityMessage[] = [
     {
       role: 'system',
-      content:
-        'あなたは学術論文・研究の専門家です。' +
-        '必ず日本語で回答してください。英語や他の言語は使わないでください。' +
-        '論文・研究の引用元を必ず示してください。' +
-        '回答は構造化して、要点を箇条書きでまとめてください。' +
-        '最新の研究動向も含めて回答してください。',
+      content: getCurrentLocale() === 'ja'
+        ? 'あなたは学術論文・研究の専門家です。日本語で回答してください。引用元を示し、要点を箇条書きでまとめてください。'
+        : 'You are an expert in academic papers and research. Reply in English. Always cite sources and summarize key points in bullet points.',
     },
     ...(history ?? []).map((m) => ({ role: m.role as PerplexityMessage['role'], content: m.content })),
     {
