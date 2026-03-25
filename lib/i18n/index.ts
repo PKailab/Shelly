@@ -100,6 +100,13 @@ export function useTranslation() {
   return { t: translate, locale };
 }
 
+/**
+ * Get current locale outside React components (for system prompts etc.)
+ */
+export function getCurrentLocale(): Locale {
+  return useI18n.getState().locale;
+}
+
 export const AVAILABLE_LOCALES: Array<{ code: Locale; label: string; nativeLabel: string }> = [
   { code: 'en', label: 'English', nativeLabel: 'English' },
   { code: 'ja', label: 'Japanese', nativeLabel: '日本語' },

@@ -14,31 +14,58 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCurrentLocale } from '@/lib/i18n';
 
 // ─── Shelly Core Identity ─────────────────────────────────────────────────────
 
-const SHELLY_IDENTITY = `あなたはShellyのAIアシスタントです。日本語で簡潔に回答してください。
+function getShellyIdentity(): string {
+  const locale = getCurrentLocale();
+  const langInstruction = locale === 'ja'
+    ? 'あなたはShellyのAIアシスタントです。日本語で簡潔に回答してください。'
+    : 'You are Shelly\'s AI assistant. Reply concisely in English.';
 
-Shellyは Android のAI統合ターミナルアプリです（バックエンドはTermux）。
+  const appDesc = locale === 'ja'
+    ? 'Shellyは Android のAI統合ターミナルアプリです（バックエンドはTermux）。'
+    : 'Shelly is an AI-integrated terminal app for Android (powered by Termux).';
 
-# 利用可能なコマンド（正確な名前を使うこと）
-- claude — Claude Code（AIコーディング）
+  const cmdHeader = locale === 'ja'
+    ? '# 利用可能なコマンド（正確な名前を使うこと）'
+    : '# Available commands (use exact names)';
+
+  const cmdDesc = locale === 'ja'
+    ? `- claude — Claude Code（AIコーディング）
 - gemini — Gemini CLI（AI検索・コード生成）
 - codex — Codex CLI（軽量コード修正）
-- git, node, python, pnpm — 開発ツール
+- git, node, python, pnpm — 開発ツール`
+    : `- claude — Claude Code (AI coding)
+- gemini — Gemini CLI (AI search & code gen)
+- codex — Codex CLI (lightweight code fixes)
+- git, node, python, pnpm — dev tools`;
 
-コマンド実行が必要な場合のみ:
+  const execNote = locale === 'ja'
+    ? 'コマンド実行が必要な場合のみ:'
+    : 'Only when command execution is needed:';
+
+  return `${langInstruction}
+
+${appDesc}
+
+${cmdHeader}
+${cmdDesc}
+
+${execNote}
 \`\`\`
 [EXECUTE]
-コマンド
+command
 \`\`\``;
+}
 
 // ─── Tool Definitions ─────────────────────────────────────────────────────────
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
-  'claude-code': 'Claude Code: AIコーディング（コマンド: claude）',
-  'gemini-cli': 'Gemini CLI: AI検索・コード生成（コマンド: gemini）',
-  'llama-server': 'llama-server: ローカルLLM',
+  'claude-code': 'Claude Code (command: claude)',
+  'gemini-cli': 'Gemini CLI (command: gemini)',
+  'llama-server': 'llama-server: local LLM',
   'node': 'Node.js',
   'python': 'Python',
   'git': 'Git',
@@ -66,43 +93,53 @@ export interface SystemPromptContext {
  * LLMに送信するmessagesのsystem roleに使用。
  */
 export function buildSystemPrompt(ctx: SystemPromptContext = {}): string {
-  const parts: string[] = [SHELLY_IDENTITY];
+  const parts: string[] = [getShellyIdentity()];
 
   // ── ツール状態 ────────────────────────────────────────────────────────
   if (ctx.toolStatuses && ctx.toolStatuses.length > 0) {
-    const lines = ['# 利用可能なツール'];
+    const locale = getCurrentLocale();
+    const isJa = locale === 'ja';
+    const lines = [isJa ? '# 利用可能なツール' : '# Available tools'];
     for (const tool of ctx.toolStatuses) {
       const desc = TOOL_DESCRIPTIONS[tool.id] || tool.id;
       const status = tool.installed
-        ? `インストール済み${tool.version ? ` (${tool.version})` : ''}${tool.running ? ' - 稼働中' : ''}`
-        : '未インストール';
-      lines.push(`- ${desc}\n  状態: ${status}`);
+        ? (isJa
+          ? `インストール済み${tool.version ? ` (${tool.version})` : ''}${tool.running ? ' - 稼働中' : ''}`
+          : `installed${tool.version ? ` (${tool.version})` : ''}${tool.running ? ' - running' : ''}`)
+        : (isJa ? '未インストール' : 'not installed');
+      lines.push(`- ${desc}\n  ${isJa ? '状態' : 'status'}: ${status}`);
     }
     lines.push('');
-    lines.push('未インストールのツールが必要な場合は [SETUP:ツール名] で自動セットアップを提案してください。');
+    lines.push(isJa
+      ? '未インストールのツールが必要な場合は [SETUP:ツール名] で自動セットアップを提案してください。'
+      : 'If an uninstalled tool is needed, suggest auto-setup with [SETUP:tool-name].');
     parts.push(lines.join('\n'));
   }
 
   // ── 機能は SHELLY_IDENTITY に含めたので個別セクション不要 ──
 
   // ── プロジェクトコンテキスト ──────────────────────────────────────────
+  const locale = getCurrentLocale();
+  const isJa = locale === 'ja';
+
   if (ctx.projectContext) {
-    parts.push(`# 現在のプロジェクト\n${ctx.projectContext}`);
+    parts.push(`# ${isJa ? '現在のプロジェクト' : 'Current project'}\n${ctx.projectContext}`);
   }
 
-  // ── ユーザープロファイル ──────────────────────────────────────────────
   if (ctx.userProfileSummary) {
-    parts.push(`# ユーザー情報\n${ctx.userProfileSummary}`);
+    parts.push(`# ${isJa ? 'ユーザー情報' : 'User info'}\n${ctx.userProfileSummary}`);
   }
 
-  // ── 判断ログ（永続メモリ） ──────────────────────────────────────────
   if (ctx.decisionLog) {
-    parts.push(`# 過去の設計判断・修正履歴\n以下はセッション跨ぎで保存された重要な判断です。矛盾する変更を避けてください。\n${ctx.decisionLog}`);
+    const header = isJa ? '過去の設計判断・修正履歴' : 'Past design decisions';
+    const note = isJa
+      ? '以下はセッション跨ぎで保存された重要な判断です。矛盾する変更を避けてください。'
+      : 'These are important decisions preserved across sessions. Avoid contradicting them.';
+    parts.push(`# ${header}\n${note}\n${ctx.decisionLog}`);
   }
 
-  // ── ユーザーカスタムコンテキスト ──────────────────────────────────────
   if (ctx.customContext) {
-    parts.push(`# ユーザー定義コンテキスト\n${ctx.customContext}`);
+    parts.push(`# ${isJa ? 'ユーザー定義コンテキスト' : 'Custom context'}\n${ctx.customContext}`);
   }
 
   return parts.join('\n\n');
