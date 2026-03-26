@@ -73,12 +73,28 @@ const DEFAULT_TERMUX_SETTINGS: TermuxSettings = {
   ttyUrl: 'http://localhost:7681',
 };
 
-function createSession(id: string, name: string): TabSession {
+// ─── Multi-session port pool ─────────────────────────────────────────────────
+
+const TTYD_PORT_BASE = 7681;
+const MAX_SESSIONS = 6;
+const TTYD_PORTS = Array.from({ length: MAX_SESSIONS }, (_, i) => TTYD_PORT_BASE + i);
+
+function allocatePort(sessions: TabSession[]): number | null {
+  const usedPorts = new Set(sessions.map((s) => s.port));
+  for (const port of TTYD_PORTS) {
+    if (!usedPorts.has(port)) return port;
+  }
+  return null;
+}
+
+function createSession(id: string, name: string, port: number = TTYD_PORT_BASE): TabSession {
   return {
     id,
     name,
     connectionStatus: 'local',
     currentDir: '/home/user',
+    port,
+    ttyUrl: `http://localhost:${port}`,
     blocks: [],
     entries: [],
     commandHistory: [],
@@ -199,11 +215,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   addSession: () => {
     const { sessions } = get();
-    if (sessions.length >= 3) return;
+    if (sessions.length >= MAX_SESSIONS) return;
+    const port = allocatePort(sessions);
+    if (!port) return;
     const id = `session-${Date.now()}`;
     const name = `Terminal ${sessions.length + 1}`;
     set((state) => ({
-      sessions: [...state.sessions, createSession(id, name)],
+      sessions: [...state.sessions, createSession(id, name, port)],
       activeSessionId: id,
     }));
     get().saveSessionState();
@@ -611,6 +629,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         id: s.id,
         name: s.name,
         currentDir: s.currentDir,
+        port: s.port,
+        ttyUrl: s.ttyUrl,
         commandHistory: s.commandHistory.slice(0, 100),
         blocks: s.blocks
           .filter((b) => !b.isRunning) // skip running blocks
@@ -647,8 +667,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const data = JSON.parse(raw);
       if (!data.sessions || !Array.isArray(data.sessions) || data.sessions.length === 0) return;
       // Restore sessions with defaults for missing fields
-      const restored: TabSession[] = data.sessions.map((s: any) => ({
-        ...createSession(s.id, s.name),
+      const restored: TabSession[] = data.sessions.map((s: any, index: number) => ({
+        ...createSession(s.id, s.name, s.port || TTYD_PORT_BASE + index),
         currentDir: s.currentDir || '/home/user',
         commandHistory: s.commandHistory || [],
         blocks: (s.blocks || []).map((b: any) => ({ ...b, isRunning: false })),

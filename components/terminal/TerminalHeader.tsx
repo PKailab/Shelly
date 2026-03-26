@@ -222,7 +222,7 @@ export function TerminalHeader() {
             </Text>
           </Pressable>
         ))}
-        {sessions.length < 3 && (
+        {sessions.length < 6 && (
           <Pressable
             onPress={addSession}
             style={[styles.addTabButton, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}

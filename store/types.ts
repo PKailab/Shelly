@@ -140,6 +140,8 @@ export type TabSession = {
   name: string;
   connectionStatus: ConnectionStatus;
   currentDir: string;
+  port: number;          // ttyd port (7681-7686)
+  ttyUrl: string;        // "http://localhost:{port}"
   blocks: CommandBlock[];
   /** AI応答ブロック（CommandBlockと混在して表示） */
   entries: TerminalEntry[];
