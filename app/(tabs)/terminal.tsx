@@ -30,6 +30,7 @@ import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
 import { killTtyd } from '@/lib/ttyd-manager';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import * as FileSystem from 'expo-file-system/legacy';
 import { CommandKeyBar } from '@/components/terminal/CommandKeyBar';
 import { TerminalActionBar } from '@/components/terminal/TerminalActionBar';
 
@@ -212,8 +213,7 @@ export default function TerminalScreen() {
   const copyFileToCwd = useCallback(async (sourceUri: string, fileName: string) => {
     try {
       const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-      // Use FileSystem to copy to Termux-accessible path, then mv via bridge
-      const { FileSystem } = await import('expo-file-system');
+      // Copy to Termux-accessible path via expo-file-system, then mv via bridge
       const tempPath = `${FileSystem.cacheDirectory}${safeName}`;
       await FileSystem.copyAsync({ from: sourceUri, to: tempPath });
       // Copy from app cache to terminal cwd via bridge
