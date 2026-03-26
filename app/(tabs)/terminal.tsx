@@ -348,6 +348,27 @@ export default function TerminalScreen() {
           term.options.fontSize = TARGET_SIZE;
           // Fix Unicode/CJK rendering: use a font stack that covers symbols and CJK
           term.options.fontFamily = '"Droid Sans Mono", "Noto Sans Mono", "Noto Sans CJK JP", monospace';
+          // Enable Unicode 11 for correct CJK character width calculation
+          if (term.unicode && term.unicode.activeVersion !== '11') {
+            try {
+              if (typeof Unicode11Addon !== 'undefined') {
+                term.loadAddon(new Unicode11Addon.Unicode11Addon());
+                term.unicode.activeVersion = '11';
+              } else {
+                // Dynamically load unicode11 addon from CDN
+                var script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.6.0/lib/xterm-addon-unicode11.js';
+                script.onload = function() {
+                  try {
+                    term.loadAddon(new Unicode11Addon.Unicode11Addon());
+                    term.unicode.activeVersion = '11';
+                    term.refresh(0, term.rows - 1);
+                  } catch(e2) {}
+                };
+                document.head.appendChild(script);
+              }
+            } catch(e) {}
+          }
           // Force re-render
           try { term.refresh(0, term.rows - 1); } catch(e) {}
           try {

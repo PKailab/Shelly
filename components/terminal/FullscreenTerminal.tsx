@@ -45,6 +45,7 @@ const XTERM_HTML = `<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.6.0/lib/xterm-addon-unicode11.js"></script>
 <script>
 (function() {
   var wsUrl = '';
@@ -57,7 +58,7 @@ const XTERM_HTML = `<!DOCTYPE html>
     term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", "Courier New", monospace',
+      fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", "Noto Sans CJK JP", "Courier New", monospace',
       fontSize: 13,
       lineHeight: 1.3,
       theme: {
@@ -83,6 +84,11 @@ const XTERM_HTML = `<!DOCTYPE html>
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon.WebLinksAddon());
+    // Enable Unicode 11 for correct CJK character width
+    if (typeof Unicode11Addon !== 'undefined') {
+      term.loadAddon(new Unicode11Addon.Unicode11Addon());
+      term.unicode.activeVersion = '11';
+    }
     term.open(document.getElementById('terminal'));
     fitAddon.fit();
 
