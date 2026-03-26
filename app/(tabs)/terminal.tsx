@@ -30,6 +30,8 @@ import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
 import { killTtyd } from '@/lib/ttyd-manager';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { CommandKeyBar } from '@/components/terminal/CommandKeyBar';
+import { TerminalActionBar } from '@/components/terminal/TerminalActionBar';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -183,6 +185,46 @@ export default function TerminalScreen() {
     `;
     webViewRef.current.injectJavaScript(js);
   }, []);
+
+  // Send raw key code to xterm.js (for command key bar)
+  const sendKey = useCallback((keyCode: string) => {
+    if (!webViewRef.current) return;
+    const safeKey = JSON.stringify(keyCode);
+    const js = `
+      (function() {
+        var term = window.term || (window.lib && window.lib.terminal) || window.tty;
+        if (!term) {
+          var el = document.querySelector('.xterm');
+          if (el) term = el._xterm || el.xterm;
+        }
+        if (term && term._core && term._core._coreService) {
+          term._core._coreService.triggerDataEvent(${safeKey}, true);
+        } else if (window.socket && window.socket.send) {
+          window.socket.send('0' + ${safeKey});
+        }
+      })();
+      true;
+    `;
+    webViewRef.current.injectJavaScript(js);
+  }, []);
+
+  // Copy file from device to terminal cwd via bridge
+  const copyFileToCwd = useCallback(async (sourceUri: string, fileName: string) => {
+    try {
+      const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      // Use FileSystem to copy to Termux-accessible path, then mv via bridge
+      const { FileSystem } = await import('expo-file-system');
+      const tempPath = `${FileSystem.cacheDirectory}${safeName}`;
+      await FileSystem.copyAsync({ from: sourceUri, to: tempPath });
+      // Copy from app cache to terminal cwd via bridge
+      await runRawCommand(
+        `cp '${tempPath}' './${safeName}' 2>/dev/null && echo "Copied ${safeName} to $(pwd)"`,
+        { timeoutMs: 10000, reason: 'file-attach' },
+      );
+    } catch (e) {
+      console.warn('[Terminal] file copy failed:', e);
+    }
+  }, [runRawCommand]);
 
   const handleJpSend = useCallback(() => {
     const text = jpInput.trim();
@@ -455,6 +497,23 @@ export default function TerminalScreen() {
             <MaterialIcons name="send" size={16} color={c.background} />
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* Command Key Bar (Ctrl+C, Tab, ↑, ↓, Paste) */}
+      {status === 'connected' && (
+        <CommandKeyBar
+          sendKey={sendKey}
+          sendText={sendToTerminal}
+          isCompact={layout.isCompact || layout.width < 400}
+        />
+      )}
+
+      {/* Action Bar (Attach + Voice) */}
+      {status === 'connected' && (
+        <TerminalActionBar
+          copyFileToCwd={copyFileToCwd}
+          sendText={sendToTerminal}
+        />
       )}
 
       {/* Error: Setup Guide */}

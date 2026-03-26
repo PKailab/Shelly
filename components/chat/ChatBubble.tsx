@@ -222,7 +222,7 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
         {/* Message text (Markdown) */}
         {(() => {
           const markdownStyles = {
-            body: { color: colors.foregroundDim, fontSize, fontFamily: 'monospace', lineHeight: 21 },
+            body: { color: colors.foregroundDim, fontSize, fontFamily: 'monospace', lineHeight: 18 },
             code_inline: { backgroundColor: withAlpha(colors.foreground, 0.08), color: colors.accent, fontFamily: 'monospace', fontSize: fontSize - 1, paddingHorizontal: 4, borderRadius: 3 },
             code_block: { backgroundColor: '#0D0D0D', color: '#E8E8E8', fontFamily: 'monospace', fontSize: fontSize - 1, padding: 10, borderRadius: 6, lineHeight: 18 },
             fence: { backgroundColor: '#0D0D0D', color: '#E8E8E8', fontFamily: 'monospace', fontSize: fontSize - 1, padding: 10, borderRadius: 6, lineHeight: 18 },
@@ -465,12 +465,12 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   userBubble: {
-    borderRadius: 18,
+    borderRadius: 14,
     borderTopRightRadius: 4,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    maxWidth: '75%',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    maxWidth: '80%',
   },
 
   // Assistant bubble (left-aligned)
@@ -498,8 +498,8 @@ const styles = StyleSheet.create({
   },
   assistantBubble: {
     flex: 1,
-    maxWidth: '85%',
-    borderRadius: 18,
+    maxWidth: '90%',
+    borderRadius: 14,
     borderTopLeftRadius: 4,
     borderWidth: 1,
     overflow: 'hidden',
