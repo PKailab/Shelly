@@ -26,6 +26,10 @@ import { useTranslation, t } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
 import { stripAnsi } from '@/lib/strip-ansi';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
+import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
+import { TerminalHeader } from '@/components/terminal/TerminalHeader';
+import { killTtyd } from '@/lib/ttyd-manager';
+import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -112,6 +116,9 @@ export default function TerminalScreen() {
   const layout = useDeviceLayout();
   const webViewRef = useRef<WebView>(null);
   const inputRef = useRef<TextInput>(null);
+  const activeSession = useActiveSession();
+  const { removeSession, sessions } = useTerminalStore();
+  const { runRawCommand } = useTermuxBridge();
   const {
     status,
     retryCount,
@@ -119,7 +126,7 @@ export default function TerminalScreen() {
     onWebViewLoad,
     onWebViewError,
     ttyUrl,
-  } = useTtydConnection();
+  } = useTtydConnection(activeSession?.ttyUrl);
 
   // Clean up WebView on unmount (e.g. when multi-pane → single-pane)
   useEffect(() => {
@@ -246,6 +253,8 @@ export default function TerminalScreen() {
         }
         if (term && term.options) {
           term.options.fontSize = TARGET_SIZE;
+          // Fix Unicode/CJK rendering: use a font stack that covers symbols and CJK
+          term.options.fontFamily = '"Droid Sans Mono", "Noto Sans Mono", "Noto Sans CJK JP", monospace';
           // Force re-render
           try { term.refresh(0, term.rows - 1); } catch(e) {}
           try {
@@ -262,7 +271,7 @@ export default function TerminalScreen() {
         var xtermScreen = document.querySelector('.xterm-screen');
         if (xtermScreen) {
           var style = document.createElement('style');
-          style.textContent = '.xterm-rows { font-size: ' + TARGET_SIZE + 'px !important; } .xterm { font-size: ' + TARGET_SIZE + 'px !important; }';
+          style.textContent = '.xterm-rows { font-size: ' + TARGET_SIZE + 'px !important; font-family: "Droid Sans Mono", "Noto Sans Mono", "Noto Sans CJK JP", monospace !important; } .xterm { font-size: ' + TARGET_SIZE + 'px !important; }';
           document.head.appendChild(style);
           return;
         }
@@ -343,31 +352,38 @@ export default function TerminalScreen() {
     }, 500);
   }, [retry]);
 
+  // Handle session removal with ttyd cleanup
+  const handleRemoveSession = useCallback(async (sessionId: string) => {
+    const session = sessions.find((s) => s.id === sessionId);
+    if (session) {
+      killTtyd(session.port, runRawCommand);
+    }
+    removeSession(sessionId);
+  }, [sessions, removeSession, runRawCommand]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: c.background }]}>
-      {/* Status Bar */}
-      <View style={[styles.statusBar, { backgroundColor: c.surfaceHigh, borderBottomColor: c.border }]}>
-        <View style={styles.statusLeft}>
-          <MaterialIcons name="terminal" size={18} color={c.accent} />
-          <Text style={[styles.statusTitle, { color: c.foreground }]}>Terminal</Text>
-          <StatusBadge state={webViewFailed ? 'error' : status} retryCount={retryCount} colors={c} />
-        </View>
-        <View style={styles.statusRight}>
-          <TouchableOpacity
-            onPress={toggleJpInput}
-            style={[
-              styles.jpToggle,
-              { backgroundColor: showJpInput ? withAlpha(c.accent, 0.15) : 'transparent', borderColor: showJpInput ? c.accent : c.border },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Japanese input toggle"
-          >
-            <Text style={[styles.jpToggleText, { color: showJpInput ? c.accent : c.muted }]}>あ</Text>
-          </TouchableOpacity>
-          <Pressable onPress={handleReload} style={styles.reloadBtn} accessibilityRole="button" accessibilityLabel="Reload terminal">
-            <MaterialIcons name="refresh" size={20} color={c.foreground} />
-          </Pressable>
-        </View>
+      {/* Session Tab Header */}
+      <TerminalHeader />
+
+      {/* Quick Actions Bar (JP input + reload) */}
+      <View style={[styles.quickBar, { backgroundColor: c.surfaceHigh, borderBottomColor: c.border }]}>
+        <StatusBadge state={webViewFailed ? 'error' : status} retryCount={retryCount} colors={c} />
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity
+          onPress={toggleJpInput}
+          style={[
+            styles.jpToggle,
+            { backgroundColor: showJpInput ? withAlpha(c.accent, 0.15) : 'transparent', borderColor: showJpInput ? c.accent : c.border },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Japanese input toggle"
+        >
+          <Text style={[styles.jpToggleText, { color: showJpInput ? c.accent : c.muted }]}>あ</Text>
+        </TouchableOpacity>
+        <Pressable onPress={handleReload} style={styles.reloadBtn} accessibilityRole="button" accessibilityLabel="Reload terminal">
+          <MaterialIcons name="refresh" size={18} color={c.foreground} />
+        </Pressable>
       </View>
 
       {/* Connecting Spinner */}
@@ -390,7 +406,7 @@ export default function TerminalScreen() {
         style={[styles.webView, status !== 'connected' && { height: 0, opacity: 0 }]}
         javaScriptEnabled
         domStorageEnabled
-        textZoom={layout.isCompact || layout.width < 500 ? 140 : 100}
+        textZoom={100}
         onLoadEnd={handleWebViewLoad}
         onError={handleWebViewError2}
         onHttpError={handleWebViewError2}
@@ -576,18 +592,15 @@ function SetupGuide({ url, onRetry, colors: c }: { url: string; onRetry: () => v
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Status bar
-  statusBar: {
+  // Quick actions bar (below TerminalHeader)
+  quickBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     borderBottomWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 6,
   },
-  statusLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusTitle: { fontSize: 15, fontWeight: '700', fontFamily: 'monospace' },
-  statusRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reloadBtn: { padding: 4, borderRadius: 6 },
 
   // JP toggle
