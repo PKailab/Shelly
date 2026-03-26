@@ -33,6 +33,10 @@ import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CommandKeyBar } from '@/components/terminal/CommandKeyBar';
 import { TerminalActionBar } from '@/components/terminal/TerminalActionBar';
+import { startSmartWakelock, stopSmartWakelock } from '@/lib/smart-wakelock';
+import { startPhantomGuard, stopPhantomGuard, monitorPort, unmonitorPort, showPhantomKillerRecovery } from '@/lib/phantom-process-guard';
+import { loadSessionsFromProject, startAutoSave, stopAutoSave } from '@/lib/session-persistence';
+import { VoiceChat } from '@/components/VoiceChat';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -131,12 +135,50 @@ export default function TerminalScreen() {
     ttyUrl,
   } = useTtydConnection(activeSession?.ttyUrl);
 
+  // Voice dialog mode state
+  const [voiceChatVisible, setVoiceChatVisible] = useState(false);
+
   // Clean up WebView on unmount (e.g. when multi-pane → single-pane)
   useEffect(() => {
     return () => {
       webViewRef.current?.stopLoading();
     };
   }, []);
+
+  // Start smart wakelock + phantom process guard on mount
+  useEffect(() => {
+    startSmartWakelock(runRawCommand);
+    const ports = sessions.map((s) => s.port);
+    startPhantomGuard(ports, runRawCommand, (killedPort) => {
+      const killed = sessions.find((s) => s.port === killedPort);
+      if (killed) {
+        showPhantomKillerRecovery(killed.name, () => {
+          retry();
+        });
+      }
+    });
+    return () => {
+      stopSmartWakelock();
+      stopPhantomGuard();
+    };
+  }, []);
+
+  // Keep phantom guard in sync with session changes
+  useEffect(() => {
+    for (const s of sessions) {
+      monitorPort(s.port);
+    }
+  }, [sessions.length]);
+
+  // Auto-save sessions to project directory (if chat has a projectPath)
+  useEffect(() => {
+    // Try to detect project path from first session's cwd or chat store
+    const cwd = activeSession?.currentDir;
+    if (cwd && cwd !== '/home/user' && cwd !== '') {
+      startAutoSave(cwd, runRawCommand);
+      return () => stopAutoSave();
+    }
+  }, [activeSession?.currentDir, runRawCommand]);
 
   // Track actual WebView render success (distinct from HTTP HEAD check)
   const [webViewFailed, setWebViewFailed] = useState(false);
@@ -513,8 +555,15 @@ export default function TerminalScreen() {
         <TerminalActionBar
           copyFileToCwd={copyFileToCwd}
           sendText={sendToTerminal}
+          onVoiceDialog={() => setVoiceChatVisible(true)}
         />
       )}
+
+      {/* Voice Dialog Mode */}
+      <VoiceChat
+        visible={voiceChatVisible}
+        onClose={() => setVoiceChatVisible(false)}
+      />
 
       {/* Error: Setup Guide */}
       {(status === 'error' || webViewFailed) && <SetupGuide url={ttyUrl} onRetry={() => { setWebViewFailed(false); retry(); }} colors={c} />}
