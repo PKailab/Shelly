@@ -87,8 +87,11 @@ class ShellyTerminalView(
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
+        val w = right - left
+        val h = bottom - top
+        Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
         // Ensure TerminalView fills the entire ExpoView frame
-        terminalView.layout(0, 0, right - left, bottom - top)
+        terminalView.layout(0, 0, w, h)
     }
 
     // --- Session Management ---
@@ -281,8 +284,8 @@ class ShellyTerminalView(
 
     override fun onEmulatorSet() {
         terminalView.invalidate()
-        // Notify React Native of the new terminal size so it can resize tmux
         val emulator = terminalView.mEmulator ?: return
+        Log.i(TAG, "onEmulatorSet: cols=${emulator.mColumns}, rows=${emulator.mRows}, viewSize=${terminalView.width}x${terminalView.height}")
         onResize(mapOf("cols" to emulator.mColumns, "rows" to emulator.mRows))
     }
 
