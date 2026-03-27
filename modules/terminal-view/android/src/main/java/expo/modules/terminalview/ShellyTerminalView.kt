@@ -181,8 +181,11 @@ class ShellyTerminalView(
     // --- Scroll Ownership ---
 
     override fun onInterceptTouchEvent(event: MotionEvent?): Boolean {
-        // Intercept vertical scroll events so parent ScrollView doesn't steal them
-        return true
+        // Let touch events pass through to the child TerminalView so it can
+        // handle taps (show keyboard) and gestures (scroll, select).
+        // Tell parent views not to intercept our touch events.
+        parent?.requestDisallowInterceptTouchEvent(true)
+        return false
     }
 
     // --- Output Processing ---
