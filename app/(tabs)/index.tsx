@@ -45,6 +45,7 @@ import { TranslateOverlay } from '@/components/chat/TranslateOverlay';
 import { generateId } from '@/lib/id';
 import { useTranslation } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
+import { buildTerminalContext } from '@/lib/terminal-context';
 import { ChatOnboarding } from '@/components/ChatOnboarding';
 import { type OnboardingStep, getOnboardingStep, setOnboardingStep, isOnboardingDone } from '@/lib/chat-onboarding';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -679,8 +680,14 @@ export default function ChatScreen() {
       return;
     }
 
+    // Inject terminal output when user references terminal (@terminal, etc.)
+    const terminalContext = buildTerminalContext(parsed.prompt);
+    const enrichedPrompt = terminalContext
+      ? `[Terminal Context]\n${terminalContext}\n\n[User Message]\n${parsed.prompt}`
+      : parsed.prompt;
+
     // Dispatch to AI agent (with conversation context + file attachments)
-    const result = await aiDispatch({ target, prompt: parsed.prompt, chatSessionId, messages: messagesRef.current, files, isWide });
+    const result = await aiDispatch({ target, prompt: enrichedPrompt, chatSessionId, messages: messagesRef.current, files, isWide });
     if (!result.handled) {
       const msgId = addAssistantMessage(undefined);
       updateMessage(chatSessionId, msgId, {

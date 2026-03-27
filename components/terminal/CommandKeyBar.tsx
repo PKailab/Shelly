@@ -5,7 +5,7 @@
  * Responsive: shrinks labels on narrow panes.
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -41,13 +41,19 @@ const KEYS: KeyDef[] = [
 export function CommandKeyBar({ sendKey, sendText, isCompact }: Props) {
   const { colors: c } = useTheme();
   const { settings } = useTerminalStore();
+  const [altActive, setAltActive] = useState(false);
 
   const handleKeyPress = useCallback((keyCode: string) => {
     if (settings.hapticFeedback) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    sendKey(keyCode);
-  }, [sendKey, settings.hapticFeedback]);
+    if (altActive) {
+      sendKey('\x1b' + keyCode); // ESC prefix = Alt modifier
+      setAltActive(false);
+    } else {
+      sendKey(keyCode);
+    }
+  }, [sendKey, settings.hapticFeedback, altActive]);
 
   const handlePaste = useCallback(async () => {
     try {
@@ -86,6 +92,51 @@ export function CommandKeyBar({ sendKey, sendText, isCompact }: Props) {
         accessibilityLabel="Paste"
       >
         <MaterialIcons name="content-paste" size={14} color={c.foreground} />
+      </Pressable>
+      {/* Alt key toggle */}
+      <Pressable
+        style={[
+          styles.key,
+          {
+            backgroundColor: altActive
+              ? withAlpha(c.accent, 0.2)
+              : withAlpha(c.foreground, 0.06),
+            borderColor: altActive ? c.accent : c.borderLight,
+          },
+        ]}
+        onPress={() => {
+          setAltActive((v) => !v);
+          if (settings.hapticFeedback) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Alt key"
+      >
+        <Text style={[styles.keyText, { color: altActive ? c.accent : c.foreground }]}>
+          Alt
+        </Text>
+      </Pressable>
+      {/* Enter key */}
+      <Pressable
+        style={[styles.key, { backgroundColor: withAlpha(c.foreground, 0.06), borderColor: c.borderLight }]}
+        onPress={() => {
+          if (settings.hapticFeedback) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }
+          if (altActive) {
+            sendKey('\x1b\r');
+            setAltActive(false);
+          } else {
+            sendKey('\r');
+          }
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Enter"
+      >
+        <Text style={[styles.keyText, { color: c.foreground }]}>
+          {isCompact ? '\u21B5' : 'Enter'}
+        </Text>
       </Pressable>
     </View>
   );

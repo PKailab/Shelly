@@ -94,6 +94,10 @@ type ExecutionLogStore = {
   addTerminalOutput: (line: string, sessionId?: string) => void;
   /** エラー行の前後contextLines行を含む直近出力を取得。sessionIdでフィルタ可能 */
   getRecentOutput: (lines?: number, contextLines?: number, sessionId?: string) => string;
+  /** 記録済みセッションIDの一覧を取得 */
+  getSessionIds: () => string[];
+  /** 全セッションの直近出力をまとめて取得 */
+  getRecentOutputForAllSessions: (lines?: number) => { sessionId: string; output: string }[];
   /** ターミナル出力をクリア */
   clearTerminalOutput: () => void;
   clearEntries: () => void;
@@ -176,6 +180,24 @@ export const useExecutionLogStore = create<ExecutionLogStore>((set, get) => ({
       .filter((_, i) => includeSet.has(i))
       .map((l) => l.text)
       .join('\n');
+  },
+
+  getSessionIds: () => {
+    const { sessionBuffer } = get();
+    return [...new Set(sessionBuffer.filter((l) => l.sessionId).map((l) => l.sessionId!))];
+  },
+
+  getRecentOutputForAllSessions: (lines = 30) => {
+    const { sessionBuffer } = get();
+    const sessionIds = [...new Set(sessionBuffer.filter((l) => l.sessionId).map((l) => l.sessionId!))];
+    return sessionIds.map((sid) => ({
+      sessionId: sid,
+      output: sessionBuffer
+        .filter((l) => l.sessionId === sid)
+        .slice(-lines)
+        .map((l) => l.text)
+        .join('\n'),
+    }));
   },
 
   clearTerminalOutput: () => set({ hotBuffer: [], sessionBuffer: [], terminalOutput: [] }),

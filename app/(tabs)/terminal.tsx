@@ -35,7 +35,8 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { CommandKeyBar } from '@/components/terminal/CommandKeyBar';
 import { TerminalActionBar } from '@/components/terminal/TerminalActionBar';
 import { startSmartWakelock, stopSmartWakelock } from '@/lib/smart-wakelock';
-import { startPhantomGuard, stopPhantomGuard, monitorPort, unmonitorPort, showPhantomKillerRecovery, pauseMonitorForRecovery, resumeMonitorAfterRecovery } from '@/lib/phantom-process-guard';
+import TermuxBridge from '@/modules/termux-bridge';
+import { startPhantomGuard, stopPhantomGuard, monitorPort, unmonitorPort, pauseMonitorForRecovery, resumeMonitorAfterRecovery } from '@/lib/phantom-process-guard';
 import { loadSessionsFromProject, startAutoSave, stopAutoSave } from '@/lib/session-persistence';
 import { VoiceChat } from '@/components/VoiceChat';
 
@@ -173,20 +174,21 @@ export default function TerminalScreen() {
     }, 10_000);
   }, [runRawCommand, retry]);
 
-  // Start smart wakelock + phantom process guard on mount
+  // Start smart wakelock + foreground service + phantom process guard on mount
   useEffect(() => {
     startSmartWakelock(runRawCommand);
+    TermuxBridge.startForeground().catch(() => {});
     const ports = sessions.map((s) => s.port);
     startPhantomGuard(ports, runRawCommand, (killedPort) => {
       const killed = sessions.find((s) => s.port === killedPort);
       if (killed) {
-        showPhantomKillerRecovery(killed.name, () => {
-          recoverSession(killed);
-        });
+        // Silently recover — no scary dialog for the user
+        recoverSession(killed);
       }
     });
     return () => {
       stopSmartWakelock();
+      TermuxBridge.stopForeground().catch(() => {});
       stopPhantomGuard();
     };
   }, []);

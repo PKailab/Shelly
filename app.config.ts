@@ -64,7 +64,7 @@ const config: ExpoConfig & { android?: any } = {
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
     usesCleartextTraffic: true as any, // Required for localhost HTTP (ttyd/bridge)
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: ["POST_NOTIFICATIONS", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_SPECIAL_USE"],
     intentFilters: [
       {
         action: "VIEW",

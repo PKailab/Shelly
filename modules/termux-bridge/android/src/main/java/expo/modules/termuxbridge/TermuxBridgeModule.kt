@@ -51,6 +51,24 @@ class TermuxBridgeModule : Module() {
       }
     }
 
+    AsyncFunction("startForeground") {
+      val context = appContext.reactContext
+        ?: throw Exception("React context not available")
+      ShellyForegroundService.start(context)
+      mapOf("success" to true)
+    }
+
+    AsyncFunction("stopForeground") {
+      val context = appContext.reactContext
+        ?: throw Exception("React context not available")
+      ShellyForegroundService.stop(context)
+      mapOf("success" to true)
+    }
+
+    Function("isForegroundRunning") {
+      ShellyForegroundService.running()
+    }
+
     /**
      * Check if a package is installed on the device.
      */
