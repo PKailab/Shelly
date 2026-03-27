@@ -85,6 +85,19 @@ class ShellyTerminalView(
         terminalView.setTypeface(defaultTypeface)
     }
 
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        // Pass the exact measured size to the TerminalView child so it
+        // doesn't fall back to wrap_content sizing.
+        val w = measuredWidth
+        val h = measuredHeight
+        if (w > 0 && h > 0) {
+            val exactW = View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY)
+            val exactH = View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)
+            terminalView.measure(exactW, exactH)
+        }
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val w = right - left
@@ -92,6 +105,12 @@ class ShellyTerminalView(
         Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
         // Ensure TerminalView fills the entire ExpoView frame
         terminalView.layout(0, 0, w, h)
+        // Force emulator to recalculate cols/rows based on the new pixel size.
+        // layout() alone may not trigger onSizeChanged if called before measure,
+        // or the emulator may have been initialized with stale dimensions.
+        if (w > 0 && h > 0) {
+            terminalView.updateSize()
+        }
     }
 
     // --- Session Management ---
