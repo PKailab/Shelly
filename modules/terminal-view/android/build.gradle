@@ -1,0 +1,19 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.terminalview'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.terminalview"
+
+  lint {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation project(':terminal-emulator')
+}
