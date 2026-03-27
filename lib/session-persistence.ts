@@ -37,7 +37,7 @@ function sessionToJson(session: TabSession, outputLines: string[]): PersistedSes
   return {
     id: session.id,
     name: session.name,
-    port: session.port,
+    port: 0, // Legacy field — no longer used with native PTY
     cwd: session.currentDir || '',
     commandHistory: session.commandHistory.slice(0, 100),
     outputBuffer: outputLines.slice(-MAX_OUTPUT_LINES),

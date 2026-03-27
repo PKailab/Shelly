@@ -394,7 +394,7 @@ export function useTermuxBridge() {
           // === Layer 2: CLI session recovery ===
           const { sessions } = useTerminalStore.getState();
           for (const session of sessions) {
-            const tmuxName = session.tmuxSession || `shelly-${session.port - 7681 + 1}`;
+            const tmuxName = session.tmuxSession;
             const alive = await isSessionAlive(tmuxName, runRawCommand);
             if (!alive && (session.activeCli || session.currentDir !== '/home/user')) {
               // tmux died — create new session and auto-resume
