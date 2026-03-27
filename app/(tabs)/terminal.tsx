@@ -28,7 +28,8 @@ import { stripAnsi } from '@/lib/strip-ansi';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
-import { killTtyd } from '@/lib/ttyd-manager';
+import { killTtyd, launchTtyd } from '@/lib/ttyd-manager';
+import { sendKeysToSession, buildRecoveryCommand } from '@/lib/tmux-manager';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CommandKeyBar } from '@/components/terminal/CommandKeyBar';
@@ -148,6 +149,26 @@ export default function TerminalScreen() {
     };
   }, []);
 
+  // Recover a session after phantom process killer: re-launch ttyd+tmux, resume CLI
+  const recoverSession = useCallback(async (killed: typeof sessions[number]) => {
+    // 1. Re-launch ttyd (which also re-creates tmux session if dead)
+    await launchTtyd(killed.port, runRawCommand);
+    // 2. Re-monitor the port
+    monitorPort(killed.port);
+    // 3. Retry WebView connection
+    retry();
+    // 4. If a CLI was active (claude/gemini), send resume command after ttyd is ready
+    if (killed.activeCli) {
+      const recoveryCmd = buildRecoveryCommand(killed.currentDir, killed.activeCli);
+      if (recoveryCmd) {
+        // Wait for ttyd+tmux to be ready before sending keys
+        setTimeout(async () => {
+          await sendKeysToSession(killed.tmuxSession, recoveryCmd, runRawCommand);
+        }, 3000);
+      }
+    }
+  }, [runRawCommand, retry]);
+
   // Start smart wakelock + phantom process guard on mount
   useEffect(() => {
     startSmartWakelock(runRawCommand);
@@ -156,7 +177,7 @@ export default function TerminalScreen() {
       const killed = sessions.find((s) => s.port === killedPort);
       if (killed) {
         showPhantomKillerRecovery(killed.name, () => {
-          retry();
+          recoverSession(killed);
         });
       }
     });
@@ -349,6 +370,8 @@ export default function TerminalScreen() {
         }
         if (term && term.options) {
           term.options.fontSize = TARGET_SIZE;
+          // Force pure black background on xterm.js terminal
+          term.options.theme = Object.assign({}, term.options.theme || {}, { background: '#000000' });
           // Fix Unicode/CJK rendering: use a font stack that covers symbols and CJK
           term.options.fontFamily = '"Droid Sans Mono", "Noto Sans Mono", "Noto Sans CJK JP", monospace';
           // Enable Unicode 11 for correct CJK character width calculation
@@ -403,11 +426,20 @@ export default function TerminalScreen() {
     setWebViewFailed(false);
     setIsRecovering(false);
     onWebViewLoad();
+    // Force pure black background via CSS (covers body/viewport before xterm.js init)
+    webViewRef.current?.injectJavaScript(`
+      (function() {
+        var s = document.createElement('style');
+        s.textContent = 'html, body, .xterm-viewport, .xterm-screen { background-color: #000000 !important; }';
+        document.head.appendChild(s);
+        document.body.style.backgroundColor = '#000000';
+      })(); true;
+    `);
     // Inject terminal output capture after xterm.js initializes
     setTimeout(() => {
       webViewRef.current?.injectJavaScript(CAPTURE_INJECT_JS);
     }, 1000);
-    // Font size injection — delayed + retrying to catch late xterm.js init
+    // Font size + theme injection — delayed + retrying to catch late xterm.js init
     setTimeout(() => {
       webViewRef.current?.injectJavaScript(FONT_INJECT_JS);
     }, 2000);
