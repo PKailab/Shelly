@@ -435,10 +435,14 @@ public final class TerminalBuffer {
      * of characters.
      */
     public void blockSet(int sx, int sy, int w, int h, int val, long style) {
-        if (sx < 0 || sx + w > mColumns || sy < 0 || sy + h > mScreenRows) {
-            throw new IllegalArgumentException(
-                "Illegal arguments! blockSet(" + sx + ", " + sy + ", " + w + ", " + h + ", " + val + ", " + mColumns + ", " + mScreenRows + ")");
-        }
+        // Clamp to current buffer dimensions instead of throwing.
+        // With socat/stream-based sessions, resize and data processing can race,
+        // causing momentary out-of-bounds that would crash the app.
+        if (sx < 0) sx = 0;
+        if (sy < 0) sy = 0;
+        if (sx + w > mColumns) w = mColumns - sx;
+        if (sy + h > mScreenRows) h = mScreenRows - sy;
+        if (w <= 0 || h <= 0) return;
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
                 setChar(sx + x, sy + y, val, style);
