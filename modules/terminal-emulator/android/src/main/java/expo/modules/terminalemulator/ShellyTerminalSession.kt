@@ -40,27 +40,12 @@ class ShellyTerminalSession(
         sock.tcpNoDelay = true
         socket = sock
 
-        // Extract native fd from socket via reflection
-        val fd = getSocketFd(sock)
+        // Initialize emulator with socket streams (no reflection, no fd extraction)
+        val inputStream = sock.getInputStream()
+        val outputStream = sock.getOutputStream()
+        terminalSession.initializeWithStreams(inputStream, outputStream, cols, rows, 1, 1)
 
-        // Initialize emulator with socket fd (no fork/exec)
-        terminalSession.initializeWithFd(fd, cols, rows, 1, 1)
-
-        Log.i(TAG, "Session $sessionId connected to socat on port $port (fd=$fd)")
-    }
-
-    private fun getSocketFd(sock: Socket): Int {
-        val implField = Socket::class.java.getDeclaredField("impl")
-        implField.isAccessible = true
-        val impl = implField.get(sock)
-
-        val fdField = impl.javaClass.getDeclaredField("fd")
-        fdField.isAccessible = true
-        val fileDescriptor = fdField.get(impl) as java.io.FileDescriptor
-
-        val fdIntField = java.io.FileDescriptor::class.java.getDeclaredField("fd")
-        fdIntField.isAccessible = true
-        return fdIntField.getInt(fileDescriptor)
+        Log.i(TAG, "Session $sessionId connected to socat on port $port")
     }
 
     private val flushRunnable = Runnable { flushOutputBuffer() }

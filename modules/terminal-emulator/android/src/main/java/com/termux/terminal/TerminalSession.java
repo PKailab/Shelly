@@ -13,6 +13,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -65,6 +66,9 @@ public final class TerminalSession extends TerminalOutput {
      */
     private int mTerminalFileDescriptor;
 
+    /** True when this session uses streams (TCP socket) instead of a local PTY fd. */
+    private boolean mStreamBased = false;
+
     /** Set by the application for user identification of session, not by terminal. */
     public String mSessionName;
 
@@ -104,7 +108,9 @@ public final class TerminalSession extends TerminalOutput {
         if (mEmulator == null) {
             initializeEmulator(columns, rows, cellWidthPixels, cellHeightPixels);
         } else {
-            JNI.setPtyWindowSize(mTerminalFileDescriptor, rows, columns, cellWidthPixels, cellHeightPixels);
+            if (!mStreamBased && mTerminalFileDescriptor != -1) {
+                JNI.setPtyWindowSize(mTerminalFileDescriptor, rows, columns, cellWidthPixels, cellHeightPixels);
+            }
             mEmulator.resize(columns, rows, cellWidthPixels, cellHeightPixels);
         }
     }
@@ -174,24 +180,23 @@ public final class TerminalSession extends TerminalOutput {
     }
 
     /**
-     * Initialize emulator with an already-open file descriptor (e.g., TCP socket to socat).
+     * Initialize emulator with streams (e.g., from a TCP socket to socat).
      * Unlike initializeEmulator(), this does NOT fork/exec a subprocess.
-     * The fd is used directly for terminal I/O read/write.
+     * Reads terminal output from inputStream, writes user input to outputStream.
      */
-    public void initializeWithFd(int fd, int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
+    public void initializeWithStreams(InputStream inputStream, OutputStream outputStream, int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
         mEmulator = new TerminalEmulator(this, columns, rows, cellWidthPixels, cellHeightPixels, mTranscriptRows, mClient);
-        mTerminalFileDescriptor = fd;
+        mTerminalFileDescriptor = -1;
         mShellPid = 0; // No local process — socat runs in Termux
+        mStreamBased = true;
 
-        final FileDescriptor fdWrapped = wrapFileDescriptor(fd, mClient);
-
-        new Thread("TermSessionInputReader[fd=" + fd + "]") {
+        new Thread("TermSessionInputReader[stream]") {
             @Override
             public void run() {
-                try (InputStream termIn = new FileInputStream(fdWrapped)) {
+                try {
                     final byte[] buffer = new byte[4096];
                     while (true) {
-                        int read = termIn.read(buffer);
+                        int read = inputStream.read(buffer);
                         if (read == -1) return;
                         if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) return;
                         mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
@@ -205,15 +210,16 @@ public final class TerminalSession extends TerminalOutput {
             }
         }.start();
 
-        new Thread("TermSessionOutputWriter[fd=" + fd + "]") {
+        new Thread("TermSessionOutputWriter[stream]") {
             @Override
             public void run() {
                 final byte[] buffer = new byte[4096];
-                try (FileOutputStream termOut = new FileOutputStream(fdWrapped)) {
+                try {
                     while (true) {
                         int bytesToWrite = mTerminalToProcessIOQueue.read(buffer, true);
                         if (bytesToWrite == -1) return;
-                        termOut.write(buffer, 0, bytesToWrite);
+                        outputStream.write(buffer, 0, bytesToWrite);
+                        outputStream.flush();
                     }
                 } catch (IOException e) {
                     // Ignore — connection closed
@@ -225,7 +231,7 @@ public final class TerminalSession extends TerminalOutput {
     /** Write data to the shell process. */
     @Override
     public void write(byte[] data, int offset, int count) {
-        if (mShellPid > 0 || mShellPid == 0 && mTerminalFileDescriptor != -1) mTerminalToProcessIOQueue.write(data, offset, count);
+        if (mShellPid > 0 || mStreamBased) mTerminalToProcessIOQueue.write(data, offset, count);
     }
 
     /** Write the Unicode code point to the terminal encoded in UTF-8. */
@@ -283,8 +289,9 @@ public final class TerminalSession extends TerminalOutput {
     /** Finish this terminal session by sending SIGKILL to the shell (or closing the fd for socat sessions). */
     public void finishIfRunning() {
         if (isRunning()) {
-            if (mShellPid == 0 && mTerminalFileDescriptor != -1) {
-                // fd-based session (socat) — no process to kill, just close the fd
+            if (mStreamBased) {
+                // Stream-based session (socat) — no process to kill
+                mStreamBased = false;
                 cleanupResources(0);
                 return;
             }
@@ -315,8 +322,7 @@ public final class TerminalSession extends TerminalOutput {
     }
 
     public synchronized boolean isRunning() {
-        // fd-based session (socat): alive if fd is still open
-        if (mShellPid == 0 && mTerminalFileDescriptor != -1) return true;
+        if (mStreamBased) return true;
         return mShellPid > 0;
     }
 
