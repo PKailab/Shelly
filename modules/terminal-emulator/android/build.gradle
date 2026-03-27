@@ -11,6 +11,8 @@ android {
   ndkVersion "26.1.10909125"
 
   defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
     externalNativeBuild {
       cmake {
         cppFlags ""
