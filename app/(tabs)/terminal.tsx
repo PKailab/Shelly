@@ -350,18 +350,13 @@ export default function TerminalScreen() {
     (function() {
       var TARGET_SIZE = ${termFontSize};
       var attempts = 0;
-      function apply() {
-        // Approach 1: ttyd stores terminal on window.term (older ttyd)
-        // Approach 2: ttyd 1.7+ stores on lib.terminal or window.tty
+      function findTerm() {
         var term = window.term || (window.lib && window.lib.terminal) || window.tty;
-        // Approach 3: find xterm instance via DOM
         if (!term) {
           var xtermEl = document.querySelector('.xterm');
           if (xtermEl) {
-            // xterm.js 4.x+ stores instance in _core
             term = xtermEl._xterm || xtermEl.xterm;
             if (!term) {
-              // Walk up to find Terminal instance
               var keys = Object.keys(xtermEl);
               for (var i = 0; i < keys.length; i++) {
                 var val = xtermEl[keys[i]];
@@ -372,51 +367,36 @@ export default function TerminalScreen() {
             }
           }
         }
+        return term;
+      }
+      function apply() {
+        var term = findTerm();
         if (term && term.options) {
           term.options.fontSize = TARGET_SIZE;
-          // Force pure black background on xterm.js terminal
           term.options.theme = Object.assign({}, term.options.theme || {}, { background: '#000000' });
-          // Fix Unicode/CJK rendering: use a font stack that covers symbols and CJK
-          term.options.fontFamily = '"Droid Sans Mono", "Noto Sans Mono", "Noto Sans CJK JP", monospace';
-          // Enable Unicode 11 for correct CJK character width calculation
-          if (term.unicode && term.unicode.activeVersion !== '11') {
-            try {
-              if (typeof Unicode11Addon !== 'undefined') {
-                term.loadAddon(new Unicode11Addon.Unicode11Addon());
-                term.unicode.activeVersion = '11';
-              } else {
-                // Dynamically load unicode11 addon from CDN
-                var script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.6.0/lib/xterm-addon-unicode11.js';
-                script.onload = function() {
-                  try {
-                    term.loadAddon(new Unicode11Addon.Unicode11Addon());
-                    term.unicode.activeVersion = '11';
-                    term.refresh(0, term.rows - 1);
-                  } catch(e2) {}
-                };
-                document.head.appendChild(script);
-              }
-            } catch(e) {}
-          }
-          // Force re-render
-          try { term.refresh(0, term.rows - 1); } catch(e) {}
+          // CJK font fix: use monospace as primary, let Android resolve CJK glyphs
+          // Avoid specifying CJK-specific fonts that may not exist on all devices
+          term.options.fontFamily = 'monospace';
+          // Ensure Unicode 11 is active for correct CJK width calculation
+          // ttyd 1.7.7 bundles Unicode11Addon — just verify it's activated
           try {
-            // FitAddon — multiple possible locations
+            if (term.unicode && term.unicode.activeVersion !== '11') {
+              // ttyd should have already loaded this, but activate if not
+              if (term.unicode.versions && term.unicode.versions.indexOf('11') >= 0) {
+                term.unicode.activeVersion = '11';
+              }
+            }
+          } catch(e) {}
+          // Force re-render to apply font/unicode changes
+          try { term.refresh(0, term.rows - 1); } catch(e) {}
+          // Fit terminal to container
+          try {
             var fit = window.fitAddon || (term._addonManager && term._addonManager._addons);
             if (window.fitAddon && window.fitAddon.fit) { window.fitAddon.fit(); }
             else if (fit) {
               fit.forEach(function(a) { if (a.instance && a.instance.fit) a.instance.fit(); });
             }
           } catch(e) {}
-          return;
-        }
-        // Approach 4: CSS fallback — force font-size on xterm canvas/rows
-        var xtermScreen = document.querySelector('.xterm-screen');
-        if (xtermScreen) {
-          var style = document.createElement('style');
-          style.textContent = '.xterm-rows { font-size: ' + TARGET_SIZE + 'px !important; font-family: "Droid Sans Mono", "Noto Sans Mono", "Noto Sans CJK JP", monospace !important; } .xterm { font-size: ' + TARGET_SIZE + 'px !important; }';
-          document.head.appendChild(style);
           return;
         }
         if (attempts++ < 20) setTimeout(apply, 500);
@@ -430,11 +410,13 @@ export default function TerminalScreen() {
     setWebViewFailed(false);
     setIsRecovering(false);
     onWebViewLoad();
-    // Force pure black background via CSS (covers body/viewport before xterm.js init)
+    // Force pure black background + CJK font fix via CSS
     webViewRef.current?.injectJavaScript(`
       (function() {
         var s = document.createElement('style');
-        s.textContent = 'html, body, .xterm-viewport, .xterm-screen { background-color: #000000 !important; }';
+        s.textContent = 'html, body, .xterm-viewport, .xterm-screen { background-color: #000000 !important; }' +
+          ' .xterm { font-feature-settings: "liga" 0; }' +
+          ' canvas { image-rendering: pixelated; }';
         document.head.appendChild(s);
         document.body.style.backgroundColor = '#000000';
       })(); true;
@@ -447,46 +429,9 @@ export default function TerminalScreen() {
     setTimeout(() => {
       webViewRef.current?.injectJavaScript(FONT_INJECT_JS);
     }, 2000);
-    // Restore previous terminal output after reconnect
-    setTimeout(() => {
-      const sessionLines = useExecutionLogStore.getState().sessionBuffer;
-      if (sessionLines.length > 0) {
-        const lines = sessionLines
-          .slice(-50)
-          .map(l => l.text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n'))
-          .join('\\r\\n');
-        const restoreJS = `
-          (function() {
-            function restore() {
-              var term = window.term || (window.lib && window.lib.terminal) || window.tty;
-              if (!term) {
-                var xtermEl = document.querySelector('.xterm');
-                if (xtermEl) {
-                  term = xtermEl._xterm || xtermEl.xterm;
-                  if (!term) {
-                    var keys = Object.keys(xtermEl);
-                    for (var i = 0; i < keys.length; i++) {
-                      var val = xtermEl[keys[i]];
-                      if (val && val.write) { term = val; break; }
-                    }
-                  }
-                }
-              }
-              if (term && term.write) {
-                term.write('\\x1b[90m--- Previous session output ---\\x1b[0m\\r\\n');
-                term.write('\\x1b[90m${lines}\\x1b[0m\\r\\n');
-                term.write('\\x1b[90m--- End of previous output ---\\x1b[0m\\r\\n\\r\\n');
-              } else {
-                setTimeout(restore, 500);
-              }
-            }
-            restore();
-          })();
-          true;
-        `;
-        webViewRef.current?.injectJavaScript(restoreJS);
-      }
-    }, 3000);
+    // NOTE: Previous session output restoration removed.
+    // tmux preserves scrollback buffer, so ttyd reconnects with full history.
+    // Injecting old sessionBuffer caused duplicate/stale output (gray text).
   }, [onWebViewLoad, FONT_INJECT_JS]);
 
   const handleWebViewError2 = useCallback(() => {
@@ -495,16 +440,35 @@ export default function TerminalScreen() {
   }, [onWebViewError]);
 
   // WebView render process killed (split-screen, memory pressure, etc.)
-  // Show recovery splash while WebView reloads — ttyd/tmux are still alive
-  const handleRenderProcessGone = useCallback(() => {
+  // Verify ttyd is alive before reloading WebView; re-launch if dead.
+  const handleRenderProcessGone = useCallback(async () => {
     console.warn('[Terminal] WebView render process gone — recovering');
     setIsRecovering(true);
     setWebViewFailed(false);
-    setTimeout(() => {
-      webViewRef.current?.reload();
-      retry();
-    }, 300);
-  }, [retry]);
+    // Check if ttyd is still alive via HTTP HEAD
+    let ttydAlive = false;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(ttyUrl, { method: 'HEAD', signal: controller.signal });
+      clearTimeout(timeout);
+      ttydAlive = res.ok;
+    } catch {
+      ttydAlive = false;
+    }
+    if (!ttydAlive && activeSession) {
+      // ttyd is dead — re-launch it (also ensures tmux session exists)
+      console.warn('[Terminal] ttyd dead after render process gone — re-launching');
+      pauseMonitorForRecovery(activeSession.port);
+      await launchTtyd(activeSession.port, runRawCommand);
+      // Wait for ttyd to start accepting connections
+      await new Promise((r) => setTimeout(r, 2000));
+      resumeMonitorAfterRecovery(activeSession.port);
+    }
+    // Now reload WebView — ttyd should be ready
+    webViewRef.current?.reload();
+    retry();
+  }, [retry, ttyUrl, activeSession, runRawCommand]);
 
   // Scroll xterm.js to bottom
   const scrollToBottom = useCallback(() => {
@@ -578,6 +542,8 @@ export default function TerminalScreen() {
         javaScriptEnabled
         domStorageEnabled
         textZoom={100}
+        scalesPageToFit={false}
+        setBuiltInZoomControls={false}
         onLoadEnd={handleWebViewLoad}
         onError={handleWebViewError2}
         onHttpError={handleWebViewError2}

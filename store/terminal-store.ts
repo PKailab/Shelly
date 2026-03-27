@@ -18,6 +18,9 @@ import { useSoundStore } from '@/lib/sounds';
 /** Pending tmux sessions to kill (consumed by useTermuxBridge on next tick) */
 export const _pendingTmuxKills: string[] = [];
 
+/** Pending tmux sessions to clear scrollback (consumed by useTermuxBridge on next tick) */
+export const _pendingTmuxClears: string[] = [];
+
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -263,11 +266,21 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   clearSession: (sessionId?: string) => {
     const targetId = sessionId ?? get().activeSessionId;
+    const session = get().sessions.find((s) => s.id === targetId);
     set((state) => ({
       sessions: state.sessions.map((s) =>
         s.id === targetId ? { ...s, blocks: [], entries: [] } : s
       ),
     }));
+    // Also clear the execution log buffers so stale output doesn't reappear
+    try {
+      const { useExecutionLogStore } = require('@/store/execution-log-store');
+      useExecutionLogStore.getState().clearTerminalOutput();
+    } catch {}
+    // Clear tmux scrollback buffer + screen so ttyd doesn't show old output
+    if (session?.tmuxSession) {
+      _pendingTmuxClears.push(session.tmuxSession);
+    }
     get().saveSessionState();
   },
 

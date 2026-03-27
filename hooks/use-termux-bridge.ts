@@ -37,7 +37,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { AppState, AppStateStatus, Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useTerminalStore, _pendingTmuxKills } from '@/store/terminal-store';
+import { useTerminalStore, _pendingTmuxKills, _pendingTmuxClears } from '@/store/terminal-store';
 import { notifyCommandComplete } from '@/lib/command-notifier';
 import { runTermuxCommand } from '@/lib/termux-intent';
 import { isSessionAlive, ensureSession, sendKeysToSession, buildRecoveryCommand, killSession as killTmuxSession } from '@/lib/tmux-manager';
@@ -507,6 +507,16 @@ export function useTermuxBridge() {
     while (_pendingTmuxKills.length > 0) {
       const name = _pendingTmuxKills.shift()!;
       killTmuxSession(name, runRawCommand);
+    }
+    // Clear tmux scrollback for reset sessions
+    while (_pendingTmuxClears.length > 0) {
+      const name = _pendingTmuxClears.shift()!;
+      sendKeysToSession(name, 'clear', runRawCommand);
+      // Also clear tmux scrollback history
+      runRawCommand(
+        `tmux clear-history -t "${name}" 2>/dev/null`,
+        { timeoutMs: 3000, reason: 'tmux-clear-history' },
+      ).catch(() => {});
     }
 
     if (activeItemRef.current) return; // busy
