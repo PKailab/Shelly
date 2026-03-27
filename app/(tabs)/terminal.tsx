@@ -377,19 +377,44 @@ export default function TerminalScreen() {
           term.options.fontSize = TARGET_SIZE;
           term.options.theme = Object.assign({}, term.options.theme || {}, { background: '#000000' });
           // CJK font fix: use monospace as primary, let Android resolve CJK glyphs
-          // Avoid specifying CJK-specific fonts that may not exist on all devices
           term.options.fontFamily = 'monospace';
-          // Ensure Unicode 11 is active for correct CJK width calculation
-          // ttyd 1.7.7 bundles Unicode11Addon — just verify it's activated
+          // Load Unicode11Addon from CDN for correct CJK character width
+          // Without this, xterm.js treats CJK chars as single-width → garbled display
           try {
-            if (term.unicode && term.unicode.activeVersion !== '11') {
-              // ttyd should have already loaded this, but activate if not
-              if (term.unicode.versions && term.unicode.versions.indexOf('11') >= 0) {
-                term.unicode.activeVersion = '11';
-              }
+            if (term.unicode && term.unicode.activeVersion === '11') {
+              // Already active, just refresh
+              term.refresh(0, term.rows - 1);
+            } else if (term.unicode && term.unicode.versions && term.unicode.versions.indexOf('11') >= 0) {
+              // Available but not active — activate
+              term.unicode.activeVersion = '11';
+              term.refresh(0, term.rows - 1);
+            } else {
+              // Not available — load from CDN
+              var script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/@xterm/addon-unicode11@0.8.0/lib/addon-unicode11.js';
+              script.onload = function() {
+                try {
+                  var Unicode11Addon = window.Unicode11Addon || (window.Unicode11Addon_1 && window.Unicode11Addon_1.Unicode11Addon);
+                  if (!Unicode11Addon) {
+                    // Try module.exports pattern
+                    var keys = Object.keys(window);
+                    for (var k = 0; k < keys.length; k++) {
+                      var v = window[keys[k]];
+                      if (v && v.Unicode11Addon) { Unicode11Addon = v.Unicode11Addon; break; }
+                    }
+                  }
+                  if (Unicode11Addon) {
+                    var addon = new Unicode11Addon();
+                    term.loadAddon(addon);
+                    term.unicode.activeVersion = '11';
+                    term.refresh(0, term.rows - 1);
+                  }
+                } catch(e2) {}
+              };
+              document.head.appendChild(script);
             }
           } catch(e) {}
-          // Force re-render to apply font/unicode changes
+          // Force re-render
           try { term.refresh(0, term.rows - 1); } catch(e) {}
           // Fit terminal to container
           try {
