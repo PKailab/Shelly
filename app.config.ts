@@ -40,9 +40,7 @@ const config: ExpoConfig & { android?: any } = {
   name: env.appName,
   slug: env.appSlug,
   version: "1.0.0",
-  runtimeVersion: {
-    policy: "appVersion",
-  },
+  runtimeVersion: "1.0.0",
   orientation: "default",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
