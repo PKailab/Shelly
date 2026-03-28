@@ -23,17 +23,11 @@ import expo.modules.terminalemulator.ShellyTerminalSession
 /**
  * ShellyTerminalView wraps the vendored Termux TerminalView using composition.
  *
- * This is an ExpoView (FrameLayout) that contains a TerminalView child and
- * implements TerminalViewClient to handle all terminal interactions.
- *
- * Features:
- * - Font injection via FontManager
- * - Theme color application
- * - Battery optimization (stop rendering when not visible)
- * - Auto-resize on size change
- * - Scroll ownership (intercepts vertical scroll)
- * - BlockDetector and LinkDetector integration
- * - Event emission to React Native
+ * Resize strategy (modeled after Termux):
+ *   onSizeChanged → updateSize() → onEmulatorSet() → syncTmuxSize()
+ * No debouncing. tmux resize-window is called directly from Kotlin via
+ * Runtime.exec(), bypassing the JS bridge entirely. This mirrors Termux's
+ * synchronous JNI.setPtyWindowSize() approach.
  */
 class ShellyTerminalView(
     context: Context,
@@ -43,10 +37,6 @@ class ShellyTerminalView(
     companion object {
         private const val TAG = "ShellyTerminalView"
         private const val DEFAULT_FONT_SIZE = 14
-        // 500ms debounce covers keyboard animation (~300ms) and Z Fold6 screen
-        // transitions (3-5 layout passes in <100ms). Only the final stable size
-        // triggers an onResize event to JS/tmux.
-        private const val RESIZE_DEBOUNCE_MS = 500L
     }
 
     val terminalView: TerminalView = TerminalView(context, null)
@@ -55,13 +45,12 @@ class ShellyTerminalView(
     private var currentSessionId: String? = null
     private var currentShellySession: ShellyTerminalSession? = null
 
-    // Debounce onResize events to avoid rapid-fire during screen transitions
-    // (e.g. Z Fold6 main/sub/split view changes trigger multiple layout passes)
-    private val resizeHandler = Handler(Looper.getMainLooper())
-    private var pendingResizeRunnable: Runnable? = null
-    // Track last emitted resize to avoid duplicate events
-    private var lastEmittedCols = -1
-    private var lastEmittedRows = -1
+    // tmux session name — set via prop so we can resize directly from Kotlin
+    var tmuxSessionName: String? = null
+
+    // Track last synced size to avoid redundant tmux resize calls
+    private var lastSyncedCols = -1
+    private var lastSyncedRows = -1
 
     // Event callbacks set by the Expo module
     var onOutputEvent: ((text: String, isError: Boolean) -> Unit)? = null
@@ -84,7 +73,6 @@ class ShellyTerminalView(
     private val linkDetector = LinkDetector
 
     init {
-        // Add TerminalView as child, filling the entire frame
         addView(terminalView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -105,8 +93,6 @@ class ShellyTerminalView(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        // Pass the exact measured size to the TerminalView child so it
-        // doesn't fall back to wrap_content sizing.
         val w = measuredWidth
         val h = measuredHeight
         if (w > 0 && h > 0) {
@@ -116,13 +102,15 @@ class ShellyTerminalView(
         }
     }
 
+    // Mirrors Termux: onSizeChanged → updateSize() synchronously. No post, no debounce.
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (w > 0 && h > 0 && (w != oldw || h != oldh)) {
-            Log.i(TAG, "onSizeChanged: ${oldw}x${oldh} → ${w}x${h}")
-            terminalView.post {
-                terminalView.updateSize()
-            }
+        Log.i(TAG, "onSizeChanged: ${oldw}x${oldh} → ${w}x${h}")
+        // updateSize is called by the child TerminalView's own onSizeChanged.
+        // We also call it here in case the ExpoView wrapper resizes but the
+        // child hasn't laid out yet.
+        if (w > 0 && h > 0) {
+            terminalView.updateSize()
         }
     }
 
@@ -130,9 +118,6 @@ class ShellyTerminalView(
         super.onLayout(changed, left, top, right, bottom)
         val w = right - left
         val h = bottom - top
-        // Ensure TerminalView fills the entire ExpoView frame.
-        // layout() triggers onSizeChanged() → updateSize() → onEmulatorSet() synchronously.
-        // We do NOT post an additional updateSize() to avoid duplicate resize events.
         terminalView.layout(0, 0, w, h)
         Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
     }
@@ -143,9 +128,10 @@ class ShellyTerminalView(
         currentShellySession = shellySession
         currentSessionId = sessionId
         terminalView.attachSession(shellySession.terminalSession)
-        // Force updateSize after attach — the emulator may have been initialized
-        // with stale dimensions (80x24) from createSession. Post to next frame
-        // to ensure the view has its final measured size.
+        // attachSession calls updateSize() internally. If the view already has
+        // valid dimensions, this will trigger onEmulatorSet → syncTmuxSize.
+        // Post one additional updateSize to cover the case where layout hasn't
+        // settled yet (view width/height still 0 at attach time).
         terminalView.post {
             if (terminalView.width > 0 && terminalView.height > 0) {
                 Log.i(TAG, "attachSession.post: TerminalView=${terminalView.width}x${terminalView.height}")
@@ -168,9 +154,6 @@ class ShellyTerminalView(
     }
 
     fun setFontSizeDp(size: Int) {
-        // Convert sp to px — TerminalRenderer uses Paint.setTextSize which expects px.
-        // Without this, 14sp on a 2.75x density screen renders as 14px (~5sp),
-        // producing tiny text with cols=230+ instead of the expected ~80 cols.
         val px = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_SP, size.toFloat(), context.resources.displayMetrics
         ).toInt()
@@ -178,12 +161,11 @@ class ShellyTerminalView(
     }
 
     fun setCursorShape(shape: String) {
-        // TerminalEmulator cursor styles: 0=block, 1=underline, 2=bar
         val emulator = terminalView.mEmulator ?: return
         val style = when (shape) {
             "underline" -> 1
             "bar" -> 2
-            else -> 0 // block
+            else -> 0
         }
         try {
             val field = emulator.javaClass.getDeclaredField("mCursorStyle")
@@ -196,22 +178,16 @@ class ShellyTerminalView(
     }
 
     fun setCursorBlinkEnabled(enabled: Boolean) {
-        if (enabled) {
-            setTerminalCursorBlinkerRate(500)
-        } else {
-            setTerminalCursorBlinkerRate(0)
-        }
+        setTerminalCursorBlinkerRate(if (enabled) 500 else 0)
     }
 
-    // --- Battery Optimization ---
+    // --- Visibility / Focus ---
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
         isViewVisible = (visibility == View.VISIBLE)
         if (isViewVisible) {
-            // Force size recalculation when becoming visible — screen transitions
-            // (fold/unfold/split) may have changed dimensions while hidden.
-            terminalView.post { terminalView.updateSize() }
+            terminalView.updateSize()
         } else {
             setTerminalCursorBlinkerRate(0)
         }
@@ -221,18 +197,13 @@ class ShellyTerminalView(
         super.onWindowFocusChanged(hasWindowFocus)
         isViewVisible = hasWindowFocus
         if (hasWindowFocus) {
-            // Recalculate size when regaining focus — covers app switch and
-            // Z Fold6 screen configuration changes.
-            terminalView.post { terminalView.updateSize() }
+            terminalView.updateSize()
         }
     }
 
     // --- Scroll Ownership ---
 
     override fun onInterceptTouchEvent(event: MotionEvent?): Boolean {
-        // Let touch events pass through to the child TerminalView so it can
-        // handle taps (show keyboard) and gestures (scroll, select).
-        // Tell parent views not to intercept our touch events.
         parent?.requestDisallowInterceptTouchEvent(true)
         return false
     }
@@ -241,19 +212,16 @@ class ShellyTerminalView(
 
     fun processTerminalOutput(text: String) {
         blockDetector.processOutput(text)
-
         val links = linkDetector.detect(text)
         for (link in links) {
             onUrlDetectedEvent?.invoke(link.text, link.type.name)
         }
-
         onOutputEvent?.invoke(text, false)
     }
 
     // --- Cleanup ---
 
     fun destroy() {
-        pendingResizeRunnable?.let { resizeHandler.removeCallbacks(it) }
         blockDetector.destroy()
         inputHandler.resetModifiers()
         detachCurrentSession()
@@ -262,29 +230,24 @@ class ShellyTerminalView(
     // --- View Commands ---
 
     fun scrollToBottomCommand() {
-        val emulator = terminalView.mEmulator ?: return
+        terminalView.mEmulator ?: return
         terminalView.setTopRow(0)
         terminalView.invalidate()
     }
 
     fun scrollToTopCommand() {
         val emulator = terminalView.mEmulator ?: return
-        val topRow = -(emulator.screen.activeTranscriptRows)
-        terminalView.setTopRow(topRow)
+        terminalView.setTopRow(-(emulator.screen.activeTranscriptRows))
         terminalView.invalidate()
     }
 
-    fun selectAllCommand() {
-        // Not directly supported; use getTranscriptText from session
-    }
+    fun selectAllCommand() {}
 
     fun clearSelectionCommand() {
         terminalView.stopTextSelectionMode()
     }
 
-    fun getSelectedTextCommand(): String? {
-        return terminalView.getSelectedText()
-    }
+    fun getSelectedTextCommand(): String? = terminalView.getSelectedText()
 
     fun copyToClipboardCommand(): Boolean {
         val text = terminalView.getSelectedText() ?: return false
@@ -303,98 +266,96 @@ class ShellyTerminalView(
 
     // ===== TerminalViewClient Implementation =====
 
-    override fun onScale(scale: Float): Float {
-        return scale.coerceIn(0.5f, 2.0f)
-    }
+    override fun onScale(scale: Float): Float = scale.coerceIn(0.5f, 2.0f)
 
     override fun onSingleTapUp(e: MotionEvent) {
         terminalView.requestFocus()
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(terminalView, 0)
-        // Force size recalculation on tap — user reports that tapping fixes
-        // misaligned rendering after screen transitions on Z Fold6.
-        // This ensures emulator cols/rows match the current view dimensions
-        // and triggers onEmulatorSet → onResize → tmux resize-window.
-        terminalView.post {
-            terminalView.updateSize()
-        }
+        // Force size sync on tap — same as Termux behavior
+        terminalView.updateSize()
     }
 
     override fun shouldBackButtonBeMappedToEscape(): Boolean = true
-
     override fun shouldEnforceCharBasedInput(): Boolean = false
-
     override fun shouldUseCtrlSpaceWorkaround(): Boolean = false
-
     override fun isTerminalViewSelected(): Boolean = terminalView.hasFocus()
 
     override fun copyModeChanged(copyMode: Boolean) {
         if (copyMode) {
-            val text = terminalView.getSelectedText()
-            if (text != null) {
-                onSelectionChangedEvent?.invoke(text)
-            }
+            terminalView.getSelectedText()?.let { onSelectionChangedEvent?.invoke(it) }
         }
     }
 
-    override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean {
-        return inputHandler.onKeyDown(keyCode, e, session)
-    }
+    override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean =
+        inputHandler.onKeyDown(keyCode, e, session)
 
-    override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean {
-        return inputHandler.onKeyUp(keyCode, e)
-    }
+    override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean =
+        inputHandler.onKeyUp(keyCode, e)
 
-    override fun onLongPress(event: MotionEvent): Boolean {
-        return false
-    }
+    override fun onLongPress(event: MotionEvent): Boolean = false
 
     override fun readControlKey(): Boolean = inputHandler.ctrlDown
     override fun readAltKey(): Boolean = inputHandler.altDown
     override fun readShiftKey(): Boolean = inputHandler.shiftDown
     override fun readFnKey(): Boolean = inputHandler.fnDown
 
-    override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean {
-        return inputHandler.onCodePoint(codePoint, ctrlDown, session)
-    }
+    override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean =
+        inputHandler.onCodePoint(codePoint, ctrlDown, session)
 
-    // Expo EventDispatcher — auto-wired to React Native's onResize prop
+    // Expo EventDispatcher — still emits to JS for any UI updates that need size info
     private val onResize by EventDispatcher()
 
+    /**
+     * Called by TerminalView when the emulator is (re)set after updateSize().
+     * Mirrors Termux's approach: NO debouncing. Immediately syncs tmux size
+     * from Kotlin via Runtime.exec(), bypassing the JS bridge.
+     */
     override fun onEmulatorSet() {
         terminalView.invalidate()
         val emulator = terminalView.mEmulator ?: return
-        Log.i(TAG, "onEmulatorSet: cols=${emulator.mColumns}, rows=${emulator.mRows}, viewSize=${terminalView.width}x${terminalView.height}")
+        val cols = emulator.mColumns
+        val rows = emulator.mRows
+        Log.i(TAG, "onEmulatorSet: cols=$cols, rows=$rows, viewSize=${terminalView.width}x${terminalView.height}")
 
-        // Debounce: cancel any pending resize and schedule a single callback.
-        // The callback reads the CURRENT emulator state at fire time (not captured values),
-        // ensuring we always emit the final stable size after rapid layout passes.
-        pendingResizeRunnable?.let { resizeHandler.removeCallbacks(it) }
+        // Skip if size hasn't changed
+        if (cols == lastSyncedCols && rows == lastSyncedRows) return
 
-        val isFirstResize = lastEmittedCols == -1
+        lastSyncedCols = cols
+        lastSyncedRows = rows
 
-        val runnable = Runnable {
-            val emu = terminalView.mEmulator ?: return@Runnable
-            val cols = emu.mColumns
-            val rows = emu.mRows
-            // Skip if identical to last emitted resize
-            if (cols == lastEmittedCols && rows == lastEmittedRows) {
-                Log.i(TAG, "onResize: skipped duplicate cols=$cols, rows=$rows")
-                return@Runnable
+        // 1. Sync tmux directly from Kotlin — no JS bridge, no debounce
+        syncTmuxSize(cols, rows)
+
+        // 2. Also emit to JS for any UI that needs to know the size
+        onResize(mapOf("cols" to cols, "rows" to rows))
+    }
+
+    /**
+     * Resize tmux window directly from Kotlin via Termux RunCommandService.
+     * This is the equivalent of Termux's JNI.setPtyWindowSize() — we can't
+     * use ioctl because the PTY lives in Termux's UID, so we send an Intent
+     * to Termux's RunCommandService to execute tmux resize-window.
+     * This bypasses the JS bridge entirely for minimal latency.
+     */
+    private fun syncTmuxSize(cols: Int, rows: Int) {
+        val tmuxName = tmuxSessionName ?: return
+        try {
+            val cmd = "tmux resize-window -t \"$tmuxName\" -x $cols -y $rows 2>/dev/null; true"
+            val intent = android.content.Intent("com.termux.RUN_COMMAND").apply {
+                component = android.content.ComponentName(
+                    "com.termux",
+                    "com.termux.app.RunCommandService"
+                )
+                putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/sh")
+                putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-c", cmd))
+                putExtra("com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home")
+                putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
             }
-            lastEmittedCols = cols
-            lastEmittedRows = rows
-            Log.i(TAG, "onResize (${if (isFirstResize) "immediate" else "debounced"}): cols=$cols, rows=$rows")
-            onResize(mapOf("cols" to cols, "rows" to rows))
-        }
-        pendingResizeRunnable = runnable
-
-        if (isFirstResize) {
-            // First resize: fire immediately so tmux gets correct size ASAP
-            resizeHandler.post(runnable)
-        } else {
-            // Subsequent resizes: debounce to avoid rapid-fire during transitions
-            resizeHandler.postDelayed(runnable, RESIZE_DEBOUNCE_MS)
+            context.startService(intent)
+            Log.i(TAG, "syncTmuxSize: sent tmux resize -t $tmuxName -x $cols -y $rows")
+        } catch (e: Exception) {
+            Log.w(TAG, "syncTmuxSize failed: ${e.message}")
         }
     }
 

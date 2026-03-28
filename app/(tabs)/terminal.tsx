@@ -284,8 +284,8 @@ export default function TerminalScreen() {
   const termFontSize = layout.isCompact ? 11 : layout.width < 500 ? 12 : layout.isWide ? 11 : 12;
 
   // Debounced tmux resize — only send the final stable size after 500ms
-  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastResizeRef = useRef<{ cols: number; rows: number } | null>(null);
+  // tmux resize is now handled directly in Kotlin (syncTmuxSize via RunCommandService).
+  // No JS-side resize refs needed.
 
   // Send text to terminal via native PTY
   const sendToTerminal = useCallback((text: string) => {
@@ -407,6 +407,7 @@ export default function TerminalScreen() {
           {/* Native Terminal View */}
           <NativeTerminalView
             sessionId={activeSession.nativeSessionId}
+            tmuxSessionName={activeSession.tmuxSession}
             fontFamily={'jetbrains-mono'}
             fontSize={termFontSize}
             cursorShape={settings.cursorShape || 'block'}
@@ -422,18 +423,9 @@ export default function TerminalScreen() {
                 import('expo-web-browser').then(m => m.openBrowserAsync(url)).catch(() => {});
               }
             }}
-            onResize={(e) => {
-              const { cols, rows } = e.nativeEvent;
-              if (!activeSession) return;
-              // Kotlin side already debounces (500ms); no JS debounce needed.
-              // Skip only if identical to last emitted size.
-              const last = lastResizeRef.current;
-              if (last && last.cols === cols && last.rows === rows) return;
-              lastResizeRef.current = { cols, rows };
-              runRawCommand(
-                `tmux resize-window -t "${activeSession.tmuxSession}" -x ${cols} -y ${rows} 2>/dev/null; true`,
-                { timeoutMs: 3000, reason: 'tmux-resize' }
-              );
+            onResize={() => {
+              // tmux resize is now handled directly in Kotlin (syncTmuxSize).
+              // This callback is kept for any future JS-side size tracking.
             }}
           />
 
