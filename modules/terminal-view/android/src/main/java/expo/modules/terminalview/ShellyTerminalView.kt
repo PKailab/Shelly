@@ -198,6 +198,7 @@ class ShellyTerminalView(
             changed = true
         }
         if (changed) {
+            Log.i(TAG, "syncOverlay: placeholder=${w}x${h}@($x,$y) tv=${terminalView.width}x${terminalView.height}")
             terminalView.layoutParams = lp
         }
 
