@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -93,9 +94,12 @@ class ShellyTerminalView(
         terminalView.isFocusable = true
         terminalView.isFocusableInTouchMode = true
 
-        // Set default font and size
+        // Set default font and size (convert sp to px)
         val defaultTypeface = FontManager.getTypeface(context, "jetbrains-mono")
-        terminalView.setTextSize(DEFAULT_FONT_SIZE)
+        val defaultPx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, DEFAULT_FONT_SIZE.toFloat(), context.resources.displayMetrics
+        ).toInt()
+        terminalView.setTextSize(defaultPx)
         terminalView.setTypeface(defaultTypeface)
     }
 
@@ -109,6 +113,16 @@ class ShellyTerminalView(
             val exactW = View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY)
             val exactH = View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)
             terminalView.measure(exactW, exactH)
+        }
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && h > 0 && (w != oldw || h != oldh)) {
+            Log.i(TAG, "onSizeChanged: ${oldw}x${oldh} → ${w}x${h}")
+            terminalView.post {
+                terminalView.updateSize()
+            }
         }
     }
 
@@ -130,10 +144,11 @@ class ShellyTerminalView(
         currentSessionId = sessionId
         terminalView.attachSession(shellySession.terminalSession)
         // Force updateSize after attach — the emulator may have been initialized
-        // with stale dimensions from an earlier layout pass. Post to next frame
+        // with stale dimensions (80x24) from createSession. Post to next frame
         // to ensure the view has its final measured size.
         terminalView.post {
             if (terminalView.width > 0 && terminalView.height > 0) {
+                Log.i(TAG, "attachSession.post: TerminalView=${terminalView.width}x${terminalView.height}")
                 terminalView.updateSize()
                 terminalView.invalidate()
             }
@@ -153,9 +168,12 @@ class ShellyTerminalView(
     }
 
     fun setFontSizeDp(size: Int) {
-        // Convert dp to px — TerminalRenderer uses Paint.setTextSize which expects px.
-        // Without this, 14dp on a 2.9x density screen renders as 14px (~4.8dp) = unreadably small.
-        val px = (size * context.resources.displayMetrics.density).toInt()
+        // Convert sp to px — TerminalRenderer uses Paint.setTextSize which expects px.
+        // Without this, 14sp on a 2.75x density screen renders as 14px (~5sp),
+        // producing tiny text with cols=230+ instead of the expected ~80 cols.
+        val px = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, size.toFloat(), context.resources.displayMetrics
+        ).toInt()
         terminalView.setTextSize(px)
     }
 
@@ -334,25 +352,34 @@ class ShellyTerminalView(
 
         // Debounce: cancel any pending resize and schedule a single callback.
         // The callback reads the CURRENT emulator state at fire time (not captured values),
-        // ensuring we always emit the final stable size after rapid layout passes
-        // (Z Fold6 main↔sub↔split triggers 3-5 layout passes in <100ms).
+        // ensuring we always emit the final stable size after rapid layout passes.
         pendingResizeRunnable?.let { resizeHandler.removeCallbacks(it) }
+
+        val isFirstResize = lastEmittedCols == -1
+
         val runnable = Runnable {
             val emu = terminalView.mEmulator ?: return@Runnable
             val cols = emu.mColumns
             val rows = emu.mRows
             // Skip if identical to last emitted resize
             if (cols == lastEmittedCols && rows == lastEmittedRows) {
-                Log.i(TAG, "onResize (debounced): skipped duplicate cols=$cols, rows=$rows")
+                Log.i(TAG, "onResize: skipped duplicate cols=$cols, rows=$rows")
                 return@Runnable
             }
             lastEmittedCols = cols
             lastEmittedRows = rows
-            Log.i(TAG, "onResize (debounced): cols=$cols, rows=$rows")
+            Log.i(TAG, "onResize (${if (isFirstResize) "immediate" else "debounced"}): cols=$cols, rows=$rows")
             onResize(mapOf("cols" to cols, "rows" to rows))
         }
         pendingResizeRunnable = runnable
-        resizeHandler.postDelayed(runnable, RESIZE_DEBOUNCE_MS)
+
+        if (isFirstResize) {
+            // First resize: fire immediately so tmux gets correct size ASAP
+            resizeHandler.post(runnable)
+        } else {
+            // Subsequent resizes: debounce to avoid rapid-fire during transitions
+            resizeHandler.postDelayed(runnable, RESIZE_DEBOUNCE_MS)
+        }
     }
 
     // --- Logging ---
