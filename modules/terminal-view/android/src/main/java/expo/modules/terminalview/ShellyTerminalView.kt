@@ -55,6 +55,9 @@ class ShellyTerminalView(
     // (e.g. Z Fold6 main/sub/split view changes trigger multiple layout passes)
     private val resizeHandler = Handler(Looper.getMainLooper())
     private var pendingResizeRunnable: Runnable? = null
+    // Track last emitted resize to avoid duplicate events
+    private var lastEmittedCols = -1
+    private var lastEmittedRows = -1
 
     // Event callbacks set by the Expo module
     var onOutputEvent: ((text: String, isError: Boolean) -> Unit)? = null
@@ -110,20 +113,11 @@ class ShellyTerminalView(
         super.onLayout(changed, left, top, right, bottom)
         val w = right - left
         val h = bottom - top
-        Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
-        // Ensure TerminalView fills the entire ExpoView frame
+        // Ensure TerminalView fills the entire ExpoView frame.
+        // layout() triggers onSizeChanged() → updateSize() → onEmulatorSet() synchronously.
+        // We do NOT post an additional updateSize() to avoid duplicate resize events.
         terminalView.layout(0, 0, w, h)
-        // Force emulator to recalculate cols/rows AFTER layout has settled.
-        // layout() sets the new dimensions but getWidth()/getHeight() may not
-        // reflect them until the next frame. Post to ensure updateSize() reads
-        // the correct pixel values — critical for Z Fold6 screen transitions
-        // (main ↔ sub ↔ split) where multiple layout passes happen in <100ms.
-        if (w > 0 && h > 0) {
-            terminalView.post {
-                Log.i(TAG, "onLayout.post: TerminalView=${terminalView.width}x${terminalView.height}")
-                terminalView.updateSize()
-            }
-        }
+        Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
     }
 
     // --- Session Management ---
@@ -321,15 +315,24 @@ class ShellyTerminalView(
     override fun onEmulatorSet() {
         terminalView.invalidate()
         val emulator = terminalView.mEmulator ?: return
-        val cols = emulator.mColumns
-        val rows = emulator.mRows
-        Log.i(TAG, "onEmulatorSet: cols=$cols, rows=$rows, viewSize=${terminalView.width}x${terminalView.height}")
+        Log.i(TAG, "onEmulatorSet: cols=${emulator.mColumns}, rows=${emulator.mRows}, viewSize=${terminalView.width}x${terminalView.height}")
 
-        // Debounce: cancel any pending resize and schedule a new one.
-        // This prevents rapid-fire resize events during screen transitions
+        // Debounce: cancel any pending resize and schedule a single callback.
+        // The callback reads the CURRENT emulator state at fire time (not captured values),
+        // ensuring we always emit the final stable size after rapid layout passes
         // (Z Fold6 main↔sub↔split triggers 3-5 layout passes in <100ms).
         pendingResizeRunnable?.let { resizeHandler.removeCallbacks(it) }
         val runnable = Runnable {
+            val emu = terminalView.mEmulator ?: return@Runnable
+            val cols = emu.mColumns
+            val rows = emu.mRows
+            // Skip if identical to last emitted resize
+            if (cols == lastEmittedCols && rows == lastEmittedRows) {
+                Log.i(TAG, "onResize (debounced): skipped duplicate cols=$cols, rows=$rows")
+                return@Runnable
+            }
+            lastEmittedCols = cols
+            lastEmittedRows = rows
             Log.i(TAG, "onResize (debounced): cols=$cols, rows=$rows")
             onResize(mapOf("cols" to cols, "rows" to rows))
         }

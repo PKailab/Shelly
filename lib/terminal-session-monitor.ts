@@ -8,16 +8,21 @@ type RunCommand = (cmd: string, opts: { timeoutMs: number; reason: string }) => 
 const CHECK_INTERVAL = 60_000;
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _onSessionDied: ((tmuxName: string) => void) | null = null;
+// Track consecutive failures to avoid false positives from transient errors
+const _failCounts = new Map<string, number>();
+const FAIL_THRESHOLD = 3; // require 3 consecutive failures before declaring dead
 
 async function checkTmuxSession(name: string, runCmd: RunCommand): Promise<boolean> {
   try {
     const result = await runCmd(
       `tmux has-session -t "${name}" 2>/dev/null && echo ALIVE || echo DEAD`,
-      { timeoutMs: 3000, reason: 'tmux-check' }
+      { timeoutMs: 5000, reason: 'tmux-check' }
     );
-    const output = typeof result === 'string' ? result : result?.output || '';
+    // runRawCommand returns { stdout, stderr, exitCode }
+    const output = typeof result === 'string' ? result : result?.stdout || result?.output || '';
     return output.includes('ALIVE');
   } catch {
+    // On error (bridge disconnected, timeout), assume alive to avoid false recovery
     return true;
   }
 }
@@ -29,12 +34,21 @@ export function startSessionMonitor(
 ): void {
   stopSessionMonitor();
   _onSessionDied = onDied;
+  _failCounts.clear();
 
   _timer = setInterval(async () => {
     for (const name of tmuxNames) {
       const alive = await checkTmuxSession(name, runCmd);
-      if (!alive) {
-        _onSessionDied?.(name);
+      if (alive) {
+        _failCounts.set(name, 0);
+      } else {
+        const count = (_failCounts.get(name) || 0) + 1;
+        _failCounts.set(name, count);
+        // Only trigger recovery after FAIL_THRESHOLD consecutive failures
+        if (count >= FAIL_THRESHOLD) {
+          _failCounts.set(name, 0);
+          _onSessionDied?.(name);
+        }
       }
     }
   }, CHECK_INTERVAL);
@@ -46,4 +60,5 @@ export function stopSessionMonitor(): void {
     _timer = null;
   }
   _onSessionDied = null;
+  _failCounts.clear();
 }

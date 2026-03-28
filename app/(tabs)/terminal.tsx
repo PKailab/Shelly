@@ -2,7 +2,7 @@
  * Terminal Screen — Native terminal view via PTY + tmux
  * Japanese input proxy + session monitor + setup guide
  */
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -28,6 +28,7 @@ import { useTranslation, t } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useActiveSession, useTerminalStore, getSocatPort } from '@/store/terminal-store';
+import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
 import { sendKeysToSession, buildRecoveryCommand } from '@/lib/tmux-manager';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
@@ -69,6 +70,8 @@ export default function TerminalScreen() {
   const { removeSession, sessions, settings } = useTerminalStore();
   const bridgeStatus = useTerminalStore((s) => s.bridgeStatus);
   const { runRawCommand } = useTermuxBridge();
+  const isMultiPane = useMultiPaneStore((s) => s.isMultiPane);
+  const isHiddenBehindMultiPane = isMultiPane && layout.isWide;
 
   // Bridge terminal output events to execution-log-store
   useTerminalOutput();
@@ -241,6 +244,10 @@ export default function TerminalScreen() {
   // Adaptive terminal font size for small screens (Z Fold6 cover ~ 373dp)
   const termFontSize = layout.isCompact ? 20 : layout.width < 500 ? 18 : layout.isWide ? 14 : 16;
 
+  // Debounced tmux resize — only send the final stable size after 500ms
+  const resizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastResizeRef = useRef<{ cols: number; rows: number } | null>(null);
+
   // Send text to terminal via native PTY
   const sendToTerminal = useCallback((text: string) => {
     if (!activeSession || !text) return;
@@ -354,7 +361,9 @@ export default function TerminalScreen() {
       )}
 
       {/* Terminal + Preview Split View */}
-      {activeSession && isConnected && (
+      {/* Skip rendering when hidden behind MultiPaneContainer to prevent
+          two NativeTerminalView instances from fighting over emulator size */}
+      {activeSession && isConnected && !isHiddenBehindMultiPane && (
         <View style={{ flex: 1, flexDirection: showSplitPreview ? 'row' : 'column' }}>
           {/* Native Terminal View */}
           <NativeTerminalView
@@ -376,12 +385,18 @@ export default function TerminalScreen() {
             }}
             onResize={(e) => {
               const { cols, rows } = e.nativeEvent;
-              if (activeSession) {
+              if (!activeSession) return;
+              // Debounce: cancel previous timer, only send final size after 500ms
+              if (resizeTimerRef.current) clearTimeout(resizeTimerRef.current);
+              const last = lastResizeRef.current;
+              if (last && last.cols === cols && last.rows === rows) return;
+              resizeTimerRef.current = setTimeout(() => {
+                lastResizeRef.current = { cols, rows };
                 runRawCommand(
                   `tmux resize-window -t "${activeSession.tmuxSession}" -x ${cols} -y ${rows} 2>/dev/null; true`,
                   { timeoutMs: 3000, reason: 'tmux-resize' }
                 );
-              }
+              }, 500);
             }}
           />
 
