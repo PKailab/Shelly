@@ -30,7 +30,10 @@ class TerminalEmulatorModule : Module() {
             val cols = (config["cols"] as? Number)?.toInt() ?: 80
 
             if (sessions.containsKey(sessionId)) {
-                throw IllegalStateException("Session $sessionId already exists")
+                // Session already exists — return it instead of crashing.
+                // This happens when the view is re-created during screen transitions
+                // (e.g. split view) but the underlying session is still alive.
+                return@AsyncFunction sessionId
             }
 
             val session = ShellyTerminalSession(

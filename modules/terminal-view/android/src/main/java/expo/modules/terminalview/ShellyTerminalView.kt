@@ -113,11 +113,16 @@ class ShellyTerminalView(
         Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
         // Ensure TerminalView fills the entire ExpoView frame
         terminalView.layout(0, 0, w, h)
-        // Force emulator to recalculate cols/rows based on the new pixel size.
-        // layout() alone may not trigger onSizeChanged if called before measure,
-        // or the emulator may have been initialized with stale dimensions.
+        // Force emulator to recalculate cols/rows AFTER layout has settled.
+        // layout() sets the new dimensions but getWidth()/getHeight() may not
+        // reflect them until the next frame. Post to ensure updateSize() reads
+        // the correct pixel values — critical for Z Fold6 screen transitions
+        // (main ↔ sub ↔ split) where multiple layout passes happen in <100ms.
         if (w > 0 && h > 0) {
-            terminalView.updateSize()
+            terminalView.post {
+                Log.i(TAG, "onLayout.post: TerminalView=${terminalView.width}x${terminalView.height}")
+                terminalView.updateSize()
+            }
         }
     }
 
