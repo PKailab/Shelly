@@ -5,6 +5,7 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo, useContext } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   Linking,
   Pressable,
   ScrollView,
@@ -186,29 +187,42 @@ export default function TerminalScreen() {
     setIsRecovering(false);
   }, [createNativeSession, runRawCommand]);
 
-  // Initialize native sessions on mount.
-  // Sessions persisted as 'alive' need re-creation since the native socat
-  // process died when the app was killed by Android.
-  useEffect(() => {
+  // Ensure native sessions exist. Called on bridge connect AND on foreground resume.
+  // tmux sessions survive in Termux, but the socat TCP socket dies when Android
+  // backgrounds/kills the app. This silently re-creates the socat+native session
+  // so the terminal appears uninterrupted (tmux preserves scrollback + running processes).
+  const ensureNativeSessions = useCallback(async () => {
     if (bridgeStatus !== 'connected') return;
     for (const session of sessions) {
       if (session.sessionStatus === 'starting' || session.sessionStatus === 'alive') {
-        // Verify native session actually exists; if not, recreate
-        TerminalEmulator.isSessionAlive(session.nativeSessionId)
-          .then((alive) => {
-            if (!alive) {
-              createNativeSession(session);
-            }
-          })
-          .catch(() => {
-            // Native session doesn't exist — recreate
-            createNativeSession(session);
-          });
+        try {
+          const alive = await TerminalEmulator.isSessionAlive(session.nativeSessionId);
+          if (!alive) {
+            await createNativeSession(session);
+          }
+        } catch {
+          await createNativeSession(session);
+        }
       } else if (session.sessionStatus === 'exited') {
         recoverSession(session);
       }
     }
-  }, [bridgeStatus]); // Re-run when bridge connects/reconnects
+  }, [bridgeStatus, sessions, createNativeSession, recoverSession]);
+
+  // Run on bridge connect/reconnect
+  useEffect(() => {
+    ensureNativeSessions();
+  }, [bridgeStatus]);
+
+  // Run on foreground resume — handles app switch, home button, split view toggle
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        ensureNativeSessions();
+      }
+    });
+    return () => sub.remove();
+  }, [ensureNativeSessions]);
 
   // Start smart wakelock + foreground service + session monitor on mount
   useEffect(() => {
