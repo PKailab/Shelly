@@ -23,11 +23,13 @@ import expo.modules.terminalemulator.ShellyTerminalSession
 /**
  * ShellyTerminalView wraps the vendored Termux TerminalView using composition.
  *
- * Resize strategy (modeled after Termux):
- *   onSizeChanged → updateSize() → onEmulatorSet() → syncTmuxSize()
- * No debouncing. tmux resize-window is called directly from Kotlin via
- * Runtime.exec(), bypassing the JS bridge entirely. This mirrors Termux's
- * synchronous JNI.setPtyWindowSize() approach.
+ * Resize strategy:
+ *   onLayout (debounced 150ms) → updateSize() → onEmulatorSet() → syncTmuxSize()
+ *
+ * Unlike pure Termux (synchronous, single layout pass), React Native + ExpoView
+ * fires 3-5 layout passes within ~100ms during fold/unfold/split transitions.
+ * Without debouncing, each pass resets the emulator causing corrupted rendering.
+ * The 150ms debounce ensures only the final stable layout triggers resize.
  */
 class ShellyTerminalView(
     context: Context,
@@ -51,6 +53,15 @@ class ShellyTerminalView(
     // Track last synced size to avoid redundant tmux resize calls
     private var lastSyncedCols = -1
     private var lastSyncedRows = -1
+
+    // Debounce handler — React Native fires 3-5 layout passes in ~100ms
+    // during fold/unfold/split. Only the final stable size should trigger
+    // updateSize + syncTmuxSize.
+    private val resizeHandler = Handler(Looper.getMainLooper())
+    private var pendingResizeRunnable: Runnable? = null
+    private companion object ResizeConfig {
+        const val RESIZE_DEBOUNCE_MS = 150L
+    }
 
     // Event callbacks set by the Expo module
     var onOutputEvent: ((text: String, isError: Boolean) -> Unit)? = null
@@ -81,6 +92,12 @@ class ShellyTerminalView(
         terminalView.setTerminalViewClient(this)
         terminalView.isFocusable = true
         terminalView.isFocusableInTouchMode = true
+        // Defer child TerminalView's own updateSize() — we control it via
+        // debounced onLayout to avoid 3-5 emulator resets during fold/split.
+        terminalView.mDeferUpdateSize = true
+
+        // Request RUN_COMMAND permission at runtime (dangerous permission)
+        ensureRunCommandPermission()
 
         // Set default font and size (convert sp to px)
         val defaultTypeface = FontManager.getTypeface(context, "jetbrains-mono")
@@ -102,16 +119,12 @@ class ShellyTerminalView(
         }
     }
 
-    // Mirrors Termux: onSizeChanged → updateSize() synchronously. No post, no debounce.
+    // Do NOT call updateSize() here — the child TerminalView's own onSizeChanged
+    // will fire too, and React Native triggers multiple passes. We defer to
+    // onLayout with debounce instead.
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        Log.i(TAG, "onSizeChanged: ${oldw}x${oldh} → ${w}x${h}")
-        // updateSize is called by the child TerminalView's own onSizeChanged.
-        // We also call it here in case the ExpoView wrapper resizes but the
-        // child hasn't laid out yet.
-        if (w > 0 && h > 0) {
-            terminalView.updateSize()
-        }
+        Log.d(TAG, "onSizeChanged: ${oldw}x${oldh} → ${w}x${h}")
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -119,7 +132,28 @@ class ShellyTerminalView(
         val w = right - left
         val h = bottom - top
         terminalView.layout(0, 0, w, h)
-        Log.i(TAG, "onLayout: ExpoView=${w}x${h}, TerminalView=${terminalView.width}x${terminalView.height}, emulator=${terminalView.mEmulator?.mColumns ?: -1}x${terminalView.mEmulator?.mRows ?: -1}")
+
+        if (w > 0 && h > 0) {
+            scheduleUpdateSize("onLayout ${w}x${h}")
+        }
+    }
+
+    /**
+     * Schedule a debounced updateSize(). Cancel-and-reschedule ensures that
+     * only the final layout pass within RESIZE_DEBOUNCE_MS triggers the actual
+     * emulator resize + tmux sync.
+     */
+    private fun scheduleUpdateSize(source: String) {
+        pendingResizeRunnable?.let { resizeHandler.removeCallbacks(it) }
+        pendingResizeRunnable = Runnable {
+            val w = terminalView.width
+            val h = terminalView.height
+            Log.i(TAG, "scheduleUpdateSize[$source]: TerminalView=${w}x${h}, triggering updateSize")
+            if (w > 0 && h > 0) {
+                terminalView.updateSize()
+            }
+        }
+        resizeHandler.postDelayed(pendingResizeRunnable!!, RESIZE_DEBOUNCE_MS)
     }
 
     // --- Session Management ---
@@ -187,7 +221,7 @@ class ShellyTerminalView(
         super.onVisibilityChanged(changedView, visibility)
         isViewVisible = (visibility == View.VISIBLE)
         if (isViewVisible) {
-            terminalView.updateSize()
+            scheduleUpdateSize("onVisibilityChanged")
         } else {
             setTerminalCursorBlinkerRate(0)
         }
@@ -197,7 +231,7 @@ class ShellyTerminalView(
         super.onWindowFocusChanged(hasWindowFocus)
         isViewVisible = hasWindowFocus
         if (hasWindowFocus) {
-            terminalView.updateSize()
+            scheduleUpdateSize("onWindowFocusChanged")
         }
     }
 
@@ -272,7 +306,7 @@ class ShellyTerminalView(
         terminalView.requestFocus()
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(terminalView, 0)
-        // Force size sync on tap — same as Termux behavior
+        // Force size sync on tap — immediate (no debounce) since user explicitly tapped
         terminalView.updateSize()
     }
 
@@ -338,6 +372,24 @@ class ShellyTerminalView(
      * to Termux's RunCommandService to execute tmux resize-window.
      * This bypasses the JS bridge entirely for minimal latency.
      */
+    /**
+     * Request com.termux.permission.RUN_COMMAND at runtime.
+     * This is a dangerous permission defined by Termux — uses-permission alone
+     * is not enough, the user must grant it explicitly.
+     */
+    private fun ensureRunCommandPermission() {
+        val perm = "com.termux.permission.RUN_COMMAND"
+        val activity = (context as? android.app.Activity)
+            ?: (context as? android.content.ContextWrapper)?.baseContext as? android.app.Activity
+            ?: return
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, perm)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(TAG, "RUN_COMMAND permission not granted, requesting...")
+            androidx.core.app.ActivityCompat.requestPermissions(activity, arrayOf(perm), 9999)
+        }
+    }
+
     private fun syncTmuxSize(cols: Int, rows: Int) {
         val tmuxName = tmuxSessionName ?: return
         try {
