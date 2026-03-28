@@ -208,7 +208,11 @@ class ShellyTerminalView(
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
         isViewVisible = (visibility == View.VISIBLE)
-        if (!isViewVisible) {
+        if (isViewVisible) {
+            // Force size recalculation when becoming visible — screen transitions
+            // (fold/unfold/split) may have changed dimensions while hidden.
+            terminalView.post { terminalView.updateSize() }
+        } else {
             setTerminalCursorBlinkerRate(0)
         }
     }
@@ -216,6 +220,11 @@ class ShellyTerminalView(
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
         super.onWindowFocusChanged(hasWindowFocus)
         isViewVisible = hasWindowFocus
+        if (hasWindowFocus) {
+            // Recalculate size when regaining focus — covers app switch and
+            // Z Fold6 screen configuration changes.
+            terminalView.post { terminalView.updateSize() }
+        }
     }
 
     // --- Scroll Ownership ---
@@ -302,6 +311,13 @@ class ShellyTerminalView(
         terminalView.requestFocus()
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(terminalView, 0)
+        // Force size recalculation on tap — user reports that tapping fixes
+        // misaligned rendering after screen transitions on Z Fold6.
+        // This ensures emulator cols/rows match the current view dimensions
+        // and triggers onEmulatorSet → onResize → tmux resize-window.
+        terminalView.post {
+            terminalView.updateSize()
+        }
     }
 
     override fun shouldBackButtonBeMappedToEscape(): Boolean = true
