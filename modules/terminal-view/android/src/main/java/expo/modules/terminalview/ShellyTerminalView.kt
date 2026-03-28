@@ -129,6 +129,15 @@ class ShellyTerminalView(
         currentShellySession = shellySession
         currentSessionId = sessionId
         terminalView.attachSession(shellySession.terminalSession)
+        // Force updateSize after attach — the emulator may have been initialized
+        // with stale dimensions from an earlier layout pass. Post to next frame
+        // to ensure the view has its final measured size.
+        terminalView.post {
+            if (terminalView.width > 0 && terminalView.height > 0) {
+                terminalView.updateSize()
+                terminalView.invalidate()
+            }
+        }
     }
 
     fun detachCurrentSession() {
