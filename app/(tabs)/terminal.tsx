@@ -101,46 +101,65 @@ export default function TerminalScreen() {
   const { openPreview, closePreview, dismissBanner } = usePreviewStore.getState();
   const showSplitPreview = previewIsOpen && previewUrl && layout.isWide;
 
-  // Create a native session connected via TCP to pty-helper
+  // Create or reconnect a native session to pty-helper
   const createNativeSession = useCallback(async (session: TabSession) => {
     const port = getPtyPort(session.tmuxSession);
     try {
-      // 0. Destroy any stale native session before re-creating
+      // 0. Destroy any stale Kotlin session before re-creating
       try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
 
-      // 0.5. Kill any old pty-helper for this port
-      await runRawCommand(
-        `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
-        { timeoutMs: 3000, reason: 'pty-cleanup' }
-      ).catch(() => {});
+      // 1. Check if pty-helper is already running on this port
+      let ptyAlive = false;
+      try {
+        const check = await runRawCommand(
+          `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo ALIVE || echo DEAD`,
+          { timeoutMs: 2000, reason: 'pty-check' }
+        );
+        ptyAlive = check?.stdout?.includes('ALIVE') ?? false;
+      } catch {}
 
-      // 1. Launch pty-helper in Termux (creates PTY + shell, listens on TCP port)
-      await runRawCommand(
-        `nohup ~/shelly-bridge/pty-helper ${port} 80 24 > /dev/null 2>&1 &`,
-        { timeoutMs: 5000, reason: 'pty-start' }
-      );
+      if (!ptyAlive) {
+        // pty-helper not running — start a new one
+        console.log('[Terminal] pty-helper not running, starting on port', port);
 
-      // 2. Wait for pty-helper to be ready (poll TCP port, max 3s)
-      let ready = false;
-      for (let i = 0; i < 6; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        try {
-          const result = await runRawCommand(
-            `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
-            { timeoutMs: 2000, reason: 'pty-wait' }
-          );
-          if (result?.stdout?.includes('READY')) {
-            ready = true;
-            break;
-          }
-        } catch {}
+        // Kill any stale process on this port
+        await runRawCommand(
+          `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
+          { timeoutMs: 3000, reason: 'pty-cleanup' }
+        ).catch(() => {});
+
+        // Launch pty-helper
+        await runRawCommand(
+          `nohup ~/shelly-bridge/pty-helper ${port} 80 24 > /dev/null 2>&1 &`,
+          { timeoutMs: 5000, reason: 'pty-start' }
+        );
+
+        // Wait for pty-helper to be ready (poll TCP port, max 3s)
+        let ready = false;
+        for (let i = 0; i < 6; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          try {
+            const result = await runRawCommand(
+              `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
+              { timeoutMs: 2000, reason: 'pty-wait' }
+            );
+            if (result?.stdout?.includes('READY')) {
+              ready = true;
+              break;
+            }
+          } catch {}
+        }
+        if (!ready) {
+          throw new Error(`pty-helper not ready on port ${port} after 3s`);
+        }
+      } else {
+        // pty-helper is already running — just reconnect.
+        // Small delay to let pty-helper accept loop close the old client.
+        console.log('[Terminal] pty-helper already running on port', port, '— reconnecting');
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
-      if (!ready) {
-        throw new Error(`pty-helper not ready on port ${port} after 3s`);
-      }
-
-      // 3. Create native session connected to pty-helper TCP port (with retry)
+      // 2. Create Kotlin session connected to pty-helper TCP port (with retry)
       try {
         await TerminalEmulator.createSession({
           sessionId: session.nativeSessionId,
@@ -158,6 +177,12 @@ export default function TerminalScreen() {
           cols: 80,
         });
       }
+
+      // 3. Send Ctrl+L to refresh the screen (makes running programs redraw)
+      try {
+        await TerminalEmulator.writeToSession(session.nativeSessionId, '\x0c');
+      } catch {}
+
 
       // 4. Update session status to alive
       useTerminalStore.setState((state) => ({
