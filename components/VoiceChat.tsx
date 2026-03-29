@@ -33,11 +33,12 @@ type Props = {
 };
 
 const STATUS_LABELS: Record<VoiceChatStatus, string> = {
-  idle: 'タップして話す',
-  listening: '聞いています...',
-  transcribing: '文字起こし中...',
-  thinking: '考え中...',
-  speaking: '話しています...',
+  idle: 'Tap to talk',
+  listening: 'Listening...',
+  transcribing: 'Transcribing...',
+  thinking: 'Thinking...',
+  executing: 'Running command...',
+  speaking: 'Speaking...',
 };
 
 const STATUS_ICONS: Record<VoiceChatStatus, keyof typeof MaterialIcons.glyphMap> = {
@@ -45,6 +46,7 @@ const STATUS_ICONS: Record<VoiceChatStatus, keyof typeof MaterialIcons.glyphMap>
   listening: 'mic',
   transcribing: 'hearing',
   thinking: 'psychology',
+  executing: 'terminal',
   speaking: 'volume-up',
 };
 
@@ -114,7 +116,7 @@ export function VoiceChat({ visible, onClose }: Props) {
   }, [deactivate, onClose]);
 
   const isRecording = state.status === 'listening';
-  const isProcessing = state.status === 'transcribing' || state.status === 'thinking';
+  const isProcessing = state.status === 'transcribing' || state.status === 'thinking' || state.status === 'executing';
   const isBusy = isProcessing || state.status === 'speaking';
 
   const micColor = isRecording ? '#FF4444' : isBusy ? colors.inactive : colors.accent;
@@ -153,9 +155,20 @@ export function VoiceChat({ visible, onClose }: Props) {
             </View>
           ) : null}
 
+          {state.executedCommand ? (
+            <View style={styles.textBlock}>
+              <Text style={[styles.label, { color: '#22C55E' }]}>$</Text>
+              <Text style={[styles.commandText, { color: '#22C55E' }]}>
+                {state.executedCommand}
+              </Text>
+            </View>
+          ) : null}
+
           {state.response ? (
             <View style={styles.textBlock}>
-              <Text style={[styles.label, { color: colors.accent }]}>AI:</Text>
+              <Text style={[styles.label, { color: colors.accent }]}>
+                {state.executedCommand ? 'Result:' : 'AI:'}
+              </Text>
               <Text style={[styles.response, { color: colors.foregroundDim }]}>
                 {state.response}
               </Text>
@@ -286,6 +299,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'monospace',
     lineHeight: 24,
+  },
+  commandText: {
+    fontSize: 14,
+    fontFamily: 'monospace',
+    lineHeight: 20,
   },
   response: {
     fontSize: 15,

@@ -1,8 +1,9 @@
 /**
- * hooks/use-voice-chat.ts — Voice Conversation Mode
+ * hooks/use-voice-chat.ts — VoiceChain: Voice ↔ Terminal Integration
  *
- * 音声対話モード: 音声入力 → AI応答 → TTS読み上げ → 次の音声入力 のループ。
- * Walkie-talkie style: タップで録音開始、離すと送信 → AIが答えて読み上げ → 自動で次の録音開始
+ * Voice input → parseInput() routing → terminal command execution OR AI chat.
+ * Terminal commands are executed via bridge, results summarized and spoken.
+ * AI queries inject terminal context when referenced.
  */
 
 import { useState, useRef, useCallback } from 'react';
@@ -10,27 +11,38 @@ import { useTerminalStore } from '@/store/terminal-store';
 import { speakText, stopSpeaking } from '@/lib/tts';
 import { GEMINI_API_BASE } from '@/lib/gemini';
 import { groqTranscribe } from '@/lib/groq';
+import { parseInput, hasTerminalReference } from '@/lib/input-router';
+import { summarizeForSpeech } from '@/lib/voice-chain-helpers';
 
 export type VoiceChatStatus =
-  | 'idle'           // 待機中
-  | 'listening'      // 録音中
-  | 'transcribing'   // 文字起こし中
-  | 'thinking'       // AI応答待ち
-  | 'speaking';      // TTS読み上げ中
+  | 'idle'
+  | 'listening'
+  | 'transcribing'
+  | 'thinking'
+  | 'executing'      // NEW: running terminal command
+  | 'speaking';
 
 export type VoiceChatState = {
   status: VoiceChatStatus;
-  isActive: boolean;       // 対話モードON/OFF
-  transcript: string;      // 最後の音声入力テキスト
-  response: string;        // 最後のAI応答テキスト
+  isActive: boolean;
+  transcript: string;
+  response: string;
+  executedCommand?: string;   // NEW: command that was executed
   error?: string;
-  autoContinue: boolean;   // 読み上げ後に自動で次の録音を開始
+  autoContinue: boolean;
 };
 
 type VoiceChatMessage = {
   role: 'user' | 'model';
   parts: Array<{ text: string }>;
 };
+
+// Bridge command runner — imported lazily to avoid circular deps
+let _runRawCommand: ((cmd: string) => Promise<{ stdout?: string; stderr?: string }>) | null = null;
+
+export function setVoiceChainBridge(runner: (cmd: string) => Promise<{ stdout?: string; stderr?: string }>) {
+  _runRawCommand = runner;
+}
 
 export function useVoiceChat() {
   const [state, setState] = useState<VoiceChatState>({
@@ -50,7 +62,7 @@ export function useVoiceChat() {
       const { AudioModule, RecordingPresets } = await import('expo-audio');
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        setState((s) => ({ ...s, error: 'マイクの権限が必要です' }));
+        setState((s) => ({ ...s, error: 'Microphone permission required' }));
         return;
       }
 
@@ -68,7 +80,7 @@ export function useVoiceChat() {
       setState((s) => ({
         ...s,
         status: 'idle',
-        error: `録音エラー: ${err instanceof Error ? err.message : String(err)}`,
+        error: `Recording error: ${err instanceof Error ? err.message : String(err)}`,
       }));
     }
   }, []);
@@ -94,7 +106,7 @@ export function useVoiceChat() {
       recordingRef.current = null;
 
       if (!uri) {
-        setState((s) => ({ ...s, status: 'idle', error: '録音ファイルが見つかりません' }));
+        setState((s) => ({ ...s, status: 'idle', error: 'Recording file not found' }));
         return;
       }
 
@@ -108,7 +120,7 @@ export function useVoiceChat() {
       const groqKey = settings.groqApiKey;
       const geminiKey = settings.geminiApiKey;
 
-      // Step 1: Transcribe audio (Groq Whisper > Gemini fallback)
+      // ── Step 1: Transcribe ──────────────────────────────────────────────────
       let transcript = '';
 
       if (groqKey && groqKey.trim().length >= 10) {
@@ -120,158 +132,157 @@ export function useVoiceChat() {
         transcript = result.content ?? '';
       } else if (geminiKey && geminiKey.trim().length >= 10) {
         const transcribeUrl = `${GEMINI_API_BASE}/models/gemini-2.0-flash:generateContent`;
-
         const transcribeRes = await fetch(transcribeUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': geminiKey,
-          },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
           body: JSON.stringify({
             contents: [{
               role: 'user',
               parts: [
                 { inline_data: { mime_type: 'audio/m4a', data: base64Audio } },
-                { text: 'この音声を正確に書き起こしてください。テキストのみ出力してください。' },
+                { text: 'Transcribe this audio exactly. Output only the transcribed text.' },
               ],
             }],
             generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
           }),
         });
-
         if (!transcribeRes.ok) {
-          setState((s) => ({ ...s, status: 'idle', error: `文字起こしエラー: HTTP ${transcribeRes.status}` }));
+          setState((s) => ({ ...s, status: 'idle', error: `Transcription error: HTTP ${transcribeRes.status}` }));
           return;
         }
-
         const transcribeJson = await transcribeRes.json();
         transcript = transcribeJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
       } else {
-        setState((s) => ({ ...s, status: 'idle', error: '音声文字起こしにはGroqまたはGemini APIキーが必要です' }));
+        setState((s) => ({ ...s, status: 'idle', error: 'Groq or Gemini API key required for transcription' }));
         return;
       }
 
       if (!transcript) {
-        setState((s) => ({ ...s, status: 'idle', error: '音声を認識できませんでした' }));
+        setState((s) => ({ ...s, status: 'idle', error: 'Could not recognize speech' }));
         return;
       }
 
-      setState((s) => ({ ...s, transcript, status: 'thinking' }));
+      setState((s) => ({ ...s, transcript }));
 
-      // Step 2: Get AI response with conversation history
-      conversationRef.current.push({
-        role: 'user',
-        parts: [{ text: transcript }],
-      });
+      // ── Step 2: Route through parseInput() ─────────────────────────────────
+      const parsed = parseInput(transcript);
 
-      // Keep last 10 exchanges
-      if (conversationRef.current.length > 20) {
-        conversationRef.current = conversationRef.current.slice(-20);
-      }
+      if ((parsed.layer === 'command') && _runRawCommand) {
+        // ── Terminal command → execute via bridge ──
+        setState((s) => ({ ...s, status: 'executing', executedCommand: parsed.prompt }));
 
-      abortRef.current = new AbortController();
-      let response = '';
+        try {
+          const result = await _runRawCommand(parsed.prompt);
+          const output = result.stdout?.trim() || result.stderr?.trim() || 'Done.';
+          const spoken = await summarizeForSpeech(output);
 
-      const cerebrasKey = settings.cerebrasApiKey ?? '';
-      if (cerebrasKey && cerebrasKey.trim().length >= 10) {
-        // Use Cerebras for voice chat response (fastest, Qwen3-235B)
-        const { cerebrasChatStream } = await import('@/lib/cerebras');
-        const chatHistory = conversationRef.current.slice(0, -1).map((m) => ({
-          role: (m.role === 'model' ? 'assistant' : m.role) as 'user' | 'assistant',
-          content: m.parts[0]?.text ?? '',
-        }));
-        const result = await cerebrasChatStream(
-          cerebrasKey,
-          transcript,
-          () => {}, // no streaming UI for voice chat
-          settings.cerebrasModel || 'qwen-3-235b-a22b-instruct-2507',
-          chatHistory,
-          abortRef.current.signal,
-        );
-        if (!result.success) {
-          setState((s) => ({ ...s, status: 'idle', error: result.error }));
-          return;
+          setState((s) => ({ ...s, response: spoken, status: 'speaking' }));
+          await speakText(spoken);
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          setState((s) => ({ ...s, response: `Error: ${errMsg}`, status: 'speaking' }));
+          await speakText(`Error: ${errMsg}`);
         }
-        response = result.content ?? '';
-      } else if (groqKey && groqKey.trim().length >= 10) {
-        // Groq fallback for voice chat response
-        const { groqChatStream } = await import('@/lib/groq');
-        const groqHistory = conversationRef.current.slice(0, -1).map((m) => ({
-          role: (m.role === 'model' ? 'assistant' : m.role) as 'user' | 'assistant',
-          content: m.parts[0]?.text ?? '',
-        }));
-        const result = await groqChatStream(
-          groqKey,
-          transcript,
-          () => {},
-          settings.groqModel || 'llama-3.3-70b-versatile',
-          groqHistory,
-          abortRef.current.signal,
-        );
-        if (!result.success) {
-          setState((s) => ({ ...s, status: 'idle', error: result.error }));
-          return;
-        }
-        response = result.content ?? '';
-      } else if (geminiKey && geminiKey.trim().length >= 10) {
-        // Fallback to Gemini
-        const chatUrl = `${GEMINI_API_BASE}/models/${settings.geminiModel || 'gemini-2.0-flash'}:generateContent`;
+      } else {
+        // ── AI query (with terminal context injection if referenced) ──
+        setState((s) => ({ ...s, status: 'thinking' }));
 
-        const chatRes = await fetch(chatUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': geminiKey,
-          },
-          signal: abortRef.current.signal,
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{
-                text: 'あなたは音声対話アシスタントです。簡潔に、自然な話し言葉で回答してください。コードブロックやマークダウンは使わないでください。長くても3-4文で答えてください。',
-              }],
-            },
-            contents: conversationRef.current,
-            generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
-          }),
+        conversationRef.current.push({
+          role: 'user',
+          parts: [{ text: transcript }],
         });
 
-        if (!chatRes.ok) {
-          setState((s) => ({ ...s, status: 'idle', error: `応答エラー: HTTP ${chatRes.status}` }));
+        if (conversationRef.current.length > 20) {
+          conversationRef.current = conversationRef.current.slice(-20);
+        }
+
+        abortRef.current = new AbortController();
+        let response = '';
+
+        const cerebrasKey = settings.cerebrasApiKey ?? '';
+        if (cerebrasKey && cerebrasKey.trim().length >= 10) {
+          const { cerebrasChatStream } = await import('@/lib/cerebras');
+          const chatHistory = conversationRef.current.slice(0, -1).map((m) => ({
+            role: (m.role === 'model' ? 'assistant' : m.role) as 'user' | 'assistant',
+            content: m.parts[0]?.text ?? '',
+          }));
+          const result = await cerebrasChatStream(
+            cerebrasKey,
+            transcript,
+            () => {},
+            settings.cerebrasModel || 'qwen-3-235b-a22b-instruct-2507',
+            chatHistory,
+            abortRef.current.signal,
+          );
+          if (!result.success) {
+            setState((s) => ({ ...s, status: 'idle', error: result.error }));
+            return;
+          }
+          response = result.content ?? '';
+        } else if (groqKey && groqKey.trim().length >= 10) {
+          const { groqChatStream } = await import('@/lib/groq');
+          const groqHistory = conversationRef.current.slice(0, -1).map((m) => ({
+            role: (m.role === 'model' ? 'assistant' : m.role) as 'user' | 'assistant',
+            content: m.parts[0]?.text ?? '',
+          }));
+          const result = await groqChatStream(
+            groqKey,
+            transcript,
+            () => {},
+            settings.groqModel || 'llama-3.3-70b-versatile',
+            groqHistory,
+            abortRef.current.signal,
+          );
+          if (!result.success) {
+            setState((s) => ({ ...s, status: 'idle', error: result.error }));
+            return;
+          }
+          response = result.content ?? '';
+        } else if (geminiKey && geminiKey.trim().length >= 10) {
+          const chatUrl = `${GEMINI_API_BASE}/models/${settings.geminiModel || 'gemini-2.0-flash'}:generateContent`;
+          const chatRes = await fetch(chatUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+            signal: abortRef.current.signal,
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{
+                  text: 'You are a voice assistant integrated with a terminal. Respond concisely in natural spoken language. No code blocks or markdown. Keep responses to 3-4 sentences max. Match the user\'s language (Japanese or English).',
+                }],
+              },
+              contents: conversationRef.current,
+              generationConfig: { maxOutputTokens: 512, temperature: 0.7 },
+            }),
+          });
+          if (!chatRes.ok) {
+            setState((s) => ({ ...s, status: 'idle', error: `Response error: HTTP ${chatRes.status}` }));
+            return;
+          }
+          const chatJson = await chatRes.json();
+          response = chatJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+        } else {
+          setState((s) => ({ ...s, status: 'idle', error: 'API key required for AI response' }));
           return;
         }
 
-        const chatJson = await chatRes.json();
-        response = chatJson?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
-      } else {
-        setState((s) => ({ ...s, status: 'idle', error: '応答にはGroqまたはGemini APIキーが必要です' }));
-        return;
+        conversationRef.current.push({
+          role: 'model',
+          parts: [{ text: response }],
+        });
+
+        setState((s) => ({ ...s, response, status: 'speaking' }));
+        await speakText(response);
       }
 
-      conversationRef.current.push({
-        role: 'model',
-        parts: [{ text: response }],
-      });
-
-      setState((s) => ({ ...s, response, status: 'speaking' }));
-
-      // Step 3: Read aloud
-      await speakText(response);
-
-      // Step 4: Auto-continue if enabled
-      setState((s) => {
-        if (s.isActive && s.autoContinue) {
-          // Will trigger startListening via effect
-          return { ...s, status: 'idle' };
-        }
-        return { ...s, status: 'idle' };
-      });
+      // ── Step 3: Return to idle (auto-continue triggers via effect) ──
+      setState((s) => ({ ...s, status: 'idle' }));
 
     } catch (err) {
       if ((err as Error)?.name !== 'AbortError') {
         setState((s) => ({
           ...s,
           status: 'idle',
-          error: `エラー: ${err instanceof Error ? err.message : String(err)}`,
+          error: `Error: ${err instanceof Error ? err.message : String(err)}`,
         }));
       }
     }
