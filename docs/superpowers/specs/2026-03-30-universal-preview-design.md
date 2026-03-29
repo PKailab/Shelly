@@ -56,7 +56,9 @@ Preview Button tap
     └── Compact → full screen overlay
 
 Files tab → file tap
-    ↓ bridge.runRawCommand(`cat <path>`)
+    ↓ bridge.runRawCommand(`stat -c %s '<escaped-path>'`)  // size check first
+    ↓ if >1MB: `head -n 1000 '<escaped-path>'` (truncated)
+    ↓ else: `cat '<escaped-path>'` (single-quote escaped, see Security below)
     ↓ detectFileType(extension)
     └── route to appropriate renderer
 ```
@@ -127,9 +129,10 @@ interface CodeTabProps {
 ```
 
 **File detection (combined approach):**
-1. On tab open / refresh: `git diff --name-only HEAD` via bridge → list of changed files
+1. On tab open / refresh: `git diff --name-only HEAD 2>/dev/null; git diff --name-only 2>/dev/null` via bridge → combined list (staged + unstaged), deduplicated. In repos with no commits, both commands fail silently and the list is empty.
 2. On PTY file change detection: immediately push file path to preview-store
 3. Display the most recent file from either source
+4. Toggle between "Full file" and "Diff view" (`git diff <path>`) — default: full file
 
 **UI:**
 - File path header with language badge
@@ -162,7 +165,7 @@ type FileEntry = {
 };
 ```
 
-- Scan cwd via bridge: `ls -la` (shallow, max depth 2 for speed)
+- Scan cwd via bridge: `find . -maxdepth 2 -printf '%f\t%s\t%Y\n'` (structured output, avoids `ls` parsing fragility)
 - Directory icons (folder) vs file icons (by extension)
 - Tap directory → expand
 - Tap file → switch to preview state
@@ -196,7 +199,7 @@ renderers/
   ImageRenderer.tsx    — ScrollView + Image with pinch zoom
   CodeRenderer.tsx     — Line numbers + keyword highlighting
   JsonTreeRenderer.tsx — Collapsible tree nodes
-  PdfRenderer.tsx      — react-native-pdf or WebView fallback
+  PdfRenderer.tsx      — react-native-pdf or "Open externally" fallback
   CsvTableRenderer.tsx — Horizontal/vertical scroll grid
   PlainTextRenderer.tsx — Monospace fallback
 ```
@@ -236,6 +239,21 @@ type RecentFile = {
 };
 ```
 
+**Critical behavior changes to existing actions:**
+
+- `openPreview(url?)`: **Must always set `isOpen: true`** regardless of URL presence. Current implementation bails if no URL — this must be removed. When no URL is available, the panel opens with the Files tab (or Code tab if recentFiles is non-empty). The `previewUrl` field is only set if a URL is provided.
+- `closePreview()`: Sets `isOpen: false` but **preserves `previewUrl`** so re-opening remembers the last URL. Currently it clears the URL — change this.
+
+**`hasNewContent` badge logic:**
+- Set to `true` when `notifyFileChange()` or `offerPreview()` is called AND `isOpen` is `false`
+- Set to `false` when `isOpen` becomes `true` (i.e., inside `openPreview()`)
+- Never set to `true` while the panel is already open (user is already looking)
+
+**`currentDir` source of truth:**
+- Initialized from `terminal-store`'s `activeSession.currentDir` on first Files tab open
+- Refreshed by running `pwd` via bridge when Files tab is activated
+- Updated when user navigates directories within Files tab
+
 ## 6. Integration Points
 
 ### TerminalHeader.tsx
@@ -243,7 +261,7 @@ type RecentFile = {
 - Badge dot driven by `preview-store.hasNewContent`
 
 ### terminal.tsx
-- Replace `<PreviewPanel>` with `<PreviewTabs>` in split/fullscreen positions
+- **Delete** `<PreviewPanel>` imports and usages. Replace with `<PreviewTabs>` in both split and fullscreen positions.
 - Pass same `onEditSubmit` prop (Click-to-Edit still works via WebTab)
 
 ### use-terminal-output.ts
@@ -252,8 +270,8 @@ type RecentFile = {
 - Existing localhost detection unchanged
 
 ### PreviewBanner.tsx
-- Unchanged. Still appears when localhost detected and preview is closed.
-- Tapping "Open" now opens PreviewTabs with Web tab active.
+- **Interface unchanged** (same props: url, onOpen, onDismiss)
+- **Behavior change**: `onOpen` now calls `openPreview()` which opens PreviewTabs with Web tab active (not the old single-view PreviewPanel)
 
 ## 7. Layout
 
@@ -292,9 +310,9 @@ type RecentFile = {
 
 | Package | Purpose | Size |
 |---------|---------|------|
-| react-native-pdf | PDF rendering | ~2MB (optional, can use WebView fallback) |
+| react-native-pdf | PDF rendering | ~2MB (optional — without it, shows "Open externally" fallback) |
 
-No other new dependencies. All renderers use existing packages (react-native-markdown-display, WebView, Image) or are custom lightweight implementations.
+No other new dependencies. All renderers use existing packages (react-native-markdown-display, react-native-webview, Image) or are custom lightweight implementations. Verify `react-native-markdown-display` is in `package.json` before implementation.
 
 ## 9. Files
 
@@ -331,25 +349,63 @@ No other new dependencies. All renderers use existing packages (react-native-mar
 
 | File | Status |
 |------|--------|
-| `components/terminal/PreviewPanel.tsx` | Content moves to WebTab.tsx. File kept as thin wrapper for backwards compat or deleted. |
+| `components/terminal/PreviewPanel.tsx` | **Deleted.** Logic extracted to WebTab.tsx. All imports in terminal.tsx updated to PreviewTabs. |
 
-## 10. Edge Cases
+## 10. Security
+
+All file paths passed to bridge commands **must be single-quote escaped** to prevent shell injection. Use a helper:
+
+```typescript
+function shellEscape(path: string): string {
+  return "'" + path.replace(/'/g, "'\\''") + "'";
+}
+
+// Usage: bridge.runRawCommand(`cat ${shellEscape(filePath)}`)
+```
+
+Binary detection before content read: `file --mime-type ${shellEscape(path)}` → check for `application/octet-stream` or non-text types.
+
+## 11. Edge Cases
 
 | Scenario | Behavior |
 |----------|----------|
 | No content available | Web: placeholder text. Code: "No recent changes". Files: shows cwd tree. |
-| File too large (>1MB) | Show first 1000 lines with "truncated" notice |
-| Binary file selected | Show file info (size, type) with "Binary file — cannot preview" |
+| File too large (>1MB) | Pre-check with `stat -c %s`. If >1MB: `head -n 1000` + "truncated" notice |
+| Binary file selected | Check with `file --mime-type`. Show file info (size, type) with "Binary file — cannot preview" |
 | Bridge disconnected | All tabs show "Connect Termux to enable preview" |
-| PDF without react-native-pdf | Fallback to WebView with Google Docs viewer URL |
-| Image file in Termux storage | Read via bridge `base64 <path>`, display as data URI |
+| PDF without react-native-pdf | Show "PDF preview unavailable" with "Open externally" button (`Linking.openURL` / `expo-sharing`) |
+| Image file in Termux storage | Read via bridge `base64 ${shellEscape(path)}`, display as data URI. For >5MB images, copy to app cache first. |
 | cwd changes during browse | Files tab auto-refreshes on cwd change detection |
+| No git repo (Code tab) | `git diff` fails silently. Code tab relies solely on PTY file change detection. |
+| Keyboard overlap (compact) | Wrap compact overlay in `KeyboardAvoidingView` following existing terminal.tsx pattern |
+| Re-open after close | `previewUrl` preserved across close/open. Last tab selection also preserved. |
 
-## 11. Performance
+## 12. i18n Keys
 
-- File tree scan: shallow (`ls -la`, max depth 2), cached per cwd
-- File content: read on demand, not pre-loaded
+New keys required in `en.ts` and `ja.ts`:
+
+| Key | EN | JA |
+|-----|----|----|
+| `preview.button` | Preview | プレビュー |
+| `preview.tab_web` | Web | Web |
+| `preview.tab_code` | Code | コード |
+| `preview.tab_files` | Files | ファイル |
+| `preview.no_url` | Start a dev server or open an HTML file | サーバー起動かHTMLファイルを開いてください |
+| `preview.no_changes` | No recent changes | 変更なし |
+| `preview.connect_termux` | Connect Termux to enable preview | Termuxに接続してください |
+| `preview.truncated` | File truncated (showing first 1000 lines) | ファイル省略（先頭1000行） |
+| `preview.binary` | Binary file — cannot preview | バイナリファイル |
+| `preview.pdf_unavailable` | PDF preview unavailable | PDF非対応 |
+| `preview.open_external` | Open externally | 外部で開く |
+| `preview.back_terminal` | Back to Terminal | ターミナルに戻る |
+| `preview.diff_view` | Diff view | 差分表示 |
+| `preview.full_file` | Full file | 全体表示 |
+
+## 13. Performance
+
+- File tree scan: `find . -maxdepth 2` (structured output), cached per cwd
+- File content: read on demand, not pre-loaded. Size-checked before read.
 - Code tab: only reads the active file, not all changed files
 - Renderers: lazy-mounted (only active tab's renderer exists in tree)
-- Images: resized to screen dimensions before display (avoid OOM on large images)
+- Images: for >5MB, copy to local cache first (avoid bridge memory pressure)
 - JSON tree: default collapsed beyond depth 2 (expand on tap)
