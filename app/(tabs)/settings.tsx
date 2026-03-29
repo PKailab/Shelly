@@ -27,6 +27,7 @@ import { LlamaCppModel, MODEL_CATALOG, buildStartAllScript, getRecommendedModel 
 import { useTranslation, t } from '@/lib/i18n';
 import { useI18n, AVAILABLE_LOCALES } from '@/lib/i18n';
 import { useTheme, useThemeStore, getAllThemes } from '@/lib/theme-engine';
+import { TERMINAL_THEMES, TERMINAL_THEME_NAMES, getTerminalTheme, type TerminalTheme } from '@/lib/terminal-theme';
 import { useDotfilesStore } from '@/lib/dotfiles-sync';
 import { SetupWizard } from '@/components/SetupWizard';
 import { PackageManager as PackageManagerModal } from '@/components/PackageManager';
@@ -673,6 +674,61 @@ export default function SettingsScreen() {
             </Pressable>
           ))}
         </View>
+
+        {/* ── Terminal Appearance ──────────────────────────────────────────── */}
+        <SectionHeader title="Terminal Appearance" subtitle="Theme, font lock, key bar" />
+
+        {/* Theme preview cards — horizontal scroll */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 10 }}>
+          {TERMINAL_THEME_NAMES.map((key) => {
+            const theme = TERMINAL_THEMES[key];
+            const isActive = (settings.terminalTheme ?? 'shelly') === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => updateSettings({ terminalTheme: key })}
+                style={{
+                  width: 110, borderRadius: 10, padding: 8, borderWidth: 2,
+                  borderColor: isActive ? '#00D4AA' : '#2D2D2D',
+                  backgroundColor: theme.background,
+                }}
+              >
+                {/* Mini terminal preview */}
+                <View style={{ gap: 2, marginBottom: 6 }}>
+                  <Text style={{ fontFamily: 'monospace', fontSize: 8, color: theme.green }} numberOfLines={1}>$ ls -la</Text>
+                  <Text style={{ fontFamily: 'monospace', fontSize: 8, color: theme.blue }} numberOfLines={1}>drwxr-xr-x node_m</Text>
+                  <Text style={{ fontFamily: 'monospace', fontSize: 8, color: theme.foreground }} numberOfLines={1}>-rw-r--r-- index.ts</Text>
+                </View>
+                <Text style={{ fontFamily: 'monospace', fontSize: 10, fontWeight: '700', color: isActive ? '#00D4AA' : theme.foreground, textAlign: 'center' }}>
+                  {theme.label}
+                </Text>
+                {isActive && (
+                  <View style={{ position: 'absolute', top: 4, right: 4 }}>
+                    <MaterialIcons name="check-circle" size={14} color="#00D4AA" />
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <SettingRow label="Lock font size" description="Disable pinch-to-zoom in terminal">
+          <Switch
+            value={settings.fontSizeLocked ?? false}
+            onValueChange={(v) => updateSettings({ fontSizeLocked: v })}
+            trackColor={{ false: '#2D2D2D', true: '#00D4AA50' }}
+            thumbColor={(settings.fontSizeLocked ?? false) ? '#00D4AA' : '#6B7280'}
+          />
+        </SettingRow>
+
+        <SettingRow label="Auto-hide key bar" description="Hide key bar when hardware keyboard is detected">
+          <Switch
+            value={settings.hideKeyBarWithHwKeyboard ?? false}
+            onValueChange={(v) => updateSettings({ hideKeyBarWithHwKeyboard: v })}
+            trackColor={{ false: '#2D2D2D', true: '#00D4AA50' }}
+            thumbColor={(settings.hideKeyBarWithHwKeyboard ?? false) ? '#00D4AA' : '#6B7280'}
+          />
+        </SettingRow>
 
         {/* ── Behavior ─────────────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.behavior_title')} />
