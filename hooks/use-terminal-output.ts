@@ -17,6 +17,7 @@ import { useChatStore } from '@/store/chat-store';
 import { detectApprovalPrompt } from '@/lib/realtime-translate';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { generateId } from '@/lib/id';
+import { diagnosePackageError } from '@/lib/package-doctor';
 
 // Patterns indicating file changes in PTY output (with capturing groups for file paths)
 const FILE_CHANGE_OUTPUT = [
@@ -43,12 +44,25 @@ const ERROR_OUTPUT_PATTERNS = [
   /Module not found/,
 ];
 
+// Patterns indicating package/apt errors (subset triggers PackageDoctor)
+const PACKAGE_ERROR_PATTERNS = [
+  /Unable to locate package/,
+  /NOSPLIT|Clearsigned file/,
+  /dpkg was interrupted/,
+  /Unable to acquire the dpkg frontend lock/,
+  /404\s+Not Found|Failed to fetch/,
+  /Unmet dependencies|Depends:/,
+  /Hash Sum mismatch/,
+];
+
 export function useTerminalOutput() {
   const addTerminalOutput = useExecutionLogStore((s) => s.addTerminalOutput);
   const savepointDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const approvalDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorAccum = useRef<string[]>([]);
+  const pkgErrorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pkgErrorAccum = useRef<string[]>([]);
   const { isWide } = useDeviceLayout();
 
   useEffect(() => {
@@ -130,6 +144,30 @@ export function useTerminalOutput() {
             }
           }
         }
+
+        // PackageDoctor: detect package manager errors → auto-repair suggestion
+        for (const pattern of PACKAGE_ERROR_PATTERNS) {
+          if (pattern.test(line)) {
+            pkgErrorAccum.current.push(line);
+            if (pkgErrorDebounce.current) clearTimeout(pkgErrorDebounce.current);
+            pkgErrorDebounce.current = setTimeout(() => {
+              const stderr = pkgErrorAccum.current.join('\n');
+              pkgErrorAccum.current = [];
+              const fix = diagnosePackageError(stderr);
+              if (!fix) return;
+              const store = useChatStore.getState();
+              const session = store.getActiveSession();
+              if (!session) return;
+              store.addMessage(session.id, {
+                id: generateId(),
+                role: 'system',
+                content: `🔧 **Package Doctor**: ${fix.message}\n\nSuggested fix: \`${fix.fix}\`${fix.autoRun ? '\n_(Auto-repair available)_' : ''}`,
+                timestamp: Date.now(),
+              });
+            }, 1500);
+            break;
+          }
+        }
       }
     });
     return () => {
@@ -137,6 +175,7 @@ export function useTerminalOutput() {
       if (savepointDebounce.current) clearTimeout(savepointDebounce.current);
       if (approvalDebounce.current) clearTimeout(approvalDebounce.current);
       if (errorDebounce.current) clearTimeout(errorDebounce.current);
+      if (pkgErrorDebounce.current) clearTimeout(pkgErrorDebounce.current);
     };
   }, [addTerminalOutput, isWide]);
 }
