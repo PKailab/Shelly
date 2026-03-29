@@ -11,6 +11,8 @@ import com.termux.terminal.TerminalRow;
 import com.termux.terminal.TextStyle;
 import com.termux.terminal.WcWidth;
 
+import expo.modules.terminalview.SyntaxHighlighter;
+
 /**
  * Renderer of a {@link TerminalEmulator} into a {@link Canvas}.
  * <p/>
@@ -81,6 +83,7 @@ public final class TerminalRenderer {
             }
 
             TerminalRow lineObject = screen.allocateFullLineIfNecessary(screen.externalToInternalRow(row));
+            SyntaxHighlighter.INSTANCE.highlightRow(lineObject, columns, TextStyle.COLOR_INDEX_FOREGROUND);
             final char[] line = lineObject.mText;
             final int charsUsedInLine = lineObject.getSpaceUsed();
 

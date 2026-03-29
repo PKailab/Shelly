@@ -280,4 +280,11 @@ public final class TerminalRow {
         return mStyle[column];
     }
 
+    /** Set the style at the given column without changing the character. */
+    public final void setStyle(int column, long style) {
+        if (column >= 0 && column < mStyle.length) {
+            mStyle[column] = style;
+        }
+    }
+
 }
