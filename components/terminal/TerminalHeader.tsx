@@ -21,6 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { SPRING_CONFIGS } from '@/hooks/use-motion';
 import { playSound } from '@/lib/sounds';
+import { HEADER_HEIGHT, HEADER_PADDING_H, BORDER_WIDTH } from '@/lib/layout-constants';
 
 // ─── Mode config ──────────────────────────────────────────────────────────────
 
@@ -309,9 +310,9 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    height: 40,
-    borderBottomWidth: 1,
+    paddingHorizontal: HEADER_PADDING_H,
+    height: HEADER_HEIGHT,
+    borderBottomWidth: BORDER_WIDTH,
   },
   appNameContainer: {
     flexDirection: 'row',

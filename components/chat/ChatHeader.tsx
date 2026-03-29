@@ -15,6 +15,7 @@ import { StatusIndicator } from '@/components/StatusIndicator';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { SaveBadge } from '@/components/SaveBadge';
+import { HEADER_HEIGHT, HEADER_PADDING_H, BORDER_WIDTH } from '@/lib/layout-constants';
 
 type ChatHeaderProps = {
   onVoiceChat?: () => void;
@@ -88,9 +89,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: HEADER_PADDING_H,
+    height: HEADER_HEIGHT,
+    borderBottomWidth: BORDER_WIDTH,
   },
   left: {
     flexDirection: 'row',

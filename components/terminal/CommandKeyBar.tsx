@@ -13,6 +13,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTerminalStore } from '@/store/terminal-store';
+import { KEY_BAR_HEIGHT, BORDER_WIDTH } from '@/lib/layout-constants';
 
 type Props = {
   /** Inject JS into WebView to send key codes */
@@ -147,9 +148,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 6,
-    paddingVertical: 4,
+    height: KEY_BAR_HEIGHT,
     gap: 4,
-    borderTopWidth: 1,
+    borderTopWidth: BORDER_WIDTH,
   },
   key: {
     paddingHorizontal: 10,
