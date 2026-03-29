@@ -2,7 +2,7 @@
  * components/chat/EditSheet.tsx — Click-to-Edit BottomSheet
  *
  * 選択された要素のプレビュー + 編集指示入力 + プリセットボタン。
- * PreviewPanelから表示される。
+ * WebTabから表示される。
  */
 
 import React, { memo, useState, useCallback } from 'react';
