@@ -61,6 +61,19 @@ export type ChatMessage = {
   wizardData?: ActionsWizardData;
   /** Auto-check proposal state */
   autoCheckState?: AutoCheckState;
+  /** 承認プロキシ（ターミナルの [Y/n] をChat側ボタンに変換） */
+  approvalData?: {
+    sessionId: string;
+    command: string;
+    translation: string;
+    dangerLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'SAFE';
+  };
+  /** エラー要約バブル（TranslateOverlayのWide時永続化版） */
+  errorSummaryData?: {
+    errorText: string;
+    translation: string;
+    provider: string;
+  };
 };
 
 export type ChatSession = {

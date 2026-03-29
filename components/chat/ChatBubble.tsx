@@ -26,6 +26,8 @@ import { parseCodeBlocks, hasCodeBlocks } from '@/lib/parse-code-blocks';
 import { ActionBlock } from '@/components/chat/ActionBlock';
 import { ActionsWizardBubble } from '@/components/chat/ActionsWizardBubble';
 import { AutoCheckProposalBubble } from '@/components/chat/AutoCheckProposalBubble';
+import { ApprovalBubble } from '@/components/chat/ApprovalBubble';
+import { ErrorSummaryBubble } from '@/components/chat/ErrorSummaryBubble';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 // ─── Agent Colors ────────────────────────────────────────────────────────────
@@ -79,11 +81,13 @@ type Props = {
   onWizardComplete?: (messageId: string, data: ActionsWizardData) => void;
   onAutoCheckEnable?: (messageId: string) => void;
   onAutoCheckDismiss?: (messageId: string) => void;
+  onAskTeam?: (context: string) => void;
+  onSuggestFix?: (context: string) => void;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground, onWizardUpdate, onWizardComplete, onAutoCheckEnable, onAutoCheckDismiss }: Props) {
+export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onRegenerate, onEdit, onDelete, projectDir, runCommand, sendToTerminal, runCommandInBackground, onWizardUpdate, onWizardComplete, onAutoCheckEnable, onAutoCheckDismiss, onAskTeam, onSuggestFix }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const { isWide } = useDeviceLayout();
@@ -127,6 +131,24 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
   }, [message.content, message.streamingText, message.agent]);
 
   const displayText = message.isStreaming ? (message.streamingText || '') : message.content;
+
+  // ── Approval Bubble (system message with approvalData) ─────────────────
+  if (message.approvalData) {
+    return (
+      <View style={styles.systemBubbleRow}>
+        <ApprovalBubble data={message.approvalData} onAskTeam={onAskTeam} />
+      </View>
+    );
+  }
+
+  // ── Error Summary Bubble (system message with errorSummaryData) ────────
+  if (message.errorSummaryData) {
+    return (
+      <View style={styles.systemBubbleRow}>
+        <ErrorSummaryBubble data={message.errorSummaryData} onSuggestFix={onSuggestFix} onAskTeam={onAskTeam} />
+      </View>
+    );
+  }
 
   // ── User Bubble (right-aligned) ──────────────────────────────────────────
   if (isUser) {
@@ -456,6 +478,11 @@ function CommandExecView({ exec, colors, onOpenInTerminal }: {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // System bubble (full-width, centered)
+  systemBubbleRow: {
+    paddingHorizontal: 12,
+    marginVertical: 4,
+  },
   // User bubble (right-aligned)
   userRow: {
     flexDirection: 'row',
