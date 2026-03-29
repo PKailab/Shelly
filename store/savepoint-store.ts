@@ -19,12 +19,19 @@ type SavepointState = {
   showBadge: boolean;
   lastSaveTime: number | null;
   messageSavepoints: Record<string, SavepointInfo>;
+  /** Pending savepoint request reason (consumed by auto-save subscriber) */
+  pendingRequest: string | null;
+  /** Security issues from last scan (if commit was blocked) */
+  securityWarnings: string[];
 
   setEnabled: (enabled: boolean) => void;
   setSaving: (saving: boolean) => void;
   flashBadge: () => void;
   recordSavepoint: (messageId: string, info: Omit<SavepointInfo, 'reverted' | 'timestamp'>) => void;
   markReverted: (messageId: string) => void;
+  requestSavepoint: (reason: string) => void;
+  clearPendingRequest: () => void;
+  setSecurityWarnings: (warnings: string[]) => void;
 };
 
 export const useSavepointStore = create<SavepointState>((set) => ({
@@ -33,6 +40,8 @@ export const useSavepointStore = create<SavepointState>((set) => ({
   showBadge: false,
   lastSaveTime: null,
   messageSavepoints: {},
+  pendingRequest: null,
+  securityWarnings: [],
 
   setEnabled: (enabled) => set({ isEnabled: enabled }),
 
@@ -62,4 +71,8 @@ export const useSavepointStore = create<SavepointState>((set) => ({
         },
       };
     }),
+
+  requestSavepoint: (reason) => set({ pendingRequest: reason }),
+  clearPendingRequest: () => set({ pendingRequest: null }),
+  setSecurityWarnings: (warnings) => set({ securityWarnings: warnings }),
 }));
