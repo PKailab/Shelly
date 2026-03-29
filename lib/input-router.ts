@@ -194,7 +194,7 @@ export function isShellCommand(input: string): boolean {
 
 type LightweightMatch = { command: string; label: string };
 
-const LIGHTWEIGHT_PATTERNS: Array<{ pattern: RegExp; command: string; label: string }> = [
+const LIGHTWEIGHT_PATTERNS: Array<{ pattern: RegExp; command: string; label: string; hasCaptureGroup?: boolean }> = [
   { pattern: /^(?:ファイル一覧|ファイルを?見せて|ファイルを?表示|フォルダの中身|list files)/i, command: 'ls -la', label: 'ls -la' },
   { pattern: /^(?:今どこ|現在の?ディレクトリ|カレントディレクトリ|current dir|where am i)/i, command: 'pwd', label: 'pwd' },
   { pattern: /^(?:ディスク容量|ディスク使用|空き容量|disk space|storage)/i, command: 'df -h', label: 'df -h' },
@@ -205,13 +205,22 @@ const LIGHTWEIGHT_PATTERNS: Array<{ pattern: RegExp; command: string; label: str
   { pattern: /^(?:プロセス一覧|実行中|running processes)/i, command: 'ps aux 2>/dev/null || ps', label: 'ps' },
   { pattern: /^(?:環境変数|env vars|printenv)/i, command: 'printenv | head -30', label: 'printenv' },
   { pattern: /^(?:IP.*アドレス|ipアドレス|ip address|my ip)/i, command: 'ip addr show 2>/dev/null || ifconfig 2>/dev/null || echo "ip command not found"', label: 'ip addr' },
+  // Package management
+  { pattern: /^(?:パッケージ|package)(?:を|)(?:更新|アップデート|update)/i, command: 'pkg update -y && pkg upgrade -y', label: 'pkg update' },
+  { pattern: /^(?:(?:install|インストール)\s+)(.+)/i, command: 'pkg install -y $1', label: 'pkg install', hasCaptureGroup: true },
+  { pattern: /^(?:(?:remove|削除|アンインストール)\s+)(.+)/i, command: 'pkg remove -y $1', label: 'pkg remove', hasCaptureGroup: true },
+  { pattern: /^(?:(?:search|検索|探す)\s+(?:package|パッケージ)\s+)(.+)/i, command: 'pkg search $1', label: 'pkg search', hasCaptureGroup: true },
 ];
 
 function matchLightweightTask(input: string): LightweightMatch | null {
   const trimmed = input.trim();
-  for (const { pattern, command, label } of LIGHTWEIGHT_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return { command, label };
+  for (const { pattern, command, label, hasCaptureGroup } of LIGHTWEIGHT_PATTERNS) {
+    const match = pattern.exec(trimmed);
+    if (match) {
+      const resolvedCommand = hasCaptureGroup && match[1]
+        ? command.replace('$1', match[1].trim())
+        : command;
+      return { command: resolvedCommand, label };
     }
   }
   return null;
