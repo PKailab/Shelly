@@ -134,6 +134,10 @@ class ShellyTerminalView(
         super.onAttachedToWindow()
         attachOverlay()
         viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
+        // Placeholder must never hold focus — overlay TerminalView owns it
+        isFocusable = false
+        isFocusableInTouchMode = false
+        clearFocus()
     }
 
     override fun onDetachedFromWindow() {
@@ -157,6 +161,13 @@ class ShellyTerminalView(
         contentFrame.addView(terminalView, lp)
         isOverlayAttached = true
         Log.i(TAG, "attachOverlay: TerminalView added to content frame")
+        // Immediately sync position and render — don't wait for debounce
+        terminalView.post {
+            syncOverlayPosition()
+            if (terminalView.width > 0 && terminalView.height > 0) {
+                terminalView.updateSize()
+            }
+        }
     }
 
     /**
@@ -329,12 +340,24 @@ class ShellyTerminalView(
         isViewVisible = hasWindowFocus
     }
 
-    // ===== Touch — forward from placeholder to overlay =====
+    // ===== Touch & IME — placeholder defers everything to overlay =====
 
     override fun onInterceptTouchEvent(event: MotionEvent?): Boolean {
-        // Placeholder is transparent; touches go through to the overlay
-        // which is positioned on top via content frame
+        // Forward touch focus to overlay TerminalView on ACTION_DOWN
+        if (event?.action == MotionEvent.ACTION_DOWN) {
+            terminalView.requestFocus()
+        }
         return false
+    }
+
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        // Placeholder never consumes touches — let them reach the overlay
+        return false
+    }
+
+    override fun onCreateInputConnection(outAttrs: android.view.inputmethod.EditorInfo?): android.view.inputmethod.InputConnection? {
+        // Never handle IME on the placeholder — force it to query the overlay TerminalView
+        return null
     }
 
     // ===== Output Processing =====
@@ -432,7 +455,7 @@ class ShellyTerminalView(
     override fun readFnKey(): Boolean = inputHandler.fnDown
 
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean =
-        inputHandler.onCodePoint(codePoint, ctrlDown, session)
+        inputHandler.onCodePoint(codePoint, ctrlDown || inputHandler.ctrlDown, session)
 
     // Expo EventDispatcher — emits to JS for size tracking
     private val onResize by EventDispatcher()
