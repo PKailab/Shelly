@@ -28,6 +28,9 @@ import { ActionsWizardBubble } from '@/components/chat/ActionsWizardBubble';
 import { AutoCheckProposalBubble } from '@/components/chat/AutoCheckProposalBubble';
 import { ApprovalBubble } from '@/components/chat/ApprovalBubble';
 import { ErrorSummaryBubble } from '@/components/chat/ErrorSummaryBubble';
+import { PlanCardList } from '@/components/chat/PlanCardList';
+import { isPlanOutput, parsePlanOutput } from '@/lib/parse-plan';
+import { usePlanStore } from '@/store/plan-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 
 // ─── Agent Colors ────────────────────────────────────────────────────────────
@@ -241,8 +244,37 @@ export const ChatBubble = memo(function ChatBubble({ message, fontSize = 14, onR
           </View>
         )}
 
-        {/* Message text (Markdown) */}
-        {(() => {
+        {/* Plan Mode ステップカード */}
+        {!message.isStreaming && displayText && isPlanOutput(displayText) && (() => {
+          const plan = parsePlanOutput(displayText, message.agent);
+          if (plan) {
+            return (
+              <View style={styles.markdownWrap}>
+                <PlanCardList
+                  plan={plan}
+                  onExecuteStep={(step) => {
+                    if (step.command && sendToTerminal) {
+                      usePlanStore.getState().updateStepStatus(plan.id, step.id, 'running');
+                      sendToTerminal(step.command + '\n');
+                      // Mark done after a short delay (real status should come from terminal output)
+                      setTimeout(() => usePlanStore.getState().updateStepStatus(plan.id, step.id, 'done'), 2000);
+                    } else {
+                      usePlanStore.getState().updateStepStatus(plan.id, step.id, 'done');
+                    }
+                  }}
+                  onSkipStep={(step) => {
+                    usePlanStore.getState().updateStepStatus(plan.id, step.id, 'skipped');
+                  }}
+                  isWide={isWide}
+                />
+              </View>
+            );
+          }
+          return null;
+        })()}
+
+        {/* Message text (Markdown) — skip if Plan Mode rendered above */}
+        {(!displayText || message.isStreaming || !isPlanOutput(displayText)) && (() => {
           const markdownStyles = {
             body: { color: colors.foregroundDim, fontSize, fontFamily: 'monospace', lineHeight: 18 },
             code_inline: { backgroundColor: withAlpha(colors.foreground, 0.08), color: colors.accent, fontFamily: 'monospace', fontSize: fontSize - 1, paddingHorizontal: 4, borderRadius: 3 },
