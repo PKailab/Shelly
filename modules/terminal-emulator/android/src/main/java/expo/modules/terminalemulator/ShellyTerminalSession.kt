@@ -1,17 +1,16 @@
 package expo.modules.terminalemulator
 
-import android.net.LocalSocket
-import android.net.LocalSocketAddress
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
+import java.net.Socket
 
 class ShellyTerminalSession(
     private val sessionId: String,
     private val emitEvent: (name: String, body: Map<String, Any?>) -> Unit,
-    private val socketPath: String,
+    private val port: Int,
     rows: Int,
     cols: Int,
     private val appContext: android.content.Context
@@ -29,7 +28,7 @@ class ShellyTerminalSession(
     @Volatile private var flushScheduled = false
     private var lastTranscriptLength = 0
 
-    private var localSocket: LocalSocket? = null
+    private var socket: Socket? = null
     val terminalSession: TerminalSession
 
     init {
@@ -38,17 +37,19 @@ class ShellyTerminalSession(
             "/bin/true", "/", arrayOf(), arrayOf(), null, this
         )
 
-        // Connect to pty-helper via Unix Domain Socket
-        val sock = LocalSocket()
-        sock.connect(LocalSocketAddress(socketPath, LocalSocketAddress.Namespace.FILESYSTEM))
-        localSocket = sock
+        // Connect to pty-helper via TCP (localhost only).
+        // TCP is used because Shelly and Termux run under different Android UIDs,
+        // and Unix Domain Sockets enforce file permissions + SELinux which block cross-UID access.
+        val sock = Socket("127.0.0.1", port)
+        sock.tcpNoDelay = true
+        socket = sock
 
         // Initialize emulator with socket streams
-        val inputStream = sock.inputStream
-        val outputStream = sock.outputStream
+        val inputStream = sock.getInputStream()
+        val outputStream = sock.getOutputStream()
         terminalSession.initializeWithStreams(inputStream, outputStream, cols, rows, 1, 1)
 
-        Log.i(TAG, "Session $sessionId connected to pty-helper via $socketPath")
+        Log.i(TAG, "Session $sessionId connected to pty-helper on port $port")
     }
 
     private val flushRunnable = Runnable { flushOutputBuffer() }
@@ -93,8 +94,8 @@ class ShellyTerminalSession(
     fun sendResizeCommand(cols: Int, rows: Int) {
         try {
             val cmd = "${RESIZE_PREFIX}${cols};${rows}\n"
-            localSocket?.outputStream?.write(cmd.toByteArray(Charsets.UTF_8))
-            localSocket?.outputStream?.flush()
+            socket?.getOutputStream()?.write(cmd.toByteArray(Charsets.UTF_8))
+            socket?.getOutputStream()?.flush()
             Log.i(TAG, "sendResizeCommand: ${cols}x${rows}")
         } catch (e: Exception) {
             Log.w(TAG, "sendResizeCommand failed: ${e.message}")
@@ -102,10 +103,11 @@ class ShellyTerminalSession(
     }
 
     fun isAlive(): Boolean {
-        val sock = localSocket ?: return false
+        val sock = socket ?: return false
+        if (sock.isClosed) return false
         return try {
-            // LocalSocket doesn't have sendUrgentData, so check if streams are accessible
-            sock.outputStream != null && sock.inputStream != null
+            sock.sendUrgentData(0xFF)
+            true
         } catch (e: Exception) {
             false
         }
@@ -115,8 +117,8 @@ class ShellyTerminalSession(
         batchHandler.removeCallbacks(flushRunnable)
         flushOutputBuffer()
         terminalSession.finishIfRunning()
-        try { localSocket?.close() } catch (_: Exception) {}
-        localSocket = null
+        try { socket?.close() } catch (_: Exception) {}
+        socket = null
     }
 
     fun getTitle(): String = terminalSession.title ?: ""

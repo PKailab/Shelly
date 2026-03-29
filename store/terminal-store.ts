@@ -83,6 +83,15 @@ const DEFAULT_TERMUX_SETTINGS: TermuxSettings = {
 const MAX_SESSIONS = 4;
 const TMUX_NAMES = ['shelly-1', 'shelly-2', 'shelly-3', 'shelly-4'];
 
+/** Base TCP port for pty-helper PTY bridges. Each session gets BASE + index. */
+const PTY_BASE_PORT = 18200;
+
+/** Get the TCP port for a given session name (for pty-helper). */
+export function getPtyPort(sessionName: string): number {
+  const idx = TMUX_NAMES.indexOf(sessionName);
+  return PTY_BASE_PORT + (idx >= 0 ? idx : 0);
+}
+
 function allocateTmuxName(sessions: TabSession[]): string | null {
   const used = new Set(sessions.map((s) => s.tmuxSession));
   for (const name of TMUX_NAMES) {

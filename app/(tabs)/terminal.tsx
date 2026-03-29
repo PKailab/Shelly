@@ -28,7 +28,7 @@ import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation, t } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
-import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
+import { useActiveSession, useTerminalStore, getPtyPort } from '@/store/terminal-store';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { MultiPaneContext } from '@/components/multi-pane/PaneSlot';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
@@ -101,50 +101,50 @@ export default function TerminalScreen() {
   const { openPreview, closePreview, dismissBanner } = usePreviewStore.getState();
   const showSplitPreview = previewIsOpen && previewUrl && layout.isWide;
 
-  // Create a native session connected via Unix Domain Socket to pty-helper
+  // Create a native session connected via TCP to pty-helper
   const createNativeSession = useCallback(async (session: TabSession) => {
-    const socketPath = `/data/data/com.termux/files/home/.shelly/pty-${session.nativeSessionId}.sock`;
+    const port = getPtyPort(session.tmuxSession);
     try {
       // 0. Destroy any stale native session before re-creating
       try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
 
-      // 0.5. Kill any old pty-helper for this session
+      // 0.5. Kill any old pty-helper for this port
       await runRawCommand(
-        `pkill -f "pty-helper.*pty-${session.nativeSessionId}" 2>/dev/null; rm -f "${socketPath}"; true`,
+        `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
         { timeoutMs: 3000, reason: 'pty-cleanup' }
       ).catch(() => {});
 
-      // 1. Launch pty-helper in Termux (creates PTY + shell + Unix socket)
+      // 1. Launch pty-helper in Termux (creates PTY + shell, listens on TCP port)
       await runRawCommand(
-        `nohup ~/shelly-bridge/start-pty.sh "${session.nativeSessionId}" 80 24 > /dev/null 2>&1 &`,
+        `nohup ~/shelly-bridge/pty-helper ${port} 80 24 > /dev/null 2>&1 &`,
         { timeoutMs: 5000, reason: 'pty-start' }
       );
 
-      // 2. Wait for pty-helper to be ready (poll for socket file, max 3s)
-      let socketReady = false;
+      // 2. Wait for pty-helper to be ready (poll TCP port, max 3s)
+      let ready = false;
       for (let i = 0; i < 6; i++) {
         await new Promise(resolve => setTimeout(resolve, 500));
         try {
           const result = await runRawCommand(
-            `test -S "${socketPath}" && echo READY || echo WAIT`,
+            `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
             { timeoutMs: 2000, reason: 'pty-wait' }
           );
           if (result?.stdout?.includes('READY')) {
-            socketReady = true;
+            ready = true;
             break;
           }
         } catch {}
       }
 
-      if (!socketReady) {
-        throw new Error('pty-helper socket not ready after 3s');
+      if (!ready) {
+        throw new Error(`pty-helper not ready on port ${port} after 3s`);
       }
 
-      // 3. Create native session connected to Unix Domain Socket (with retry)
+      // 3. Create native session connected to pty-helper TCP port (with retry)
       try {
         await TerminalEmulator.createSession({
           sessionId: session.nativeSessionId,
-          socketPath,
+          port,
           rows: 24,
           cols: 80,
         });
@@ -153,7 +153,7 @@ export default function TerminalScreen() {
         await new Promise(resolve => setTimeout(resolve, 1000));
         await TerminalEmulator.createSession({
           sessionId: session.nativeSessionId,
-          socketPath,
+          port,
           rows: 24,
           cols: 80,
         });
@@ -190,8 +190,9 @@ export default function TerminalScreen() {
     try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
 
     // Kill old pty-helper for this session
+    const port = getPtyPort(session.tmuxSession);
     await runRawCommand(
-      `pkill -f "pty-helper.*pty-${session.nativeSessionId}" 2>/dev/null; true`,
+      `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
       { timeoutMs: 3000, reason: 'pty-kill' }
     ).catch(() => {});
 
