@@ -200,7 +200,7 @@ export default function TerminalScreen() {
     }
   }, [runRawCommand]);
 
-  // Recover a session after pty-helper dies: kill old process, re-create
+  // Recover a session: reconnect to existing pty-helper, or restart if dead
   const recoverSession = useCallback(async (session: TabSession) => {
     setIsRecovering(true);
 
@@ -211,17 +211,10 @@ export default function TerminalScreen() {
       ),
     }));
 
-    // Destroy old native session
+    // Destroy old Kotlin session (not the pty-helper process!)
     try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
 
-    // Kill old pty-helper for this session
-    const port = getPtyPort(session.tmuxSession);
-    await runRawCommand(
-      `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
-      { timeoutMs: 3000, reason: 'pty-kill' }
-    ).catch(() => {});
-
-    // Re-create with new pty-helper
+    // Reconnect (createNativeSession checks if pty-helper is alive first)
     await createNativeSession(session);
 
     setIsRecovering(false);
