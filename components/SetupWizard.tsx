@@ -45,6 +45,7 @@ import {
 import { getStoreUrl, checkTermuxPackages, runTermuxCommand } from '@/lib/termux-intent';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { AuthWizard } from '@/components/AuthWizard';
+import { getDeviceProfile, type KillFixStep } from '@/lib/process-guard';
 
 const SETUP_WIZARD_KEY = '@shelly/setup_wizard_complete';
 
@@ -98,7 +99,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
   const { t } = useTranslation();
   const { runRawCommand, writeFile } = useTermuxBridge();
 
-  type WizardStep = 'welcome' | 'install' | 'init' | 'auto' | 'complete' | 'error';
+  type WizardStep = 'welcome' | 'install' | 'init' | 'auto' | 'protect' | 'complete' | 'error';
   const [wizardStep, setWizardStep] = useState<WizardStep>(
     isResetup ? 'init' : 'welcome',
   );
@@ -211,11 +212,11 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
         terminalReady: results.terminal ?? false,
       });
       setCliDetected(results.cli ?? { claudeCode: false, geminiCli: false, codex: false });
-      setWizardStep('complete');
+      setWizardStep('protect');
     } catch (err) {
-      // Phase 2 failure is non-fatal — still show complete with partial results
+      // Phase 2 failure is non-fatal — still show protect with partial results
       setSetupResult({ llmDetected: false, terminalReady: false });
-      setWizardStep('complete');
+      setWizardStep('protect');
     }
   }, [runRawCommand, writeFile]);
 
@@ -470,6 +471,71 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
     </Animated.View>
   );
 
+  // ── Render: Step 4.5 — Background Protection (ProcessGuard) ───────────
+
+  const renderProtectStep = () => {
+    const profile = getDeviceProfile();
+    return (
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
+        <View style={[styles.iconCircle, { backgroundColor: '#FF6B6B20' }]}>
+          <MaterialIcons name="shield" size={48} color="#FF6B6B" />
+        </View>
+
+        <Text style={[styles.title, { color: '#FF6B6B' }]}>Background Protection</Text>
+        <Text style={styles.description}>
+          Android may kill background processes. Follow these steps to keep Shelly running.
+        </Text>
+
+        <View style={styles.stepList}>
+          {profile.fixSteps.map((step, i) => (
+            <View key={i} style={[styles.resultCard, { marginTop: i > 0 ? 8 : 0 }]}>
+              <Text style={{ color: '#E8E8E8', fontSize: 13, fontWeight: '700', fontFamily: 'monospace', marginBottom: 4 }}>
+                {i + 1}. {step.title}
+              </Text>
+              <Text style={{ color: '#9CA3AF', fontSize: 11, fontFamily: 'monospace', lineHeight: 16 }}>
+                {step.description}
+              </Text>
+              {step.intentUri && (
+                <Pressable
+                  style={[styles.primaryBtn, { backgroundColor: '#FF6B6B', marginTop: 8, paddingVertical: 8 }]}
+                  onPress={() => Linking.openURL(`intent://#Intent;action=${step.intentUri};end`).catch(() => {})}
+                >
+                  <MaterialIcons name="settings" size={16} color="#000" />
+                  <Text style={[styles.primaryBtnText, { fontSize: 12 }]}>Open Settings</Text>
+                </Pressable>
+              )}
+              {step.adbCommand && (
+                <View style={{ marginTop: 8, backgroundColor: '#0D0D0D', padding: 8, borderRadius: 6 }}>
+                  <Text style={{ fontFamily: 'monospace', fontSize: 10, color: '#E8E8E8' }} selectable>
+                    {step.adbCommand}
+                  </Text>
+                  <Pressable
+                    style={{ alignSelf: 'flex-end', marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FF6B6B20' }}
+                    onPress={() => { Clipboard.setStringAsync(step.adbCommand!); }}
+                  >
+                    <Text style={{ fontFamily: 'monospace', fontSize: 10, color: '#FF6B6B' }}>Copy</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+
+        <Pressable
+          style={[styles.primaryBtn, { backgroundColor: '#4ADE80', marginTop: 16 }]}
+          onPress={() => setWizardStep('complete')}
+        >
+          <Text style={styles.primaryBtnText}>Continue</Text>
+          <MaterialIcons name="arrow-forward" size={18} color="#000" />
+        </Pressable>
+
+        <Pressable style={styles.skipBtn} onPress={() => setWizardStep('complete')}>
+          <Text style={styles.skipBtnText}>Skip</Text>
+        </Pressable>
+      </Animated.View>
+    );
+  };
+
   // ── Render: Step 5 — Complete ──────────────────────────────────────────
 
   const renderCompleteStep = () => (
@@ -638,6 +704,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
           {wizardStep === 'install' && renderInstallStep()}
           {wizardStep === 'init' && renderInitStep()}
           {wizardStep === 'auto' && renderAutoStep()}
+          {wizardStep === 'protect' && renderProtectStep()}
           {wizardStep === 'complete' && renderCompleteStep()}
           {wizardStep === 'error' && renderErrorStep()}
         </View>
