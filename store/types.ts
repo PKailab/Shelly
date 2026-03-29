@@ -381,4 +381,11 @@ export type AppSettings = {
   llmInterpreterEnabled?: boolean;
   /** 外部キーボードのショートカット表示（デフォルト: false） */
   externalKeyboardShortcuts?: boolean;
+  // ─── Terminal Appearance ──────────────────────────────────────────────────
+  /** Terminal ANSI color theme (default: 'shelly') */
+  terminalTheme: string;
+  /** Lock font size — disable pinch-zoom (default: false) */
+  fontSizeLocked: boolean;
+  /** Auto-hide key bar when hardware keyboard detected (default: false) */
+  hideKeyBarWithHwKeyboard: boolean;
 };

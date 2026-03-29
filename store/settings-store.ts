@@ -48,6 +48,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   realtimeTranslateEnabled: false,
   llmInterpreterEnabled: false,
   externalKeyboardShortcuts: false,
+  terminalTheme: 'shelly',
+  fontSizeLocked: false,
+  hideKeyBarWithHwKeyboard: false,
 };
 
 export const DEFAULT_TERMUX_SETTINGS: TermuxSettings = {
