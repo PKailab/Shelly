@@ -1,6 +1,6 @@
 /**
  * Terminal Screen — Native terminal view via direct PTY (pty-helper)
- * Unix Domain Socket connection. Japanese input proxy + session monitor.
+ * Unix Domain Socket connection + session monitor.
  */
 import React, { useRef, useState, useCallback, useEffect, useMemo, useContext } from 'react';
 import {
@@ -14,7 +14,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -77,7 +76,6 @@ export default function TerminalScreen() {
   const { colors: c } = useTheme();
   const { t } = useTranslation();
   const layout = useDeviceLayout();
-  const inputRef = useRef<TextInput>(null);
   const activeSession = useActiveSession();
   const { removeSession, sessions, settings } = useTerminalStore();
   const bridgeStatus = useTerminalStore((s) => s.bridgeStatus);
@@ -406,9 +404,7 @@ export default function TerminalScreen() {
     }
   }, [isConnected]);
 
-  // Japanese input proxy state
-  const [jpInput, setJpInput] = useState('');
-  const [showJpInput, setShowJpInput] = useState(false);
+  // Japanese input proxy removed — NativeTerminalView handles inline JP input
 
   // Terminal color scheme from settings — converted to Kotlin prop format
   const terminalColorScheme = useMemo(() => {
@@ -467,31 +463,6 @@ export default function TerminalScreen() {
     }
   }, [runRawCommand]);
 
-  const handleJpSend = useCallback(() => {
-    const text = jpInput.trim();
-    if (!text) return;
-    sendToTerminal(text);
-    setJpInput('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [jpInput, sendToTerminal]);
-
-  const handleJpSendNewline = useCallback(() => {
-    const text = jpInput;
-    if (!text) {
-      sendToTerminal('\r');
-      return;
-    }
-    sendToTerminal(text + '\r');
-    setJpInput('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [jpInput, sendToTerminal]);
-
-  const toggleJpInput = useCallback(() => {
-    setShowJpInput((v) => !v);
-    if (!showJpInput) {
-      setTimeout(() => inputRef.current?.focus(), 200);
-    }
-  }, [showJpInput]);
 
   const handleReload = useCallback(() => {
     if (activeSession) {
@@ -512,9 +483,7 @@ export default function TerminalScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: keyboardHeight, backgroundColor: c.background }]}>
       {/* Session Tab Header */}
       <TerminalHeader
-        onToggleJpInput={toggleJpInput}
         onReload={handleReload}
-        jpInputActive={showJpInput}
       />
 
       {/* quickBar removed — JP input + reload now integrated into TerminalHeader */}
@@ -594,39 +563,7 @@ export default function TerminalScreen() {
         </View>
       )}
 
-      {/* Japanese Input Proxy */}
-      {isConnected && showJpInput && (
-        <View style={[styles.jpInputBar, { backgroundColor: c.surfaceHigh, borderTopColor: c.border }]}>
-          <TextInput
-            ref={inputRef}
-            style={[styles.jpInputField, { backgroundColor: c.backgroundDeep, color: c.foreground, borderColor: c.borderLight }]}
-            value={jpInput}
-            onChangeText={setJpInput}
-            placeholder={t('terminal.jp_placeholder')}
-            placeholderTextColor={c.inactive}
-            autoCapitalize="none"
-            autoCorrect={false}
-            multiline={false}
-            returnKeyType="send"
-            onSubmitEditing={handleJpSendNewline}
-            blurOnSubmit={false}
-          />
-          <TouchableOpacity
-            onPress={handleJpSend}
-            style={[styles.jpSendBtn, { backgroundColor: withAlpha(c.accent, 0.15) }]}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.jpSendText, { color: c.accent }]}>{t('terminal.paste')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleJpSendNewline}
-            style={[styles.jpSendBtn, { backgroundColor: c.accent }]}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="send" size={16} color={c.background} />
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Japanese Input Proxy removed — NativeTerminalView handles inline JP input directly */}
 
       {/* Command Key Bar (Ctrl+C, Tab, up, down, Paste) + Attach/Voice */}
       {isConnected && (
@@ -699,60 +636,10 @@ export default function TerminalScreen() {
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function StatusBadge({ state, retryCount, colors: c }: { state: ConnectionState; retryCount: number; colors: any }) {
-  const label =
-    state === 'connected' ? t('terminal.connected') :
-    state === 'connecting' ? (retryCount > 0 ? t('terminal.connecting_retry', { count: retryCount }) : t('terminal.connecting')) :
-    t('terminal.disconnected');
-
-  const color =
-    state === 'connected' ? '#4ADE80' :
-    state === 'connecting' ? '#FBBF24' :
-    '#FF7878';
-
-  return (
-    <View style={[styles.badge, { borderColor: color }]}>
-      {state === 'connecting' ? (
-        <ActivityIndicator size={8} color={color} style={{ marginRight: 2 }} />
-      ) : (
-        <View style={[styles.badgeDot, { backgroundColor: color }]} />
-      )}
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  // Quick actions bar (below TerminalHeader)
-  quickBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 6,
-  },
-  reloadBtn: { padding: 4, borderRadius: 6 },
-
-  // JP toggle
-  jpToggle: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  jpToggleText: { fontSize: 11, fontWeight: '700', fontFamily: 'monospace' },
-
-  // Badge
-  badge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 10, fontFamily: 'monospace', fontWeight: '600' },
 
   // Connecting
   connectingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
@@ -760,35 +647,6 @@ const styles = StyleSheet.create({
 
   // Native terminal view
   terminalView: { backgroundColor: '#000' },
-
-  // Japanese input bar
-  jpInputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    gap: 6,
-  },
-  jpInputField: {
-    flex: 1,
-    fontFamily: 'monospace',
-    fontSize: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 38,
-  },
-  jpSendBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 38,
-  },
-  jpSendText: { fontSize: 12, fontWeight: '700', fontFamily: 'monospace' },
 
   // Error state
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },

@@ -110,12 +110,10 @@ const dotStyles = StyleSheet.create({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type TerminalHeaderProps = {
-  onToggleJpInput?: () => void;
   onReload?: () => void;
-  jpInputActive?: boolean;
 };
 
-export function TerminalHeader({ onToggleJpInput, onReload, jpInputActive }: TerminalHeaderProps = {}) {
+export function TerminalHeader({ onReload }: TerminalHeaderProps = {}) {
   const { colors } = useTheme();
   const {
     sessions,
@@ -295,19 +293,7 @@ export function TerminalHeader({ onToggleJpInput, onReload, jpInputActive }: Ter
         <MaterialIcons name="open-in-full" size={14} color={colors.inactive} />
       </Pressable>
 
-      {/* JP input + Reload */}
-      {onToggleJpInput && (
-        <Pressable
-          onPress={onToggleJpInput}
-          style={[
-            styles.jpToggleBtn,
-            { borderColor: jpInputActive ? colors.accent : colors.borderLight },
-            jpInputActive && { backgroundColor: withAlpha(colors.accent, 0.15) },
-          ]}
-        >
-          <Text style={[styles.jpToggleText, { color: jpInputActive ? colors.accent : colors.muted }]}>あ</Text>
-        </Pressable>
-      )}
+      {/* Reload */}
       {onReload && (
         <Pressable onPress={onReload} style={styles.fullscreenButton}>
           <MaterialIcons name="refresh" size={15} color={colors.inactive} />
@@ -444,18 +430,6 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '600',
-  },
-  jpToggleBtn: {
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 5,
-    borderWidth: 1,
-    marginRight: 2,
-  },
-  jpToggleText: {
-    fontSize: 10,
-    fontWeight: '700',
-    fontFamily: 'monospace',
   },
   previewBadge: {
     width: 6,
