@@ -511,27 +511,33 @@ export default function TerminalScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: keyboardHeight, backgroundColor: c.background }]}>
       {/* Session Tab Header */}
-      <TerminalHeader />
+      <TerminalHeader
+        onToggleJpInput={toggleJpInput}
+        onReload={handleReload}
+        jpInputActive={showJpInput}
+      />
 
-      {/* Quick Actions Bar (JP input + reload) */}
-      <View style={[styles.quickBar, { backgroundColor: c.surfaceHigh, borderBottomColor: c.border }]}>
-        <StatusBadge state={connectionState} retryCount={0} colors={c} />
-        <View style={{ flex: 1 }} />
-        <TouchableOpacity
-          onPress={toggleJpInput}
-          style={[
-            styles.jpToggle,
-            { backgroundColor: showJpInput ? withAlpha(c.accent, 0.15) : 'transparent', borderColor: showJpInput ? c.accent : c.border },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Japanese input toggle"
-        >
-          <Text style={[styles.jpToggleText, { color: showJpInput ? c.accent : c.muted }]}>あ</Text>
-        </TouchableOpacity>
-        <Pressable onPress={handleReload} style={styles.reloadBtn} accessibilityRole="button" accessibilityLabel="Reload terminal">
-          <MaterialIcons name="refresh" size={18} color={c.foreground} />
-        </Pressable>
-      </View>
+      {/* Quick Actions Bar — only shown in split view (main header already has status) */}
+      {isRenderedInMultiPane && (
+        <View style={[styles.quickBar, { backgroundColor: c.surfaceHigh, borderBottomColor: c.border }]}>
+          <StatusBadge state={connectionState} retryCount={0} colors={c} />
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            onPress={toggleJpInput}
+            style={[
+              styles.jpToggle,
+              { backgroundColor: showJpInput ? withAlpha(c.accent, 0.15) : 'transparent', borderColor: showJpInput ? c.accent : c.border },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Japanese input toggle"
+          >
+            <Text style={[styles.jpToggleText, { color: showJpInput ? c.accent : c.muted }]}>あ</Text>
+          </TouchableOpacity>
+          <Pressable onPress={handleReload} style={styles.reloadBtn} accessibilityRole="button" accessibilityLabel="Reload terminal">
+            <MaterialIcons name="refresh" size={18} color={c.foreground} />
+          </Pressable>
+        </View>
+      )}
 
       {/* Preview Banner — slides in when localhost URL detected */}
       {bannerVisible && bannerUrl && isConnected && (
