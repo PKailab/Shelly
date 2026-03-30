@@ -200,43 +200,50 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
 
   return (
     <View style={[styles.container, { backgroundColor: c.surfaceHigh, borderTopColor: c.border }]} onLayout={onBarLayout}>
-      {/* Set indicator dots + attach/voice shortcuts */}
-      <View style={styles.dotsRow}>
+      {/* Single row: attach/voice + swipeable keys + dots */}
+      <View style={styles.singleRow}>
+        {/* Attach + Voice mini buttons */}
         {onAttach && (
           <Pressable onPress={onAttach} hitSlop={6} style={styles.miniBtn}>
-            <MaterialIcons name="attach-file" size={12} color={c.muted} />
+            <MaterialIcons name="attach-file" size={13} color={c.muted} />
           </Pressable>
         )}
         {onVoice && (
           <Pressable onPress={onVoice} hitSlop={6} style={styles.miniBtn}>
-            <MaterialIcons name="mic" size={12} color={c.muted} />
+            <MaterialIcons name="mic" size={13} color={c.muted} />
           </Pressable>
         )}
-        <View style={{ flex: 1 }} />
-        {SET_ORDER.map((id) => (
-          <Pressable key={id} onPress={() => switchSet(id)} hitSlop={8}>
-            <View style={[
-              styles.dot,
-              { backgroundColor: id === activeSet ? c.accent : withAlpha(c.foreground, 0.2) },
-              id === suggestedSet && id !== activeSet && styles.suggestedDot,
-              id === suggestedSet && id !== activeSet && { borderColor: c.accent },
-            ]} />
-          </Pressable>
-        ))}
-        <Text style={[styles.setLabel, { color: c.muted }]}>{currentSet.label}</Text>
-      </View>
 
-      {/* Swipeable key sets */}
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScrollEnd}
-        scrollEventThrottle={16}
-      >
-        {SET_ORDER.map(renderKeySet)}
-      </ScrollView>
+        {/* Swipeable key sets */}
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            ref={scrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScrollEnd}
+            scrollEventThrottle={16}
+          >
+            {SET_ORDER.map(renderKeySet)}
+          </ScrollView>
+        </View>
+
+        {/* Dots column (compact) */}
+        <View style={styles.dotsCol}>
+          <View style={styles.dotsGroup}>
+            {SET_ORDER.map((id) => (
+              <Pressable key={id} onPress={() => switchSet(id)} hitSlop={6}>
+                <View style={[
+                  styles.dot,
+                  { backgroundColor: id === activeSet ? c.accent : withAlpha(c.foreground, 0.2) },
+                  id === suggestedSet && id !== activeSet && styles.suggestedDot,
+                  id === suggestedSet && id !== activeSet && { borderColor: c.accent },
+                ]} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </View>
     </View>
   );
 }
@@ -264,19 +271,24 @@ const styles = StyleSheet.create({
   container: {
     borderTopWidth: BORDER_WIDTH,
   },
-  dotsRow: {
+  singleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
   },
   miniBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
+    width: 28,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dotsCol: {
+    paddingRight: 6,
+    justifyContent: 'center',
+  },
+  dotsGroup: {
+    flexDirection: 'column',
+    gap: 3,
+    alignItems: 'center',
   },
   dot: {
     width: 5,
@@ -297,9 +309,9 @@ const styles = StyleSheet.create({
   keysRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingBottom: 4,
-    gap: 4,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
+    gap: 3,
   },
   key: {
     flex: 1,
