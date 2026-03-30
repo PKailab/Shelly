@@ -541,6 +541,12 @@ export function useAIDispatch() {
           content: m.content,
         }));
 
+        // Memories: inject custom context as system message
+        const customCtx = await loadCustomContext().catch(() => '');
+        if (customCtx) {
+          cerebrasHistory.unshift({ role: 'user' as const, content: `[System Context]\n${customCtx}` });
+        }
+
         // Cross-pane: inject terminal context
         const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
         const cerebrasPrompt = termCtx ? promptWithFiles + termCtx : promptWithFiles;
@@ -662,6 +668,12 @@ export function useAIDispatch() {
           role: (m.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
           content: m.content,
         }));
+
+        // Memories: inject custom context as system message
+        const groqCustomCtx = await loadCustomContext().catch(() => '');
+        if (groqCustomCtx) {
+          groqHistory.unshift({ role: 'user' as const, content: `[System Context]\n${groqCustomCtx}` });
+        }
 
         // Cross-pane: inject terminal context
         const termCtx = getTerminalContextForPrompt(prompt, isWide ?? false);
