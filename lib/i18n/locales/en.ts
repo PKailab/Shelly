@@ -533,6 +533,8 @@ const en: Record<string, string> = {
   'mention.git_desc': 'Git operations guide',
   'mention.team_desc': 'Multi-AI parallel',
   'mention.browser_desc': 'Open URL in browser',
+  'mention.plan_desc': 'Step-by-step plan',
+  'mention.arena_desc': 'Blind AI comparison',
 
   // ── AI Dispatch ─────────────────────────────────────────────────
   'dispatch.gemini_no_key': 'Gemini API key is not set.\nGet a free key at https://aistudio.google.com/app/apikey',
