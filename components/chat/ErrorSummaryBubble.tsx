@@ -23,10 +23,37 @@ type Props = {
   data: ErrorSummaryData;
   onSuggestFix?: (context: string) => void;
   onAskTeam?: (context: string) => void;
+  onExecuteFix?: (command: string) => void;
 };
 
-export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSuggestFix, onAskTeam }: Props) {
+export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSuggestFix, onAskTeam, onExecuteFix }: Props) {
   const { colors } = useTheme();
+
+  // Try to extract a quick-fix command from common error patterns
+  const quickFix = React.useMemo(() => {
+    const err = data.errorText;
+    if (err.includes('Module not found') || err.includes('Cannot find module')) {
+      const match = err.match(/Cannot find module '([^']+)'/);
+      if (match) return `npm install ${match[1].replace(/^@/, '').split('/')[0]}`;
+    }
+    if (err.includes('ENOENT') && err.includes('package.json')) return 'npm init -y';
+    if (err.includes('permission denied')) return 'chmod +x ' + (err.match(/permission denied,.*'([^']+)'/)?.[1] ?? '');
+    if (err.includes('EADDRINUSE')) {
+      const port = err.match(/port (\d+)/i)?.[1] ?? err.match(/:(\d{4,5})/)?.[1];
+      return port ? `kill $(lsof -ti:${port})` : null;
+    }
+    if (err.includes('command not found')) {
+      const cmd = err.match(/(\w+): command not found/)?.[1];
+      return cmd ? `pkg install ${cmd}` : null;
+    }
+    return null;
+  }, [data.errorText]);
+
+  const handleExecuteFix = () => {
+    if (!quickFix) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onExecuteFix?.(quickFix);
+  };
 
   const handleSuggestFix = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -64,6 +91,19 @@ export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSug
         >
           {data.errorText}
         </Text>
+
+        {/* Quick fix command (if detected) */}
+        {quickFix && onExecuteFix && (
+          <TouchableOpacity
+            style={[styles.fixBanner, { backgroundColor: withAlpha('#10B981', 0.12) }]}
+            onPress={handleExecuteFix}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons name="play-arrow" size={14} color="#10B981" />
+            <Text style={[styles.fixCommand, { color: '#10B981' }]}>$ {quickFix}</Text>
+            <Text style={[styles.fixLabel, { color: '#10B981' }]}>Run</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Action buttons */}
         <View style={styles.buttonRow}>
@@ -129,6 +169,25 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
     lineHeight: 16,
+  },
+  fixBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  fixCommand: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+  },
+  fixLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   buttonRow: {
     flexDirection: 'row',
