@@ -58,6 +58,7 @@ export interface NativeTerminalViewProps extends ViewProps {
   fontSize: number;
   cursorShape?: CursorShape;
   cursorBlink?: boolean;
+  colorScheme?: Record<string, string>;
   onOutput?: (event: OutputEvent) => void;
   onBlockCompleted?: (event: BlockCompletedEvent) => void;
   onSelectionChanged?: (event: SelectionChangedEvent) => void;

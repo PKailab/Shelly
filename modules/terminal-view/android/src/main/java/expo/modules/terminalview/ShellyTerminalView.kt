@@ -13,7 +13,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
+import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
+import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import expo.modules.kotlin.AppContext
@@ -234,6 +236,37 @@ class ShellyTerminalView(
 
     fun setCursorBlinkEnabled(enabled: Boolean) {
         setTerminalCursorBlinkerRate(if (enabled) 500 else 0)
+    }
+
+    /**
+     * Apply a terminal color theme. Expects a map with keys:
+     * color0-color15 (ANSI 16), foreground, background, cursor.
+     * Values are hex color strings like "#FF5555".
+     */
+    fun applyThemeColors(colors: Map<String, String>) {
+        try {
+            val props = java.util.Properties()
+            for ((key, value) in colors) {
+                // Convert "#RRGGBB" to "rgb:RR/GG/BB" format expected by TerminalColorScheme
+                val hex = value.removePrefix("#")
+                if (hex.length == 6) {
+                    val r = hex.substring(0, 2)
+                    val g = hex.substring(2, 4)
+                    val b = hex.substring(4, 6)
+                    props.setProperty(key, "rgb:$r/$g/$b")
+                }
+            }
+            TerminalColors.COLOR_SCHEME.updateWith(props)
+            // Reset current session colors to apply the new scheme
+            terminalView.mEmulator?.mColors?.reset()
+            // Update background color of the view
+            val bgColor = TerminalColors.COLOR_SCHEME.mDefaultColors[TextStyle.COLOR_INDEX_BACKGROUND]
+            setBackgroundColor(bgColor)
+            terminalView.invalidate()
+            Log.i(TAG, "applyThemeColors: applied ${colors.size} colors")
+        } catch (e: Exception) {
+            Log.w(TAG, "applyThemeColors failed", e)
+        }
     }
 
     // ===== Visibility / Focus =====

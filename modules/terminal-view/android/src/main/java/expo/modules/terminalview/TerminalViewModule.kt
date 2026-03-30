@@ -70,6 +70,12 @@ class TerminalViewModule : Module() {
                 view.setCursorBlinkEnabled(blink ?: false)
             }
 
+            Prop("colorScheme") { view: ShellyTerminalView, colors: Map<String, String>? ->
+                if (colors != null && colors.isNotEmpty()) {
+                    view.applyThemeColors(colors)
+                }
+            }
+
             OnViewDestroys { view: ShellyTerminalView ->
                 view.destroy()
             }

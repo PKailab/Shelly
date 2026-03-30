@@ -51,6 +51,7 @@ import { usePreviewStore } from '@/store/preview-store';
 import { ProcessGuardModal } from '@/components/terminal/ProcessGuardModal';
 import { FirstMateOverlay, shouldShowFirstMate } from '@/components/terminal/FirstMateOverlay';
 import { isProcessKill } from '@/lib/process-guard';
+import { getTerminalTheme, type TerminalTheme } from '@/lib/terminal-theme';
 import type { TabSession, SessionStatus } from '@/store/types';
 import { useChatStore } from '@/store/chat-store';
 import { generateId } from '@/lib/id';
@@ -409,6 +410,20 @@ export default function TerminalScreen() {
   const [jpInput, setJpInput] = useState('');
   const [showJpInput, setShowJpInput] = useState(false);
 
+  // Terminal color scheme from settings — converted to Kotlin prop format
+  const terminalColorScheme = useMemo(() => {
+    const theme = getTerminalTheme(settings.terminalTheme ?? 'shelly');
+    return {
+      color0: theme.black,    color1: theme.red,      color2: theme.green,     color3: theme.yellow,
+      color4: theme.blue,     color5: theme.magenta,  color6: theme.cyan,      color7: theme.white,
+      color8: theme.brightBlack,  color9: theme.brightRed,    color10: theme.brightGreen,  color11: theme.brightYellow,
+      color12: theme.brightBlue,  color13: theme.brightMagenta, color14: theme.brightCyan, color15: theme.brightWhite,
+      foreground: theme.foreground,
+      background: theme.background,
+      cursor: theme.cursor,
+    };
+  }, [settings.terminalTheme]);
+
   // Adaptive terminal font size for small screens (Z Fold6 cover ~ 373dp)
   // Terminal font size in dp (converted to px in native ShellyTerminalView).
   // Balanced for readability vs column count:
@@ -546,6 +561,7 @@ export default function TerminalScreen() {
             fontSize={termFontSize}
             cursorShape={settings.cursorShape || 'block'}
             cursorBlink={true}
+            colorScheme={terminalColorScheme}
             style={[styles.terminalView, { flex: showSplitPreview ? splitRatio : 1 }]}
             onScrollStateChanged={(e) => setIsScrolledUp(e.nativeEvent.isScrolledUp)}
             onOutput={() => {}}
