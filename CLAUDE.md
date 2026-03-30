@@ -115,6 +115,36 @@ Shelly/
 
 ---
 
+## 重要: 開発時のTermuxプロセス実行ルール（開発者向け）
+
+> このルールはTermux上でClaude Codeを使ってShellyを開発する際の注意事項です。
+> Shellyアプリのユーザーには影響しません（アプリ内ターミナルはpty-helperで分離済み）。
+
+**ブリッジ、サーバー、ビルド、テスト監視など、フォアグラウンドを占有するプロセスは絶対にClaude Codeが動いているセッションで直接実行してはいけない。**
+
+フォアグラウンドがブリッジ等に奪われると、Claude Codeに戻れなくなりセッションが死ぬ。
+
+```bash
+# NG: Claude Codeのセッションで直接実行
+node ~/shelly-bridge/start-shelly.sh
+~/shelly-bridge/pty-helper 8765 80 24
+
+# OK: tmuxの別ウィンドウで実行
+tmux new-window -t shelly "node ~/shelly-bridge/start-shelly.sh"
+tmux new-window "~/shelly-bridge/pty-helper 8765 80 24"
+
+# OK: バックグラウンド実行
+nohup node ~/shelly-bridge/start-shelly.sh > /dev/null 2>&1 &
+```
+
+対象コマンド:
+- `start-shelly.sh`, `pty-helper`, ブリッジ/サーバー起動系すべて
+- `npm start`, `expo start`, `pnpm dev` などの開発サーバー
+- `tail -f`, `watch`, `htop` などのフォアグラウンド占有コマンド
+- テストの長時間実行（`jest --watch` 等）
+
+---
+
 ## レスポンシブデザイン方針
 
 ### ブレークポイント（`hooks/use-device-layout.ts`）
