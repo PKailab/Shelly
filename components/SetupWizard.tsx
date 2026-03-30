@@ -481,9 +481,9 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
           <MaterialIcons name="shield" size={48} color="#FF6B6B" />
         </View>
 
-        <Text style={[styles.title, { color: '#FF6B6B' }]}>Background Protection</Text>
+        <Text style={[styles.title, { color: '#FF6B6B' }]}>{t('setup2.protect_title')}</Text>
         <Text style={styles.description}>
-          Android may kill background processes. Follow these steps to keep Shelly running.
+          {t('setup2.protect_desc')}
         </Text>
 
         <View style={styles.stepList}>
@@ -501,7 +501,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
                   onPress={() => Linking.openURL(`intent://#Intent;action=${step.intentUri};end`).catch(() => {})}
                 >
                   <MaterialIcons name="settings" size={16} color="#000" />
-                  <Text style={[styles.primaryBtnText, { fontSize: 12 }]}>Open Settings</Text>
+                  <Text style={[styles.primaryBtnText, { fontSize: 12 }]}>{t('guard.open_settings')}</Text>
                 </Pressable>
               )}
               {step.adbCommand && (
@@ -513,7 +513,7 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
                     style={{ alignSelf: 'flex-end', marginTop: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, backgroundColor: '#FF6B6B20' }}
                     onPress={() => { Clipboard.setStringAsync(step.adbCommand!); }}
                   >
-                    <Text style={{ fontFamily: 'monospace', fontSize: 10, color: '#FF6B6B' }}>Copy</Text>
+                    <Text style={{ fontFamily: 'monospace', fontSize: 10, color: '#FF6B6B' }}>{t('guard.copy')}</Text>
                   </Pressable>
                 </View>
               )}
@@ -525,12 +525,12 @@ export function SetupWizard({ visible, onComplete, isResetup = false }: Props) {
           style={[styles.primaryBtn, { backgroundColor: '#4ADE80', marginTop: 16 }]}
           onPress={() => setWizardStep('complete')}
         >
-          <Text style={styles.primaryBtnText}>Continue</Text>
+          <Text style={styles.primaryBtnText}>{t('setup2.protect_continue')}</Text>
           <MaterialIcons name="arrow-forward" size={18} color="#000" />
         </Pressable>
 
         <Pressable style={styles.skipBtn} onPress={() => setWizardStep('complete')}>
-          <Text style={styles.skipBtnText}>Skip</Text>
+          <Text style={styles.skipBtnText}>{t('setup2.protect_skip')}</Text>
         </Pressable>
       </Animated.View>
     );

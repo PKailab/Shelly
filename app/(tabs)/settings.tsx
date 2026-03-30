@@ -676,7 +676,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Terminal Appearance ──────────────────────────────────────────── */}
-        <SectionHeader title="Terminal Appearance" subtitle="Theme, font lock, key bar" />
+        <SectionHeader title={t('settings.terminal_appearance')} subtitle={t('settings.terminal_appearance_desc')} />
 
         {/* Theme preview cards — horizontal scroll */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 10, gap: 10 }}>
@@ -712,7 +712,7 @@ export default function SettingsScreen() {
           })}
         </ScrollView>
 
-        <SettingRow label="Lock font size" description="Disable pinch-to-zoom in terminal">
+        <SettingRow label={t('settings.font_size_lock')} description={t('settings.font_size_lock_desc')}>
           <Switch
             value={settings.fontSizeLocked ?? false}
             onValueChange={(v) => updateSettings({ fontSizeLocked: v })}
@@ -721,7 +721,7 @@ export default function SettingsScreen() {
           />
         </SettingRow>
 
-        <SettingRow label="Auto-hide key bar" description="Hide key bar when hardware keyboard is detected">
+        <SettingRow label={t('settings.hide_keybar_hw')} description={t('settings.hide_keybar_hw_desc')}>
           <Switch
             value={settings.hideKeyBarWithHwKeyboard ?? false}
             onValueChange={(v) => updateSettings({ hideKeyBarWithHwKeyboard: v })}

@@ -15,6 +15,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useTranslation } from '@/lib/i18n';
 
 type Props = {
   visible: boolean;
@@ -71,6 +72,7 @@ const STORAGE_KEY = 'firstmate_completed';
 
 export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClose }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { runRawCommand } = useTermuxBridge();
   const [installing, setInstalling] = useState(false);
   const [status, setStatus] = useState('');
@@ -113,7 +115,7 @@ export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClos
         setProgress(0);
       }, 1000);
     } catch {
-      setStatus('Setup completed with some warnings.');
+      setStatus(t('firstmate.warn'));
       await AsyncStorage.setItem(STORAGE_KEY, 'true');
       setTimeout(() => {
         onClose();
@@ -147,7 +149,7 @@ export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClos
               <View style={styles.header}>
                 <Text style={[styles.emoji]}>🐚</Text>
                 <Text style={[styles.title, { color: colors.foreground }]}>
-                  What would you like to do?
+                  {t('firstmate.title')}
                 </Text>
               </View>
 
@@ -174,7 +176,7 @@ export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClos
                 activeOpacity={0.7}
               >
                 <Text style={[styles.skipText, { color: colors.muted }]}>
-                  Skip for now
+                  {t('firstmate.skip')}
                 </Text>
               </TouchableOpacity>
             </>

@@ -383,6 +383,12 @@ const ja: Record<string, string> = {
   'guard.next': '次へ',
   'guard.done': '完了',
   'guard.back': '戻る',
+  'guard.step_counter': 'ステップ {current} / {total}',
+  // Setup Wizard — Protect step
+  'setup2.protect_title': 'バックグラウンド保護',
+  'setup2.protect_desc': 'Androidがバックグラウンドプロセスを強制終了する場合があります。以下の手順でShellyを保護してください。',
+  'setup2.protect_continue': '続ける',
+  'setup2.protect_skip': 'スキップ',
   // FirstMate
   'firstmate.title': '何をしたい？',
   'firstmate.web': 'Web開発',
@@ -394,6 +400,7 @@ const ja: Record<string, string> = {
   'firstmate.storage': 'ストレージアクセスを設定中...',
   'firstmate.installing': 'インストール中...',
   'firstmate.done': '完了！',
+  'firstmate.warn': 'セットアップは一部警告ありで完了しました。',
   // SmartKeyBar
   'keybar.default': 'デフォルト',
   'keybar.vim': 'Vim',
@@ -412,8 +419,11 @@ const ja: Record<string, string> = {
   // Terminal Appearance
   'settings.terminal_appearance': 'ターミナル外観',
   'settings.terminal_theme': 'テーマ',
-  'settings.font_size_lock': 'フォントサイズ固定（ピンチズーム無効）',
-  'settings.hide_keybar_hw': '外付けキーボード時にキーバー非表示',
+  'settings.terminal_appearance_desc': 'テーマ、フォント固定、キーバー',
+  'settings.font_size_lock': 'フォントサイズ固定',
+  'settings.font_size_lock_desc': 'ターミナルのピンチズームを無効化',
+  'settings.hide_keybar_hw': 'キーバー自動非表示',
+  'settings.hide_keybar_hw_desc': '外付けキーボード接続時にキーバーを隠す',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': '話しかけるだけ',
   'setup2.slide1_desc': '自然な日本語で入力すると\nShellyが適切なコマンドに変換します。',

@@ -382,6 +382,12 @@ const en: Record<string, string> = {
   'guard.next': 'Next',
   'guard.done': 'Done',
   'guard.back': 'Back',
+  'guard.step_counter': 'Step {current} / {total}',
+  // Setup Wizard — Protect step
+  'setup2.protect_title': 'Background Protection',
+  'setup2.protect_desc': 'Android may kill background processes. Follow these steps to keep Shelly running.',
+  'setup2.protect_continue': 'Continue',
+  'setup2.protect_skip': 'Skip',
   // FirstMate
   'firstmate.title': 'What would you like to do?',
   'firstmate.web': 'Web Dev',
@@ -393,6 +399,7 @@ const en: Record<string, string> = {
   'firstmate.storage': 'Setting up storage access...',
   'firstmate.installing': 'Installing...',
   'firstmate.done': 'Done!',
+  'firstmate.warn': 'Setup completed with some warnings.',
   // SmartKeyBar
   'keybar.default': 'Default',
   'keybar.vim': 'Vim',
@@ -411,8 +418,11 @@ const en: Record<string, string> = {
   // Terminal Appearance
   'settings.terminal_appearance': 'Terminal Appearance',
   'settings.terminal_theme': 'Theme',
-  'settings.font_size_lock': 'Lock font size (disable pinch zoom)',
-  'settings.hide_keybar_hw': 'Hide key bar with hardware keyboard',
+  'settings.terminal_appearance_desc': 'Theme, font lock, key bar',
+  'settings.font_size_lock': 'Lock font size',
+  'settings.font_size_lock_desc': 'Disable pinch-to-zoom in terminal',
+  'settings.hide_keybar_hw': 'Auto-hide key bar',
+  'settings.hide_keybar_hw_desc': 'Hide key bar when hardware keyboard is detected',
   // Slides (feature showcase during setup)
   'setup2.slide1_title': 'Just Talk to It',
   'setup2.slide1_desc': 'Type in natural language.\nShelly converts it to the right command.',

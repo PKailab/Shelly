@@ -15,6 +15,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { getDeviceProfile, type KillFixStep } from '@/lib/process-guard';
+import { useTranslation } from '@/lib/i18n';
 
 type Props = {
   visible: boolean;
@@ -23,6 +24,7 @@ type Props = {
 
 export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onClose }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [copiedCmd, setCopiedCmd] = useState(false);
 
@@ -65,7 +67,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
           <View style={styles.header}>
             <MaterialIcons name="shield" size={24} color="#FF6B6B" />
             <Text style={[styles.title, { color: colors.foreground }]}>
-              Background Protection
+              {t('guard.title')}
             </Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <MaterialIcons name="close" size={20} color={colors.muted} />
@@ -76,8 +78,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
           {currentStep === 0 && (
             <View style={[styles.alertBox, { backgroundColor: withAlpha('#FF6B6B', 0.1) }]}>
               <Text style={[styles.alertText, { color: '#FF8A8A' }]}>
-                Android is force-stopping background processes.{'\n'}
-                Your terminal sessions may be killed when you switch apps.
+                {t('guard.problem')}
               </Text>
             </View>
           )}
@@ -94,7 +95,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
               />
             ))}
             <Text style={[styles.stepCount, { color: colors.muted }]}>
-              Step {currentStep + 1} / {steps.length}
+              {t('guard.step_counter', { current: currentStep + 1, total: steps.length })}
             </Text>
           </View>
 
@@ -124,7 +125,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
                     color={colors.accent}
                   />
                   <Text style={[styles.copyText, { color: colors.accent }]}>
-                    {copiedCmd ? 'Copied' : 'Copy'}
+                    {copiedCmd ? t('guard.copied') : t('guard.copy')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -139,7 +140,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
               >
                 <MaterialIcons name="settings" size={16} color={colors.accent} />
                 <Text style={[styles.settingsBtnText, { color: colors.accent }]}>
-                  Open Settings
+                  {t('guard.open_settings')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -149,7 +150,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
           <View style={styles.footer}>
             {currentStep > 0 && (
               <TouchableOpacity onPress={() => setCurrentStep((s) => s - 1)} activeOpacity={0.7}>
-                <Text style={[styles.navText, { color: colors.muted }]}>Back</Text>
+                <Text style={[styles.navText, { color: colors.muted }]}>{t('guard.back')}</Text>
               </TouchableOpacity>
             )}
             <View style={{ flex: 1 }} />
@@ -159,7 +160,7 @@ export const ProcessGuardModal = memo(function ProcessGuardModal({ visible, onCl
               activeOpacity={0.7}
             >
               <Text style={[styles.nextText, { color: colors.background }]}>
-                {isLast ? 'Done' : 'Next'}
+                {isLast ? t('guard.done') : t('guard.next')}
               </Text>
               {!isLast && <MaterialIcons name="arrow-forward" size={16} color={colors.background} />}
             </TouchableOpacity>
