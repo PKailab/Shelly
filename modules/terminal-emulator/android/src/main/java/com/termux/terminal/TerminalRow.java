@@ -173,6 +173,10 @@ public final class TerminalRow {
         mStyle[columnToSet] = style;
 
         final int newCodePointDisplayWidth = WcWidth.width(codePoint);
+        // For wide characters (CJK), also set style on the second column they occupy
+        if (newCodePointDisplayWidth == 2 && columnToSet + 1 < mStyle.length) {
+            mStyle[columnToSet + 1] = style;
+        }
 
         // Fast path when we don't have any chars with width != 1
         if (!mHasNonOneWidthOrSurrogateChars) {

@@ -3,6 +3,7 @@ package expo.modules.terminalview
 import com.termux.terminal.TerminalBuffer
 import com.termux.terminal.TerminalRow
 import com.termux.terminal.TextStyle
+import com.termux.terminal.WcWidth
 
 /**
  * Warp-style syntax highlighter for terminal output.
@@ -69,17 +70,35 @@ object SyntaxHighlighter {
         return modified
     }
 
+    /**
+     * Mappings between column positions and text string indices, built by extractText().
+     * textIdxToCol maps each text char index to the column it starts at.
+     * Used by setColorRange to convert text-based ranges to column-based style updates.
+     */
+    private var colToTextIdx: IntArray = IntArray(0)
+    private var textIdxToCol: IntArray = IntArray(0)
+    private var lastExtractedColumns: Int = 0
+
     private fun extractText(row: TerminalRow, columns: Int): String {
         val sb = StringBuilder(columns)
         val line = row.mText
+        val spaceUsed = row.spaceUsed
+        if (colToTextIdx.size < columns + 1) colToTextIdx = IntArray(columns + 1)
         var charIdx = 0
-        for (col in 0 until columns) {
-            if (charIdx >= line.size) {
+        var col = 0
+        while (col < columns) {
+            colToTextIdx[col] = sb.length
+            if (charIdx >= spaceUsed) {
                 sb.append(' ')
+                col++
                 continue
             }
             val c = line[charIdx]
-            if (Character.isHighSurrogate(c) && charIdx + 1 < line.size) {
+            val isHigh = Character.isHighSurrogate(c)
+            val codePoint = if (isHigh && charIdx + 1 < spaceUsed)
+                Character.toCodePoint(c, line[charIdx + 1]) else c.code
+            val w = WcWidth.width(codePoint)
+            if (isHigh && charIdx + 1 < spaceUsed) {
                 sb.append(c)
                 sb.append(line[charIdx + 1])
                 charIdx += 2
@@ -87,6 +106,40 @@ object SyntaxHighlighter {
                 sb.append(c)
                 charIdx++
             }
+            // Skip combining characters (width <= 0)
+            while (charIdx < spaceUsed) {
+                val nc = line[charIdx]
+                val ncp = if (Character.isHighSurrogate(nc) && charIdx + 1 < spaceUsed)
+                    Character.toCodePoint(nc, line[charIdx + 1]) else nc.code
+                if (WcWidth.width(ncp) > 0) break
+                if (Character.isHighSurrogate(nc)) { sb.append(nc); sb.append(line[charIdx + 1]); charIdx += 2 }
+                else { sb.append(nc); charIdx++ }
+            }
+            if (w == 2 && col + 1 < columns) {
+                // Wide char occupies two columns; mark second column
+                col++
+                colToTextIdx[col] = sb.length // points past the wide char
+            }
+            col++
+        }
+        lastExtractedColumns = columns
+        // Build reverse mapping: text index → column
+        val textLen = sb.length
+        if (textIdxToCol.size < textLen + 1) textIdxToCol = IntArray(textLen + 1)
+        // Fill from column mapping
+        var prevTextIdx = 0
+        var prevCol2 = 0
+        for (c2 in 0..columns) {
+            val ti = if (c2 < columns) colToTextIdx[c2] else textLen
+            for (t in prevTextIdx until ti) {
+                textIdxToCol[t] = prevCol2
+            }
+            prevTextIdx = ti
+            prevCol2 = c2
+        }
+        // Fill remaining
+        for (t in prevTextIdx..textLen) {
+            textIdxToCol[t] = columns
         }
         return sb.toString()
     }
@@ -115,7 +168,7 @@ object SyntaxHighlighter {
         var inString = false
         var stringChar = ' '
 
-        while (i < text.length && i < columns) {
+        while (i < text.length) {
             val c = text[i]
 
             // Skip spaces
@@ -131,8 +184,8 @@ object SyntaxHighlighter {
                 stringChar = c
                 val start = i
                 i++
-                while (i < text.length && i < columns && !(text[i] == stringChar && text[i - 1] != '\\')) i++
-                if (i < columns) i++ // closing quote
+                while (i < text.length && !(text[i] == stringChar && text[i - 1] != '\\')) i++
+                if (i < text.length) i++ // closing quote
                 if (setColorRange(row, start, i, COLOR_STRING, defaultFg)) modified = true
                 continue
             }
@@ -148,7 +201,7 @@ object SyntaxHighlighter {
                 val start = i
                 i++
                 if (i < text.length && text[i] == '-') i++ // --long-option
-                while (i < text.length && i < columns && text[i] != ' ') i++
+                while (i < text.length && text[i] != ' ') i++
                 if (setColorRange(row, start, i, COLOR_OPTION, defaultFg)) modified = true
                 continue
             }
@@ -157,7 +210,7 @@ object SyntaxHighlighter {
             if ((c == '/' || (c == '.' && i + 1 < text.length && text[i + 1] == '/') ||
                  (c == '~' && i + 1 < text.length && text[i + 1] == '/')) && !inString) {
                 val start = i
-                while (i < text.length && i < columns && text[i] != ' ') i++
+                while (i < text.length && text[i] != ' ') i++
                 if (setColorRange(row, start, i, COLOR_PATH, defaultFg)) modified = true
                 continue
             }
@@ -165,7 +218,7 @@ object SyntaxHighlighter {
             // Number detection
             if (c.isDigit() && !inString && !isFirstToken) {
                 val start = i
-                while (i < text.length && i < columns && (text[i].isDigit() || text[i] == '.')) i++
+                while (i < text.length && (text[i].isDigit() || text[i] == '.')) i++
                 if (i > start + 0) {
                     if (setColorRange(row, start, i, COLOR_NUMBER, defaultFg)) modified = true
                 }
@@ -175,7 +228,7 @@ object SyntaxHighlighter {
             // First token = command name
             if (isFirstToken && c != ' ') {
                 val start = i
-                while (i < text.length && i < columns && text[i] != ' ') i++
+                while (i < text.length && text[i] != ' ') i++
                 if (setColorRange(row, start, i, COLOR_COMMAND, defaultFg)) modified = true
                 isFirstToken = false
                 continue
@@ -203,10 +256,10 @@ object SyntaxHighlighter {
 
         // Path highlighting in output
         var i = 0
-        while (i < text.length && i < columns) {
+        while (i < text.length) {
             if (text[i] == '/' && (i == 0 || text[i - 1] == ' ' || text[i - 1] == ':')) {
                 val start = i
-                while (i < text.length && i < columns && text[i] != ' ' && text[i] != ':' && text[i] != ')') i++
+                while (i < text.length && text[i] != ' ' && text[i] != ':' && text[i] != ')') i++
                 if (i - start > 2) { // Minimum path length
                     if (setColorRange(row, start, i, COLOR_PATH, defaultFg)) modified = true
                 }
@@ -219,14 +272,16 @@ object SyntaxHighlighter {
     }
 
     /**
-     * Set foreground color for a range of columns, but ONLY if the cell
-     * currently has the default foreground color. This preserves existing
-     * ANSI colors from programs like vim, htop, Claude Code, etc.
+     * Set foreground color for a range of text indices (from the extracted string),
+     * converting to column positions. Only modifies cells with default foreground color.
+     * For wide (CJK) characters, sets style on both columns they occupy.
      */
-    private fun setColorRange(row: TerminalRow, startCol: Int, endCol: Int, colorIdx: Int, defaultFg: Int): Boolean {
+    private fun setColorRange(row: TerminalRow, startTextIdx: Int, endTextIdx: Int, colorIdx: Int, defaultFg: Int): Boolean {
         var modified = false
+        val startCol = if (startTextIdx < textIdxToCol.size) textIdxToCol[startTextIdx] else return false
+        val endCol = if (endTextIdx < textIdxToCol.size) textIdxToCol[endTextIdx] else lastExtractedColumns
         for (col in startCol until endCol) {
-            if (col >= row.mText.size) break
+            if (col >= lastExtractedColumns) break
             val style = row.getStyle(col)
             val currentFg = TextStyle.decodeForeColor(style)
             // Only override if using default foreground

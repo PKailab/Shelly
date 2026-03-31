@@ -152,8 +152,9 @@ class ShellyTerminalSession(
             lastTranscriptLength = currentLength
             if (fullText.isNotEmpty()) appendToOutputBuffer(fullText)
         }
-        // Screen update is now batched with output flush (省バッテリー)
-        // onScreenUpdateCallback called from flushOutputBuffer() instead
+        // Immediately trigger native view redraw so output appears without delay.
+        // The JS event emission remains batched in flushOutputBuffer() for efficiency.
+        onScreenUpdateCallback?.invoke()
     }
 
     override fun onTitleChanged(changedSession: TerminalSession) {
