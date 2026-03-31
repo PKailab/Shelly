@@ -99,7 +99,7 @@ class TerminalEmulatorModule : Module() {
         }
 
         AsyncFunction("startSessionService") {
-            val context = appContext.reactContext ?: return@AsyncFunction
+            val context = appContext.reactContext ?: return@AsyncFunction null
             val serviceClass = Class.forName(
                 context.packageName + ".TerminalSessionService"
             )
@@ -109,14 +109,16 @@ class TerminalEmulatorModule : Module() {
             } else {
                 context.startService(intent)
             }
+            null
         }
 
         AsyncFunction("stopSessionService") {
-            val context = appContext.reactContext ?: return@AsyncFunction
+            val context = appContext.reactContext ?: return@AsyncFunction null
             val serviceClass = Class.forName(
                 context.packageName + ".TerminalSessionService"
             )
             context.stopService(Intent(context, serviceClass))
+            null
         }
     }
 }
