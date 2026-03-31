@@ -349,23 +349,48 @@ public class TerminalView extends View {
 
         return new BaseInputConnection(this, true) {
 
+            /** Track what composing text is currently on the PTY so we can erase it */
+            private String mLastComposingSent = "";
+
+            private void eraseComposingFromPty() {
+                if (mLastComposingSent.isEmpty()) return;
+                // Send one DEL per Unicode code point (not per Java char)
+                int codePointCount = mLastComposingSent.codePointCount(0, mLastComposingSent.length());
+                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
+                for (int i = 0; i < codePointCount; i++) {
+                    sendKeyEvent(deleteKey);
+                }
+                mLastComposingSent = "";
+            }
+
             @Override
             public boolean setComposingText(CharSequence text, int newCursorPosition) {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: setComposingText(\"" + text + "\", " + newCursorPosition + ")");
                 }
-                mComposingText = text != null ? text.toString() : "";
-                invalidate();
+                String newText = text != null ? text.toString() : "";
+
+                // Erase previous composing text from PTY, then send new one
+                eraseComposingFromPty();
+                if (!newText.isEmpty()) {
+                    sendTextToTerminal(newText);
+                    mLastComposingSent = newText;
+                }
+
+                // No overlay needed — text is shown inline by the terminal
+                mComposingText = "";
+
+                // Keep BaseInputConnection's internal state in sync
                 return super.setComposingText(text, newCursorPosition);
             }
 
             @Override
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
+                // Composing text is already on the PTY — just clear tracking state
+                mLastComposingSent = "";
                 mComposingText = "";
                 super.finishComposingText();
-
-                sendTextToTerminal(getEditable());
                 getEditable().clear();
                 return true;
             }
@@ -375,14 +400,18 @@ public class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: commitText(\"" + text + "\", " + newCursorPosition + ")");
                 }
+                String commitStr = text != null ? text.toString() : "";
+
+                // Erase composing text, send committed text
+                eraseComposingFromPty();
+                if (!commitStr.isEmpty()) {
+                    sendTextToTerminal(commitStr);
+                }
+
                 mComposingText = "";
+                mLastComposingSent = "";
                 super.commitText(text, newCursorPosition);
-
-                if (mEmulator == null) return true;
-
-                Editable content = getEditable();
-                sendTextToTerminal(content);
-                content.clear();
+                getEditable().clear();
                 return true;
             }
 
