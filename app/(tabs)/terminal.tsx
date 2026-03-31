@@ -182,10 +182,10 @@ export default function TerminalScreen() {
           { timeoutMs: 5000, reason: 'pty-start' }
         );
 
-        // Wait for pty-helper to be ready (poll TCP port, max 3s)
+        // Wait for pty-helper to be ready (poll TCP port, max 1.5s)
         let ready = false;
         for (let i = 0; i < 6; i++) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 250));
           try {
             const result = await runRawCommand(
               `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
@@ -198,12 +198,11 @@ export default function TerminalScreen() {
           } catch {}
         }
         if (!ready) {
-          throw new Error(`pty-helper not ready on port ${port} after 3s`);
+          throw new Error(`pty-helper not ready on port ${port} after 1.5s`);
         }
       } else {
-        // pty-helper is already running — just reconnect
+        // pty-helper is already running — just reconnect (no wait needed)
         console.log('[Terminal] pty-helper already running on port', port, '— reconnecting');
-        await new Promise(resolve => setTimeout(resolve, 300));
       }
 
       // 2. Create Kotlin session connected to pty-helper TCP port (with retry)
@@ -220,9 +219,8 @@ export default function TerminalScreen() {
           break;
         } catch (e) {
           console.warn(`[Terminal] createSession attempt ${attempt + 1} failed:`, e);
-          // Destroy stale Kotlin session before retrying
           try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
@@ -233,14 +231,13 @@ export default function TerminalScreen() {
           `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
           { timeoutMs: 3000, reason: 'pty-force-restart' }
         ).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
         await runRawCommand(
           `nohup ~/shelly-bridge/pty-helper ${port} 80 24 > /dev/null 2>&1 &`,
           { timeoutMs: 5000, reason: 'pty-restart' }
         );
-        // Wait for new pty-helper
         for (let i = 0; i < 6; i++) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 250));
           try {
             const r = await runRawCommand(
               `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
