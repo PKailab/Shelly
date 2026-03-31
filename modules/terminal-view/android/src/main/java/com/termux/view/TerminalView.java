@@ -1082,7 +1082,7 @@ public class TerminalView extends View {
         }
     }
 
-    /** Draw composing (IME pre-edit) text as an overlay at the cursor position. */
+    /** Draw composing (IME pre-edit) text as a popup above the cursor row. */
     private void drawComposingText(Canvas canvas) {
         if (mEmulator == null || mRenderer == null) return;
 
@@ -1090,38 +1090,49 @@ public class TerminalView extends View {
         int cursorRow = mEmulator.getCursorRow();
         int visibleRow = cursorRow - mTopRow;
 
-        // Cursor position in pixels — place composing text on the cursor row.
-        // Baseline calculation must match TerminalRenderer.render() which starts at
-        // mFontLineSpacingAndAscent and adds mFontLineSpacing BEFORE each row,
-        // so row N baseline = mFontLineSpacingAndAscent + (N+1) * mFontLineSpacing.
-        float x = cursorCol * mRenderer.mFontWidth;
-        float baselineY = (visibleRow + 1) * mRenderer.mFontLineSpacing + mRenderer.mFontLineSpacingAndAscent;
+        // Baseline Y matching TerminalRenderer.render():
+        // row N baseline = mFontLineSpacingAndAscent + (N+1) * mFontLineSpacing
+        float cursorBaselineY = (visibleRow + 1) * mRenderer.mFontLineSpacing + mRenderer.mFontLineSpacingAndAscent;
+        float cursorTopY = cursorBaselineY - mRenderer.mFontLineSpacingAndAscent;
 
         // Setup paint (match terminal font)
         mComposingPaint.setTypeface(mRenderer.mTypeface);
         mComposingPaint.setTextSize(mRenderer.mTextSize);
-        mComposingPaint.setColor(0xFFFFFFFF); // white text
+        mComposingPaint.setColor(0xFFFFFFFF);
 
-        mComposingBgPaint.setColor(0xCC333333); // dark semi-transparent background
+        mComposingBgPaint.setColor(0xCC333333);
 
         float textWidth = mComposingPaint.measureText(mComposingText);
         float padding = 4f;
 
-        // Clamp to view bounds
+        // X position: start at cursor column
+        float x = cursorCol * mRenderer.mFontWidth;
         if (x + textWidth + padding * 2 > getWidth()) {
             x = getWidth() - textWidth - padding * 2;
         }
         if (x < 0) x = 0;
 
-        // Background rect — sits on cursor row
-        float bgTop = baselineY - mRenderer.mFontLineSpacingAndAscent;
-        float bgBottom = bgTop + mRenderer.mFontLineSpacing;
+        // Y position: place popup ABOVE the cursor row.
+        // If cursor is on the first visible row, place BELOW instead.
+        float popupHeight = mRenderer.mFontLineSpacing + padding * 2;
+        float bgTop, bgBottom, baselineY;
+        if (visibleRow > 0) {
+            // Above cursor row
+            bgBottom = cursorTopY - 2f;
+            bgTop = bgBottom - popupHeight;
+            baselineY = bgBottom - padding;
+        } else {
+            // Below cursor row (cursor on first row)
+            bgTop = cursorBaselineY + 2f;
+            bgBottom = bgTop + popupHeight;
+            baselineY = bgBottom - padding;
+        }
+
         canvas.drawRoundRect(
-            new RectF(x - padding, bgTop - padding, x + textWidth + padding, bgBottom + padding),
+            new RectF(x - padding, bgTop, x + textWidth + padding, bgBottom),
             6f, 6f, mComposingBgPaint
         );
 
-        // Underline the composing text
         mComposingPaint.setUnderlineText(true);
         canvas.drawText(mComposingText, x, baselineY, mComposingPaint);
         mComposingPaint.setUnderlineText(false);
