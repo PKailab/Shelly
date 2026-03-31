@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { CreatorPlan, CreatorSessionStatus } from '@/store/types';
+import { t } from '@/lib/i18n';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -51,13 +52,13 @@ export function PlanLane({ status, plan, onConfirm, onCancel }: Props) {
       {/* Idle state */}
       {status === 'idle' && (
         <Text style={styles.placeholder}>
-          何を作るか入力すると、ここにプランが表示されるよ。
+          {t('creator.plan_placeholder')}
         </Text>
       )}
 
       {/* Planning state */}
       {isPlanning && (
-        <Text style={styles.thinking}>考えているよ…</Text>
+        <Text style={styles.thinking}>{t('creator.plan_thinking')}</Text>
       )}
 
       {/* Plan content */}
@@ -79,7 +80,7 @@ export function PlanLane({ status, plan, onConfirm, onCancel }: Props) {
           {/* Meta */}
           <View style={styles.meta}>
             <Text style={styles.metaText}>
-              {plan.estimatedFiles} ファイル · {planTypeLabel(plan.projectType)}
+              {t('creator.plan_files', { n: plan.estimatedFiles })} · {planTypeLabel(plan.projectType)}
             </Text>
           </View>
 
@@ -93,7 +94,7 @@ export function PlanLane({ status, plan, onConfirm, onCancel }: Props) {
                   pressed && styles.btnPressed,
                 ]}
               >
-                <Text style={styles.cancelBtnText}>やめる</Text>
+                <Text style={styles.cancelBtnText}>{t('creator.plan_cancel')}</Text>
               </Pressable>
               <Pressable
                 onPress={onConfirm}
@@ -102,7 +103,7 @@ export function PlanLane({ status, plan, onConfirm, onCancel }: Props) {
                   pressed && styles.btnPressed,
                 ]}
               >
-                <Text style={styles.confirmBtnText}>作る ▶</Text>
+                <Text style={styles.confirmBtnText}>{t('creator.plan_confirm')}</Text>
               </Pressable>
             </View>
           )}
@@ -114,10 +115,10 @@ export function PlanLane({ status, plan, onConfirm, onCancel }: Props) {
 
 function planTypeLabel(type: string): string {
   const labels: Record<string, string> = {
-    web: 'Webアプリ',
-    script: 'スクリプト',
-    document: 'ドキュメント',
-    unknown: 'プロジェクト',
+    web: t('creator.type_web'),
+    script: t('creator.type_script'),
+    document: t('creator.type_document'),
+    unknown: t('creator.type_unknown'),
   };
   return labels[type] ?? type;
 }

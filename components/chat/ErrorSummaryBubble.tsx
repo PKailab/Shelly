@@ -7,6 +7,7 @@
 
 import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { t } from '@/lib/i18n';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
@@ -57,12 +58,12 @@ export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSug
 
   const handleSuggestFix = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSuggestFix?.(`エラー修正を提案: ${data.errorText}\n翻訳: ${data.translation}`);
+    onSuggestFix?.(t('error_summary.suggest_fix_prompt', { errorText: data.errorText, translation: data.translation }));
   };
 
   const handleAskTeam = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onAskTeam?.(`エラーについて相談: ${data.errorText}\n翻訳: ${data.translation}`);
+    onAskTeam?.(t('error_summary.ask_team_prompt', { errorText: data.errorText, translation: data.translation }));
   };
 
   return (
@@ -72,7 +73,7 @@ export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSug
         <View style={styles.header}>
           <MaterialIcons name="error-outline" size={16} color="#EF4444" />
           <Text style={[styles.headerText, { color: colors.foreground }]}>
-            エラーを検出しました
+            {t('error_summary.header')}
           </Text>
           <Text style={[styles.providerLabel, { color: colors.muted }]}>
             {data.provider}
@@ -114,7 +115,7 @@ export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSug
               activeOpacity={0.7}
             >
               <MaterialIcons name="auto-fix-high" size={14} color={colors.accent} />
-              <Text style={[styles.buttonText, { color: colors.accent }]}>修正を提案</Text>
+              <Text style={[styles.buttonText, { color: colors.accent }]}>{t('error_summary.suggest_fix')}</Text>
             </TouchableOpacity>
           )}
 
@@ -125,7 +126,7 @@ export const ErrorSummaryBubble = memo(function ErrorSummaryBubble({ data, onSug
               activeOpacity={0.7}
             >
               <MaterialIcons name="group" size={14} color="#EC4899" />
-              <Text style={[styles.buttonText, { color: '#EC4899' }]}>@teamに聞く</Text>
+              <Text style={[styles.buttonText, { color: '#EC4899' }]}>{t('error_summary.ask_team')}</Text>
             </TouchableOpacity>
           )}
         </View>

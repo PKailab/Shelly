@@ -18,6 +18,7 @@ import {
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { t } from '@/lib/i18n';
 
 type Props = {
   visible: boolean;
@@ -240,10 +241,10 @@ export function FullscreenTerminal({ visible, wsUrl, onClose }: Props) {
   }[connectionStatus];
 
   const statusLabel = {
-    connecting: '接続中...',
-    connected: '接続済み',
-    error: 'エラー',
-    disconnected: '切断',
+    connecting: t('fullscreen.connecting'),
+    connected: t('fullscreen.connected'),
+    error: t('fullscreen.error'),
+    disconnected: t('fullscreen.disconnected'),
   }[connectionStatus];
 
   return (
@@ -266,7 +267,7 @@ export function FullscreenTerminal({ visible, wsUrl, onClose }: Props) {
             <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
           </View>
           <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Text style={styles.closeButtonText}>✕ 閉じる</Text>
+            <Text style={styles.closeButtonText}>{t('fullscreen.close')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -299,7 +300,7 @@ export function FullscreenTerminal({ visible, wsUrl, onClose }: Props) {
         {/* ボトムバー */}
         <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
           <Text style={styles.bottomHint}>
-            Ctrl+C: 中断　　Tab: 補完　　↑↓: 履歴
+            {t('fullscreen.hint')}
           </Text>
         </View>
       </View>

@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { AiBlock as AiBlockType } from '@/store/types';
 import { getTargetColor, getTargetLabel } from '@/lib/input-router';
+import { t } from '@/lib/i18n';
 
 type Props = {
   block: AiBlockType;
@@ -226,7 +227,7 @@ export const AiBlock = React.memo(function AiBlock({
       {hasSuggestions && (
         <View style={styles.suggestionsContainer}>
           <Text style={[styles.suggestLabel, { fontSize: smallFont }]}>
-            どのツールを使いますか？
+            {t('ai_block.tool_suggest_label')}
           </Text>
           {block.toolSuggestions!.map((s, i) => (
             <Pressable
@@ -268,7 +269,7 @@ export const AiBlock = React.memo(function AiBlock({
               {block.mentionHint.text}
             </Text>
             <Text style={[styles.hintExample, { fontSize: smallFont - 1 }]}>
-              例: {block.mentionHint.example}
+              {t('ai_block.hint_example', { example: block.mentionHint.example })}
             </Text>
           </View>
         </View>

@@ -10,6 +10,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTerminalStore } from '@/store/terminal-store';
 import { GEMINI_API_BASE } from '@/lib/gemini';
 import { groqTranscribe } from '@/lib/groq';
+import { t } from '@/lib/i18n';
 
 type SpeechState = {
   status: 'idle' | 'recording' | 'transcribing';
@@ -30,7 +31,7 @@ export function useSpeechInput() {
       // We can't use hooks dynamically, so use AudioModule directly
       const status = await AudioModule.requestRecordingPermissionsAsync();
       if (!status.granted) {
-        setState((s) => ({ ...s, error: 'マイクの権限が必要です' }));
+        setState((s) => ({ ...s, error: t('speech.mic_permission') }));
         return;
       }
 
@@ -51,7 +52,7 @@ export function useSpeechInput() {
       setState({
         status: 'idle',
         transcribedText: '',
-        error: `録音エラー: ${err instanceof Error ? err.message : String(err)}`,
+        error: t('speech.recording_error', { error: String(err instanceof Error ? err.message : err) }),
       });
     }
   }, []);
@@ -77,7 +78,7 @@ export function useSpeechInput() {
       recordingRef.current = null;
 
       if (!uri) {
-        setState({ status: 'idle', transcribedText: '', error: '録音ファイルが見つかりません' });
+        setState({ status: 'idle', transcribedText: '', error: t('speech.file_not_found') });
         return;
       }
 
@@ -124,7 +125,7 @@ export function useSpeechInput() {
                     },
                   },
                   {
-                    text: 'この音声を正確に書き起こしてください。テキストのみ出力してください。余計な説明は不要です。',
+                    text: t('speech.transcription_prompt'),
                   },
                 ],
               },
@@ -140,7 +141,7 @@ export function useSpeechInput() {
           setState({
             status: 'idle',
             transcribedText: '',
-            error: `文字起こしエラー: HTTP ${res.status}`,
+            error: t('speech.transcription_http_error', { status: String(res.status) }),
           });
           return;
         }
@@ -151,7 +152,7 @@ export function useSpeechInput() {
         setState({
           status: 'idle',
           transcribedText: '',
-          error: '音声文字起こしにはGroqまたはGemini APIキーが必要です。設定画面で入力してください。',
+          error: t('speech.api_key_required'),
         });
         return;
       }
@@ -165,7 +166,7 @@ export function useSpeechInput() {
       setState({
         status: 'idle',
         transcribedText: '',
-        error: `文字起こしエラー: ${err instanceof Error ? err.message : String(err)}`,
+        error: t('speech.transcription_error', { error: String(err instanceof Error ? err.message : err) }),
       });
     }
   }, []);

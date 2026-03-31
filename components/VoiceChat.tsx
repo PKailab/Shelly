@@ -6,6 +6,7 @@
  */
 
 import React, { useCallback, useEffect } from 'react';
+import { t } from '@/lib/i18n';
 import {
   View,
   Text,
@@ -243,7 +244,7 @@ export function VoiceChat({ visible, onClose }: Props) {
               { color: state.autoContinue ? colors.accent : colors.inactive },
             ]}
           >
-            {state.autoContinue ? '連続対話 ON' : '連続対話 OFF'}
+            {state.autoContinue ? t('voice.auto_on') : t('voice.auto_off')}
           </Text>
         </TouchableOpacity>
       </View>

@@ -7,6 +7,7 @@
 
 import React, { memo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { t } from '@/lib/i18n';
 import Animated, { SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
@@ -16,13 +17,13 @@ import type { SelectedElement } from '@/lib/click-to-edit';
 
 // ─── Presets ────────────────────────────────────────────────────────────────
 
-const PRESETS = [
-  { label: '大きく', icon: 'zoom-in' as const, instruction: 'このfont-sizeを1.5倍にして' },
-  { label: '小さく', icon: 'zoom-out' as const, instruction: 'このfont-sizeを0.75倍にして' },
-  { label: '色変更', icon: 'palette' as const, instruction: 'この要素の色をもっと目立つ色に変えて' },
-  { label: '太字', icon: 'format-bold' as const, instruction: 'このfont-weightをboldにして' },
-  { label: '間隔広く', icon: 'format-line-spacing' as const, instruction: 'このpaddingとmarginを1.5倍にして' },
-  { label: '削除', icon: 'delete-outline' as const, instruction: 'この要素を非表示にして (display: none)' },
+const getPresets = () => [
+  { label: t('edit_sheet.preset_larger'), icon: 'zoom-in' as const, instruction: t('edit_sheet.preset_larger_inst') },
+  { label: t('edit_sheet.preset_smaller'), icon: 'zoom-out' as const, instruction: t('edit_sheet.preset_smaller_inst') },
+  { label: t('edit_sheet.preset_color'), icon: 'palette' as const, instruction: t('edit_sheet.preset_color_inst') },
+  { label: t('edit_sheet.preset_bold'), icon: 'format-bold' as const, instruction: t('edit_sheet.preset_bold_inst') },
+  { label: t('edit_sheet.preset_spacing'), icon: 'format-line-spacing' as const, instruction: t('edit_sheet.preset_spacing_inst') },
+  { label: t('edit_sheet.preset_delete'), icon: 'delete-outline' as const, instruction: t('edit_sheet.preset_delete_inst') },
 ];
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -47,7 +48,9 @@ export const EditSheet = memo(function EditSheet({ visible, element, onSubmit, o
     setInstruction('');
   }, [instruction, element, onSubmit]);
 
-  const handlePreset = useCallback((preset: typeof PRESETS[number]) => {
+  const PRESETS = getPresets();
+
+  const handlePreset = useCallback((preset: ReturnType<typeof getPresets>[number]) => {
     if (!element) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onSubmit(buildEditPrompt(element, preset.instruction));
@@ -99,7 +102,7 @@ export const EditSheet = memo(function EditSheet({ visible, element, onSubmit, o
       <View style={styles.inputRow}>
         <TextInput
           style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: withAlpha(colors.foreground, 0.05) }]}
-          placeholder="どう変えたい？"
+          placeholder={t('edit_sheet.placeholder')}
           placeholderTextColor={colors.muted}
           value={instruction}
           onChangeText={setInstruction}

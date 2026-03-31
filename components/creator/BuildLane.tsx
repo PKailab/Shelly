@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BuildStep, CreatorSessionStatus } from '@/store/types';
+import { t } from '@/lib/i18n';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ export function BuildLane({ status, steps }: Props) {
       {/* Idle / planning / confirming */}
       {!isActive && (
         <Text style={styles.placeholder}>
-          プランを確認したら、ここにビルドログが流れるよ。
+          {t('creator.build_placeholder')}
         </Text>
       )}
 

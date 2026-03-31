@@ -35,6 +35,7 @@ import {
   ValidationError,
 } from '@/lib/snippet-io';
 import { useSnippetStore } from '@/store/snippet-store';
+import { t } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,7 +96,7 @@ export function ImportModal({ visible, onClose }: Props) {
       setPayload(validation.payload);
       setStep('preview');
     } catch (_e) {
-      setErrorMsg('ファイルの読み込みに失敗しました');
+      setErrorMsg(t('import.file_read_error'));
       setStep('error');
     }
   }, [snippets]);
@@ -125,7 +126,7 @@ export function ImportModal({ visible, onClose }: Props) {
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>スニペットをインポート</Text>
+            <Text style={styles.title}>{t('import.title')}</Text>
             <Pressable onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
@@ -137,10 +138,10 @@ export function ImportModal({ visible, onClose }: Props) {
             {step === 'idle' && (
               <View style={styles.center}>
                 <Text style={styles.desc}>
-                  Shelly形式のJSONファイルを選択してください。
+                  {t('import.select_file_desc')}
                 </Text>
                 <Pressable style={styles.primaryBtn} onPress={handlePickFile}>
-                  <Text style={styles.primaryBtnText}>ファイルを選択</Text>
+                  <Text style={styles.primaryBtnText}>{t('import.select_file')}</Text>
                 </Pressable>
               </View>
             )}
@@ -149,7 +150,7 @@ export function ImportModal({ visible, onClose }: Props) {
             {step === 'validating' && (
               <View style={styles.center}>
                 <ActivityIndicator color="#00D4AA" />
-                <Text style={styles.desc}>検証中...</Text>
+                <Text style={styles.desc}>{t('import.validating')}</Text>
               </View>
             )}
 
@@ -158,7 +159,7 @@ export function ImportModal({ visible, onClose }: Props) {
               <View style={styles.center}>
                 <Text style={styles.errorText}>{errorMsg}</Text>
                 <Pressable style={styles.secondaryBtn} onPress={() => setStep('idle')}>
-                  <Text style={styles.secondaryBtnText}>やり直す</Text>
+                  <Text style={styles.secondaryBtnText}>{t('import.retry')}</Text>
                 </Pressable>
               </View>
             )}
@@ -166,16 +167,16 @@ export function ImportModal({ visible, onClose }: Props) {
             {/* preview */}
             {step === 'preview' && payload && (
               <>
-                <Text style={styles.sectionLabel}>プレビュー</Text>
+                <Text style={styles.sectionLabel}>{t('import.preview')}</Text>
                 <View style={styles.previewBox}>
-                  <Text style={styles.previewRow}>📦 合計: {payload.snippets.length} 件</Text>
-                  <Text style={styles.previewRow}>✅ 新規: {newCount} 件</Text>
-                  <Text style={styles.previewRow}>⚠️ 重複: {duplicateCount} 件</Text>
+                  <Text style={styles.previewRow}>{t('import.total', { n: payload.snippets.length })}</Text>
+                  <Text style={styles.previewRow}>{t('import.new_count', { n: newCount })}</Text>
+                  <Text style={styles.previewRow}>{t('import.duplicate_count', { n: duplicateCount })}</Text>
                 </View>
 
                 {duplicateCount > 0 && (
                   <>
-                    <Text style={styles.sectionLabel}>重複の処理</Text>
+                    <Text style={styles.sectionLabel}>{t('import.duplicate_handling')}</Text>
                     {(['skip', 'overwrite', 'keepBoth'] as DuplicateStrategy[]).map((s) => (
                       <Pressable
                         key={s}
@@ -183,9 +184,9 @@ export function ImportModal({ visible, onClose }: Props) {
                         onPress={() => setStrategy(s)}
                       >
                         <Text style={[styles.strategyBtnText, strategy === s && styles.strategyBtnTextActive]}>
-                          {s === 'skip' ? 'スキップ（既存を保持）' :
-                           s === 'overwrite' ? '上書き（新しいデータで更新）' :
-                           '両方を保持'}
+                          {s === 'skip' ? t('import.strategy_skip') :
+                           s === 'overwrite' ? t('import.strategy_overwrite') :
+                           t('import.strategy_keep_both')}
                         </Text>
                       </Pressable>
                     ))}
@@ -193,7 +194,7 @@ export function ImportModal({ visible, onClose }: Props) {
                 )}
 
                 <Pressable style={styles.primaryBtn} onPress={handleImport}>
-                  <Text style={styles.primaryBtnText}>インポート実行</Text>
+                  <Text style={styles.primaryBtnText}>{t('import.execute')}</Text>
                 </Pressable>
               </>
             )}
@@ -202,7 +203,7 @@ export function ImportModal({ visible, onClose }: Props) {
             {step === 'importing' && (
               <View style={styles.center}>
                 <ActivityIndicator color="#00D4AA" />
-                <Text style={styles.desc}>インポート中...</Text>
+                <Text style={styles.desc}>{t('import.importing')}</Text>
               </View>
             )}
 
@@ -210,10 +211,10 @@ export function ImportModal({ visible, onClose }: Props) {
             {step === 'done' && importResult && (
               <View style={styles.center}>
                 <Text style={styles.doneIcon}>✅</Text>
-                <Text style={styles.doneText}>完了</Text>
+                <Text style={styles.doneText}>{t('import.done')}</Text>
                 <Text style={styles.desc}>{importSummaryText(importResult)}</Text>
                 <Pressable style={styles.primaryBtn} onPress={handleClose}>
-                  <Text style={styles.primaryBtnText}>閉じる</Text>
+                  <Text style={styles.primaryBtnText}>{t('import.close')}</Text>
                 </Pressable>
               </View>
             )}

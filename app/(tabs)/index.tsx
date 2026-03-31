@@ -214,7 +214,7 @@ export default function ChatScreen() {
   // Savepoint notification helpers (Chat system bubbles)
   const notifySavepoint = useCallback((result: { message: string; filesChanged: number; filesCreated: number; filesDeleted: number }) => {
     const total = result.filesChanged + result.filesCreated + result.filesDeleted;
-    const content = `💾 自動保存しました — ${total}ファイル変更`;
+    const content = t('chat.auto_saved', { total: String(total) });
     const sid = useChatStore.getState().activeSessionId;
     useChatStore.getState().addMessage(sid, {
       id: generateId(), role: 'system', content, timestamp: Date.now(),
@@ -223,7 +223,7 @@ export default function ChatScreen() {
 
   const notifySecurityIssues = useCallback((issues: SecurityIssue[]) => {
     const labels = issues.map((i) => `${i.file}: ${i.label}`).join('\n');
-    const content = `🔒 コミットをスキップしました\n\n${labels}\n\nAPIキーや秘密情報がコードに含まれています。`;
+    const content = t('chat.security_skip', { labels });
     const sid = useChatStore.getState().activeSessionId;
     useChatStore.getState().addMessage(sid, {
       id: generateId(), role: 'system', content, timestamp: Date.now(),
@@ -461,7 +461,7 @@ export default function ChatScreen() {
       };
       addMessage(chatSessionId, {
         id: generateId(), role: 'assistant',
-        content: `${labelMap[prev] ?? prev} セッションを終了しました。`,
+        content: t('chat.session_ended', { agent: labelMap[prev] ?? prev }),
         timestamp: Date.now(),
       });
       return;

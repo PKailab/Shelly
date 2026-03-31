@@ -41,6 +41,7 @@ import { useTerminalStore, _pendingTmuxKills, _pendingTmuxClears } from '@/store
 import { notifyCommandComplete } from '@/lib/command-notifier';
 import { runTermuxCommand } from '@/lib/termux-intent';
 import { isSessionAlive, ensureSession, sendKeysToSession, buildRecoveryCommand, killSession as killTmuxSession } from '@/lib/tmux-manager';
+import { t } from '@/lib/i18n';
 
 /** コマンド文字列からCLI種別を検出する */
 function detectCli(command: string): 'claude' | 'gemini' | 'codex' | 'cody' | null {
@@ -242,7 +243,7 @@ export function useTermuxBridge() {
 
       // Fail any active block
       if (activeItemRef.current) {
-        errorBlock(activeItemRef.current.blockId, 'WebSocket接続が切断されました');
+        errorBlock(activeItemRef.current.blockId, t('bridge.ws_disconnected'));
         activeItemRef.current = null;
       }
       clearCancelTimeout();

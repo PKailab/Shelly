@@ -61,6 +61,8 @@ export function useTerminalOutput() {
   const approvalDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorAccum = useRef<string[]>([]);
+  const lastErrorText = useRef<string>('');
+  const lastErrorTime = useRef<number>(0);
   const pkgErrorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pkgErrorAccum = useRef<string[]>([]);
   const { isWide } = useDeviceLayout();
@@ -141,6 +143,11 @@ export function useTerminalOutput() {
                 errorDebounce.current = setTimeout(() => {
                   const errorText = errorAccum.current.join('\n');
                   errorAccum.current = [];
+                  // Deduplicate: skip if same error text within 10 seconds
+                  const now = Date.now();
+                  if (errorText === lastErrorText.current && now - lastErrorTime.current < 10_000) return;
+                  lastErrorText.current = errorText;
+                  lastErrorTime.current = now;
                   const store = useChatStore.getState();
                   const session = store.getActiveSession();
                   if (!session) return;

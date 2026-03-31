@@ -7,6 +7,7 @@
 
 import React, { memo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { t } from '@/lib/i18n';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
@@ -50,7 +51,7 @@ export const ApprovalBubble = memo(function ApprovalBubble({ data, onAskTeam }: 
 
   const handleAskTeam = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onAskTeam?.(`承認プロキシ: ${data.command}\n翻訳: ${data.translation}`);
+    onAskTeam?.(t('approval.ask_team_prompt', { command: data.command, translation: data.translation }));
   };
 
   return (
@@ -60,7 +61,7 @@ export const ApprovalBubble = memo(function ApprovalBubble({ data, onAskTeam }: 
         <View style={styles.header}>
           <MaterialIcons name="warning" size={16} color={borderColor} />
           <Text style={[styles.headerText, { color: colors.foreground }]}>
-            AIが許可を求めています
+            {t('approval.header')}
           </Text>
         </View>
 
@@ -85,7 +86,7 @@ export const ApprovalBubble = memo(function ApprovalBubble({ data, onAskTeam }: 
               color={responded === 'approved' ? '#22C55E' : '#EF4444'}
             />
             <Text style={[styles.respondedText, { color: colors.muted }]}>
-              {responded === 'approved' ? '許可しました' : '拒否しました'}
+              {responded === 'approved' ? t('approval.approved') : t('approval.denied')}
             </Text>
           </View>
         ) : (
@@ -96,7 +97,7 @@ export const ApprovalBubble = memo(function ApprovalBubble({ data, onAskTeam }: 
               activeOpacity={0.7}
             >
               <MaterialIcons name="check" size={14} color="#22C55E" />
-              <Text style={[styles.buttonText, { color: '#22C55E' }]}>許可</Text>
+              <Text style={[styles.buttonText, { color: '#22C55E' }]}>{t('approval.allow')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -105,7 +106,7 @@ export const ApprovalBubble = memo(function ApprovalBubble({ data, onAskTeam }: 
               activeOpacity={0.7}
             >
               <MaterialIcons name="close" size={14} color="#EF4444" />
-              <Text style={[styles.buttonText, { color: '#EF4444' }]}>拒否</Text>
+              <Text style={[styles.buttonText, { color: '#EF4444' }]}>{t('approval.deny')}</Text>
             </TouchableOpacity>
 
             {onAskTeam && (
@@ -115,7 +116,7 @@ export const ApprovalBubble = memo(function ApprovalBubble({ data, onAskTeam }: 
                 activeOpacity={0.7}
               >
                 <MaterialIcons name="group" size={14} color="#EC4899" />
-                <Text style={[styles.buttonText, { color: '#EC4899' }]}>@teamに聞く</Text>
+                <Text style={[styles.buttonText, { color: '#EC4899' }]}>{t('approval.ask_team')}</Text>
               </TouchableOpacity>
             )}
           </View>

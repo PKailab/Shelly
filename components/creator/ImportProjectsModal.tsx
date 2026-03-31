@@ -36,6 +36,7 @@ import {
   DuplicateAction,
 } from '@/lib/project-io';
 import { useCreatorStore } from '@/store/creator-store';
+import { t } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
 
       const parsed = parseProjectExportPayload(json);
       if (!parsed) {
-        setErrorMsg('JSONの形式が正しくありません。shelly-projects形式のファイルを選んでね。');
+        setErrorMsg(t('import_projects.invalid_json'));
         setStep('error');
         return;
       }
@@ -112,7 +113,7 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
       setPayload(parsed);
       setStep('preview');
     } catch (e) {
-      setErrorMsg('ファイルを読み込めなかったよ。もう一度試してみて。');
+      setErrorMsg(t('import_projects.read_error'));
       setStep('error');
     }
   }, []);
@@ -132,7 +133,7 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
       setImportResult(result);
       setStep('done');
     } catch {
-      setErrorMsg('インポート中にエラーが起きたよ。データは変更されていないよ。');
+      setErrorMsg(t('import_projects.import_error'));
       setStep('error');
     }
   }, [payload, projects, strategy, setProjects]);
@@ -165,7 +166,7 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
         <View style={styles.sheet}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>プロジェクトをインポート</Text>
+            <Text style={styles.title}>{t('import_projects.title')}</Text>
             <Pressable onPress={handleClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>✕</Text>
             </Pressable>
@@ -180,10 +181,10 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
             {step === 'idle' && (
               <View style={styles.section}>
                 <Text style={styles.desc}>
-                  shelly-projects-YYYYMMDD.json ファイルを選んでね。
+                  {t('import_projects.select_desc')}
                 </Text>
                 <Pressable style={styles.primaryBtn} onPress={handlePickFile}>
-                  <Text style={styles.primaryBtnText}>📂 ファイルを選ぶ</Text>
+                  <Text style={styles.primaryBtnText}>{t('import_projects.select_file')}</Text>
                 </Pressable>
               </View>
             )}
@@ -192,7 +193,7 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
             {step === 'validating' && (
               <View style={styles.centerSection}>
                 <ActivityIndicator color="#00FF88" size="large" />
-                <Text style={styles.loadingText}>確認中...</Text>
+                <Text style={styles.loadingText}>{t('import_projects.validating')}</Text>
               </View>
             )}
 
@@ -202,21 +203,21 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
                 <View style={styles.countRow}>
                   <View style={styles.countBox}>
                     <Text style={styles.countNum}>{payload.projects.length}</Text>
-                    <Text style={styles.countLabel}>合計</Text>
+                    <Text style={styles.countLabel}>{t('import_projects.total')}</Text>
                   </View>
                   <View style={styles.countBox}>
                     <Text style={[styles.countNum, { color: '#00FF88' }]}>{newCount}</Text>
-                    <Text style={styles.countLabel}>新規</Text>
+                    <Text style={styles.countLabel}>{t('import_projects.new')}</Text>
                   </View>
                   <View style={styles.countBox}>
                     <Text style={[styles.countNum, { color: '#FBBF24' }]}>{duplicateCount}</Text>
-                    <Text style={styles.countLabel}>重複</Text>
+                    <Text style={styles.countLabel}>{t('import_projects.duplicate')}</Text>
                   </View>
                 </View>
 
                 {duplicateCount > 0 && (
                   <>
-                    <Text style={styles.sectionLabel}>重複の処理方法</Text>
+                    <Text style={styles.sectionLabel}>{t('import_projects.duplicate_method')}</Text>
                     {(['skip', 'overwrite', 'keep-both'] as DuplicateAction[]).map((opt) => (
                       <Pressable
                         key={opt}
@@ -227,14 +228,14 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
                           <View style={[styles.radio, strategy === opt && styles.radioActive]} />
                           <View style={styles.strategyText}>
                             <Text style={[styles.strategyLabel, strategy === opt && styles.strategyLabelActive]}>
-                              {opt === 'skip' ? 'スキップ' : opt === 'overwrite' ? '上書き' : '両方保存'}
+                              {opt === 'skip' ? t('import_projects.strategy_skip') : opt === 'overwrite' ? t('import_projects.strategy_overwrite') : t('import_projects.strategy_keep_both')}
                             </Text>
                             <Text style={styles.strategyDesc}>
                               {opt === 'skip'
-                                ? '既存のプロジェクトを変えない'
+                                ? t('import_projects.strategy_skip_desc')
                                 : opt === 'overwrite'
-                                ? '既存のプロジェクトを新しいデータで更新'
-                                : '名前の末尾に(2)を付けて両方保存'}
+                                ? t('import_projects.strategy_overwrite_desc')
+                                : t('import_projects.strategy_keep_both_desc')}
                             </Text>
                           </View>
                         </View>
@@ -244,7 +245,7 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
                 )}
 
                 <Pressable style={styles.primaryBtn} onPress={handleImport}>
-                  <Text style={styles.primaryBtnText}>インポートする</Text>
+                  <Text style={styles.primaryBtnText}>{t('import_projects.import_btn')}</Text>
                 </Pressable>
               </View>
             )}
@@ -253,22 +254,22 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
             {step === 'importing' && (
               <View style={styles.centerSection}>
                 <ActivityIndicator color="#00FF88" size="large" />
-                <Text style={styles.loadingText}>インポート中...</Text>
+                <Text style={styles.loadingText}>{t('import_projects.importing')}</Text>
               </View>
             )}
 
             {/* ── done: summary ── */}
             {step === 'done' && importResult && (
               <View style={styles.section}>
-                <Text style={styles.successTitle}>インポートできたよ ✓</Text>
+                <Text style={styles.successTitle}>{t('import_projects.success_title')}</Text>
                 <View style={styles.summaryGrid}>
-                  <SummaryRow label="追加" value={importResult.addCount} color="#00FF88" />
-                  <SummaryRow label="更新" value={importResult.updateCount} color="#60A5FA" />
-                  <SummaryRow label="スキップ" value={importResult.skipCount} color="#9BA1A6" />
-                  <SummaryRow label="失敗" value={importResult.failCount} color="#F87171" />
+                  <SummaryRow label={t('import_projects.summary_added')} value={importResult.addCount} color="#00FF88" />
+                  <SummaryRow label={t('import_projects.summary_updated')} value={importResult.updateCount} color="#60A5FA" />
+                  <SummaryRow label={t('import_projects.summary_skipped')} value={importResult.skipCount} color="#9BA1A6" />
+                  <SummaryRow label={t('import_projects.summary_failed')} value={importResult.failCount} color="#F87171" />
                 </View>
                 <Pressable style={styles.primaryBtn} onPress={handleClose}>
-                  <Text style={styles.primaryBtnText}>閉じる</Text>
+                  <Text style={styles.primaryBtnText}>{t('import_projects.close')}</Text>
                 </Pressable>
               </View>
             )}
@@ -276,10 +277,10 @@ export function ImportProjectsModal({ visible, onClose }: Props) {
             {/* ── error ── */}
             {step === 'error' && (
               <View style={styles.section}>
-                <Text style={styles.errorTitle}>読み込めなかったよ</Text>
+                <Text style={styles.errorTitle}>{t('import_projects.error_title')}</Text>
                 <Text style={styles.errorMsg}>{errorMsg}</Text>
                 <Pressable style={styles.secondaryBtn} onPress={handleRetry}>
-                  <Text style={styles.secondaryBtnText}>もう一度試す</Text>
+                  <Text style={styles.secondaryBtnText}>{t('import_projects.retry')}</Text>
                 </Pressable>
               </View>
             )}

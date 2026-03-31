@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { CreatorProject, CreatorSessionStatus } from '@/store/types';
+import { t } from '@/lib/i18n';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ export function ResultLane({
       {/* Idle / building */}
       {!isActive && (
         <Text style={styles.placeholder}>
-          完成したら、ここに結果と次のアクションが表示されるよ。
+          {t('creator.result_placeholder')}
         </Text>
       )}
 
@@ -75,13 +76,13 @@ export function ResultLane({
       {isError && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>
-            うまくいかなかった。もう一度試してみてね。
+            {t('creator.result_error')}
           </Text>
           <Pressable
             onPress={onNewProject}
             style={({ pressed }) => [styles.newBtn, pressed && styles.btnPressed]}
           >
-            <Text style={styles.newBtnText}>もう一度</Text>
+            <Text style={styles.newBtnText}>{t('creator.result_retry')}</Text>
           </Pressable>
         </View>
       )}
@@ -98,9 +99,9 @@ export function ResultLane({
 
           {/* Project info */}
           <View style={styles.infoBox}>
-            <InfoRow label="保存場所" value={`~/${project.path}`} />
-            <InfoRow label="ファイル数" value={`${project.files.length} ファイル`} />
-            <InfoRow label="種類" value={typeLabel(project.projectType)} />
+            <InfoRow label={t('creator.result_save_location')} value={`~/${project.path}`} />
+            <InfoRow label={t('creator.result_file_count')} value={t('creator.result_files', { n: project.files.length })} />
+            <InfoRow label={t('creator.result_type')} value={typeLabel(project.projectType)} />
           </View>
 
           {/* File list */}
@@ -116,7 +117,7 @@ export function ResultLane({
           {/* Suggestions */}
           {project.suggestions.length > 0 && (
             <View style={styles.suggestions}>
-              <Text style={styles.suggestionsLabel}>次にできること</Text>
+              <Text style={styles.suggestionsLabel}>{t('creator.result_suggestions')}</Text>
               {project.suggestions.map((s, i) => (
                 <View key={i} style={styles.suggestionRow}>
                   <Text style={styles.suggestionNum}>{i + 1}</Text>
@@ -134,7 +135,7 @@ export function ResultLane({
                 style={({ pressed }) => [styles.openBtn, pressed && styles.btnPressed]}
               >
                 <Text style={styles.openBtnText}>
-                  {termuxConnected ? '📂 フォルダを開く' : '📂 保存場所'}
+                  {termuxConnected ? `📂 ${t('creator.result_open_folder')}` : `📂 ${t('creator.result_save_location')}`}
                 </Text>
               </Pressable>
             )}
@@ -143,7 +144,7 @@ export function ResultLane({
               onPress={onRunInTerminal}
               style={({ pressed }) => [styles.runBtn, pressed && styles.btnPressed]}
             >
-              <Text style={styles.runBtnText}>▶ Terminal で実行</Text>
+              <Text style={styles.runBtnText}>{t('creator.result_run_terminal')}</Text>
             </Pressable>
 
             <Pressable
@@ -161,7 +162,7 @@ export function ResultLane({
                   recipeSaved && styles.recipeBtnTextSaved,
                 ]}
               >
-                {recipeSaved ? '★ Recipe保存済み' : '☆ Recipeに保存'}
+                {recipeSaved ? `★ ${t('creator.result_recipe_saved')}` : `☆ ${t('creator.result_save_recipe')}`}
               </Text>
             </Pressable>
 
@@ -169,7 +170,7 @@ export function ResultLane({
               onPress={onNewProject}
               style={({ pressed }) => [styles.newBtn, pressed && styles.btnPressed]}
             >
-              <Text style={styles.newBtnText}>新しく作る</Text>
+              <Text style={styles.newBtnText}>{t('creator.result_new_project')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -195,10 +196,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function typeLabel(type: string): string {
   const map: Record<string, string> = {
-    web: 'Webアプリ',
-    script: 'スクリプト',
-    document: 'ドキュメント',
-    unknown: 'プロジェクト',
+    web: t('creator.type_web'),
+    script: t('creator.type_script'),
+    document: t('creator.type_document'),
+    unknown: t('creator.type_unknown'),
   };
   return map[type] ?? type;
 }

@@ -610,7 +610,7 @@ export function useAIDispatch() {
         if (!result.success && result.networkError && settings.localLlmEnabled) {
           updateMessage(chatSessionId, msgId, {
             content: '',
-            streamingText: 'オフライン検出 — ローカルLLMにフォールバック中...',
+            streamingText: t('dispatch.offline_fallback'),
             isStreaming: true,
           });
 
@@ -739,7 +739,7 @@ export function useAIDispatch() {
           // Clear the failed Groq message
           updateMessage(chatSessionId, msgId, {
             content: '',
-            streamingText: 'オフライン検出 — ローカルLLMにフォールバック中...',
+            streamingText: t('dispatch.offline_fallback'),
             isStreaming: true,
           });
 
@@ -793,7 +793,7 @@ export function useAIDispatch() {
 
           if (!localResult.success && !accumulatedText) {
             updateMessage(chatSessionId, msgId, {
-              content: '', error: 'オフラインで、ローカルLLMにも接続できません',
+              content: '', error: t('dispatch.offline_no_local'),
               isStreaming: false,
             });
           }

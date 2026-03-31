@@ -7,6 +7,7 @@
 
 import React, { memo, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { t } from '@/lib/i18n';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
@@ -135,7 +136,7 @@ const StepCard = memo(function StepCard({
           >
             <MaterialIcons name="play-arrow" size={14} color="#00D4AA" />
             <Text style={[styles.buttonText, { color: '#00D4AA' }]}>
-              {step.command ? '実行' : '次へ'}
+              {step.command ? t('plan.execute') : t('plan.next')}
             </Text>
           </TouchableOpacity>
 
@@ -145,7 +146,7 @@ const StepCard = memo(function StepCard({
             activeOpacity={0.7}
           >
             <MaterialIcons name="skip-next" size={14} color={colors.muted} />
-            <Text style={[styles.buttonText, { color: colors.muted }]}>スキップ</Text>
+            <Text style={[styles.buttonText, { color: colors.muted }]}>{t('plan.skip')}</Text>
           </TouchableOpacity>
         </View>
       )}
