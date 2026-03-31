@@ -212,7 +212,39 @@ export function TerminalHeader() {
           <Pressable
             key={session.id}
             onPress={() => handleTabPress(session.id)}
-            onLongPress={() => sessions.length > 1 && removeSession(session.id)}
+            onLongPress={() => {
+              if (settings.hapticFeedback) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }
+              const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Reset',
+                  onPress: () => {
+                    // Kill pty-helper for this session, then recover (new shell)
+                    const tmux = session.tmuxSession;
+                    const port = 18200 + ['shelly-1','shelly-2','shelly-3','shelly-4'].indexOf(tmux);
+                    useTerminalStore.setState((state) => ({
+                      sessions: state.sessions.map((s) =>
+                        s.id === session.id ? { ...s, sessionStatus: 'exited' as const, isAlive: false } : s
+                      ),
+                    }));
+                  },
+                },
+              ];
+              if (sessions.length > 1) {
+                buttons.push({
+                  text: 'Close',
+                  style: 'destructive',
+                  onPress: () => removeSession(session.id),
+                });
+              }
+              Alert.alert(
+                `Session ${index + 1}`,
+                'Reset restarts the shell.\nClose removes this tab.',
+                buttons,
+              );
+            }}
             delayLongPress={500}
             style={[
               styles.tab,
