@@ -1090,9 +1090,12 @@ public class TerminalView extends View {
         int cursorRow = mEmulator.getCursorRow();
         int visibleRow = cursorRow - mTopRow;
 
-        // Cursor position in pixels — place composing text on the cursor row
+        // Cursor position in pixels — place composing text on the cursor row.
+        // Baseline calculation must match TerminalRenderer.render() which starts at
+        // mFontLineSpacingAndAscent and adds mFontLineSpacing BEFORE each row,
+        // so row N baseline = mFontLineSpacingAndAscent + (N+1) * mFontLineSpacing.
         float x = cursorCol * mRenderer.mFontWidth;
-        float baselineY = visibleRow * mRenderer.mFontLineSpacing + mRenderer.mFontLineSpacingAndAscent;
+        float baselineY = (visibleRow + 1) * mRenderer.mFontLineSpacing + mRenderer.mFontLineSpacingAndAscent;
 
         // Setup paint (match terminal font)
         mComposingPaint.setTypeface(mRenderer.mTypeface);
