@@ -61,8 +61,6 @@ export function useTerminalOutput() {
   const approvalDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorAccum = useRef<string[]>([]);
-  const lastErrorText = useRef<string>('');
-  const lastErrorTime = useRef<number>(0);
   const pkgErrorDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pkgErrorAccum = useRef<string[]>([]);
   const { isWide } = useDeviceLayout();
@@ -134,14 +132,13 @@ export function useTerminalOutput() {
             }, 300);
           }
 
-          // Wide mode only: detect error output (deduplicated)
+          // Wide mode only: detect error output (single bubble per error burst)
           if (isWide) {
             let matched = false;
             for (const pattern of ERROR_OUTPUT_PATTERNS) {
               if (pattern.test(line)) { matched = true; break; }
             }
             if (matched) {
-              // Strip ANSI escape codes for clean comparison
               const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').trim();
               if (cleanLine && !errorAccum.current.includes(cleanLine)) {
                 errorAccum.current.push(cleanLine);
@@ -151,14 +148,15 @@ export function useTerminalOutput() {
                 const errorText = errorAccum.current.join('\n');
                 errorAccum.current = [];
                 if (!errorText) return;
-                // Deduplicate: skip if same error within 10 seconds
-                const now = Date.now();
-                if (errorText === lastErrorText.current && now - lastErrorTime.current < 10_000) return;
-                lastErrorText.current = errorText;
-                lastErrorTime.current = now;
+                // Check chat history: skip if recent error bubble exists (within 10s)
                 const store = useChatStore.getState();
                 const session = store.getActiveSession();
                 if (!session) return;
+                const msgs = session.messages;
+                for (let i = msgs.length - 1; i >= Math.max(0, msgs.length - 5); i--) {
+                  const m = msgs[i];
+                  if (m.errorSummaryData && Date.now() - m.timestamp < 10_000) return;
+                }
                 store.addMessage(session.id, {
                   id: generateId(),
                   role: 'system',
