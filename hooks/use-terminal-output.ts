@@ -132,36 +132,18 @@ export function useTerminalOutput() {
             }, 300);
           }
 
-          // Wide mode only: detect error output (single bubble per error burst)
+          // Wide mode only: detect error output
           if (isWide) {
-            let matched = false;
             for (const pattern of ERROR_OUTPUT_PATTERNS) {
-              if (pattern.test(line)) { matched = true; break; }
-            }
-            if (matched) {
-              const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').trim();
-              if (cleanLine && !errorAccum.current.includes(cleanLine)) {
-                errorAccum.current.push(cleanLine);
-              }
-              if (errorDebounce.current) clearTimeout(errorDebounce.current);
-              errorDebounce.current = setTimeout(() => {
-                const errorText = errorAccum.current.join('\n');
-                errorAccum.current = [];
-                if (!errorText) return;
-                // Check chat history: skip if recent error bubble exists (within 10s)
-                let store: ReturnType<typeof useChatStore.getState>;
-                let session: ReturnType<ReturnType<typeof useChatStore.getState>['getActiveSession']>;
-                try {
-                  store = useChatStore.getState();
-                  session = store.getActiveSession();
-                } catch { return; }
-                if (!session) return;
-                const msgs = session.messages ?? [];
-                for (let i = msgs.length - 1; i >= Math.max(0, msgs.length - 5); i--) {
-                  const m = msgs[i];
-                  if (m?.errorSummaryData && Date.now() - m.timestamp < 10_000) return;
-                }
-                try {
+              if (pattern.test(line)) {
+                errorAccum.current.push(line);
+                if (errorDebounce.current) clearTimeout(errorDebounce.current);
+                errorDebounce.current = setTimeout(() => {
+                  const errorText = errorAccum.current.join('\n');
+                  errorAccum.current = [];
+                  const store = useChatStore.getState();
+                  const session = store.getActiveSession();
+                  if (!session) return;
                   store.addMessage(session.id, {
                     id: generateId(),
                     role: 'system',
@@ -169,8 +151,9 @@ export function useTerminalOutput() {
                     timestamp: Date.now(),
                     errorSummaryData: { errorText, translation: '', provider: '' },
                   });
-                } catch {}
-              }, 2000);
+                }, 2000);
+                break;
+              }
             }
           }
 

@@ -62,13 +62,13 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
 
   // Auto-scroll on new message
   useEffect(() => {
-    if (messages.length > prevCount.current) {
+    if (dedupedMessages.length > prevCount.current) {
       setTimeout(() => {
         listRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-    prevCount.current = messages.length;
-  }, [messages.length]);
+    prevCount.current = dedupedMessages.length;
+  }, [dedupedMessages.length]);
 
   const renderItem = useCallback(({ item }: { item: ChatMessage }) => (
     <ChatBubble
@@ -108,7 +108,18 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
     );
   }, [isStreaming, onStopGenerating, colors]);
 
-  if (messages.length === 0) {
+  // Deduplicate error summary bubbles: keep only the first per 10-second window
+  const dedupedMessages = useMemo(() => {
+    let lastErrorTs = 0;
+    return messages.filter((m) => {
+      if (!m.errorSummaryData) return true;
+      if (m.timestamp - lastErrorTs < 10_000) return false;
+      lastErrorTs = m.timestamp;
+      return true;
+    });
+  }, [messages]);
+
+  if (dedupedMessages.length === 0) {
     return (
       <ScrollView contentContainerStyle={styles.emptyContainer} keyboardShouldPersistTaps="handled">
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{t('chat.empty_title')}</Text>
@@ -139,7 +150,7 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
       <FlatList
         key={`chat-list-${layoutKey}`}
         ref={listRef}
-        data={messages}
+        data={dedupedMessages}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={styles.listContent}
