@@ -23,6 +23,10 @@
   <a href="#contributing">Contributing</a>
 </p>
 
+<p align="center">
+  <img src="docs/images/hero.jpg" alt="Shelly — AI analyzes terminal errors in real time" width="720">
+</p>
+
 ---
 
 ## I can't write code.
