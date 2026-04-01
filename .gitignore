@@ -37,3 +37,6 @@ Thumbs.db
 
 # Shelly project context (user-local, not committed)
 .shelly/
+
+# Superpowers cache (user-local)
+.superpowers/

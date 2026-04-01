@@ -48,7 +48,7 @@
 
 ```bash
 # Maestro CLI パスを通す（初回のみ）
-export PATH="$PATH:/c/Users/ryoxr/maestro/maestro/bin"
+export PATH="$PATH:~/maestro/bin"
 ```
 
 ### adbパスを通す（オプション）
@@ -61,8 +61,8 @@ export PATH="$PATH:/c/android-sdk/platform-tools"
 
 ```bash
 # チャットタブのテストを実行（日本語版）
-cd /c/Users/ryoxr/maestro/maestro/bin
-./maestro.bat test /c/Users/ryoxr/Shelly/.maestro/02_chat_tab_ja.yaml
+cd ~/maestro/bin
+./maestro.bat test ~/Shelly/.maestro/02_chat_tab_ja.yaml
 ```
 
 ### セットアップウィザードのテスト
@@ -70,16 +70,16 @@ cd /c/Users/ryoxr/maestro/maestro/bin
 ```bash
 # セットアップウィザードのテストを実行
 # 注意: アプリデータをクリアして初期状態にしてから実行してください
-cd /c/Users/ryoxr/maestro/maestro/bin
-./maestro.bat test /c/Users/ryoxr/Shelly/.maestro/01_setup_wizard_ja.yaml
+cd ~/maestro/bin
+./maestro.bat test ~/Shelly/.maestro/01_setup_wizard_ja.yaml
 ```
 
 ### 全テストの実行（日本語版のみ）
 
 ```bash
 # 日本語版テストのみを実行
-cd /c/Users/ryoxr/maestro/maestro/bin
-./maestro.bat test /c/Users/ryoxr/Shelly/.maestro/*_ja.yaml
+cd ~/maestro/bin
+./maestro.bat test ~/Shelly/.maestro/*_ja.yaml
 ```
 
 ### デバイス確認
@@ -137,7 +137,7 @@ adb devices
 - Maestroのログを確認（`--verbose` オプション）
 
 ```bash
-./maestro.bat test --verbose /c/Users/ryoxr/Shelly/.maestro/02_chat_tab.yaml
+./maestro.bat test --verbose ~/Shelly/.maestro/02_chat_tab.yaml
 ```
 
 ### タイムアウトエラー

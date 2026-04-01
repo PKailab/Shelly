@@ -137,6 +137,9 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
     }
   }, [sendKey, sendText, settings.hapticFeedback, altActive]);
 
+  // Track container width for paging
+  const [barWidth, setBarWidth] = useState(Dimensions.get('window').width);
+
   const switchSet = useCallback((id: KeySetId) => {
     const idx = SET_ORDER.indexOf(id);
     setActiveSet(id);
@@ -145,9 +148,6 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   }, [settings.hapticFeedback, barWidth]);
-
-  // Track container width for paging
-  const [barWidth, setBarWidth] = useState(Dimensions.get('window').width);
   const onBarLayout = useCallback((e: LayoutChangeEvent) => {
     setBarWidth(e.nativeEvent.layout.width);
   }, []);

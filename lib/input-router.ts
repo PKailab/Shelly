@@ -553,6 +553,7 @@ export function getTargetLabel(target: RouteTarget): string {
     groq: 'Groq',
     cerebras: 'Cerebras',
     plan: 'Plan Mode',
+    actions: 'Actions',
     arena: 'Arena Mode',
   };
   return labels[target];
@@ -570,6 +571,7 @@ export function getTargetColor(target: RouteTarget): string {
     team:       '#EC4899', // ピンク（Team Tableブランドカラー）
     browser:    '#4ADE80', // グリーン
     git:        '#F97316', // オレンジ（Git公式カラー）
+    actions:    '#10B981', // グリーン（Actions）
     agent:      '#EF4444', // レッド（AI Agent）
     codex:      '#10B981', // グリーン（Codex）
     cerebras:   '#FF6B35', // オレンジレッド（Cerebras）
