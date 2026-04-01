@@ -60,6 +60,20 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
     listRef.current?.scrollToEnd({ animated: true });
   }, []);
 
+  // Deduplicate error summary bubbles: same errorText within 10s → keep first only
+  const dedupedMessages = useMemo(() => {
+    const recentErrors: { ts: number; text: string }[] = [];
+    return messages.filter((m) => {
+      if (!m.errorSummaryData) return true;
+      const isDupe = recentErrors.some(
+        (e) => m.timestamp - e.ts < 10_000 && e.text === m.errorSummaryData!.errorText
+      );
+      if (isDupe) return false;
+      recentErrors.push({ ts: m.timestamp, text: m.errorSummaryData.errorText });
+      return true;
+    });
+  }, [messages]);
+
   // Auto-scroll on new message
   useEffect(() => {
     if (dedupedMessages.length > prevCount.current) {
@@ -107,17 +121,6 @@ export function ChatMessageList({ messages, fontSize, onSampleTap, onRegenerate,
       </View>
     );
   }, [isStreaming, onStopGenerating, colors]);
-
-  // Deduplicate error summary bubbles: keep only the first per 10-second window
-  const dedupedMessages = useMemo(() => {
-    let lastErrorTs = 0;
-    return messages.filter((m) => {
-      if (!m.errorSummaryData) return true;
-      if (m.timestamp - lastErrorTs < 10_000) return false;
-      lastErrorTs = m.timestamp;
-      return true;
-    });
-  }, [messages]);
 
   if (dedupedMessages.length === 0) {
     return (

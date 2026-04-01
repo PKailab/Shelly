@@ -136,7 +136,7 @@ export function useTerminalOutput() {
           if (isWide) {
             for (const pattern of ERROR_OUTPUT_PATTERNS) {
               if (pattern.test(line)) {
-                errorAccum.current.push(line);
+                errorAccum.current.push(line.replace(/\x1b\[[0-9;]*m/g, ''));
                 if (errorDebounce.current) clearTimeout(errorDebounce.current);
                 errorDebounce.current = setTimeout(() => {
                   const errorText = errorAccum.current.join('\n');
