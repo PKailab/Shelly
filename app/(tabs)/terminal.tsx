@@ -297,8 +297,10 @@ export default function TerminalScreen() {
 
       // 6. CLI auto-resume: if this was a fresh pty-helper (not reconnect),
       // and the session had an active CLI, resume it automatically.
+      console.log('[CLI-Resume] check: ptyAlive=', ptyAlive, 'activeCli=', session.activeCli, 'cwd=', session.currentDir);
       if (!ptyAlive && session.activeCli) {
         const resumeCmd = buildCliResumeCommand(session.currentDir, session.activeCli);
+        console.log('[CLI-Resume] resumeCmd=', resumeCmd);
         if (resumeCmd) {
           // Wait for shell prompt to be ready (poll transcript for prompt chars)
           let promptDetected = false;
@@ -306,22 +308,27 @@ export default function TerminalScreen() {
             await new Promise(resolve => setTimeout(resolve, 250));
             try {
               const transcript = await TerminalEmulator.getTranscriptText(session.nativeSessionId, 5);
+              console.log('[CLI-Resume] poll', i, 'transcript=', JSON.stringify(transcript?.slice(-80)));
               if (transcript && (transcript.includes('$ ') || transcript.includes('❯ ') || transcript.includes('% '))) {
                 promptDetected = true;
                 break;
               }
-            } catch {}
+            } catch (e) {
+              console.log('[CLI-Resume] poll', i, 'error:', e);
+            }
           }
           try {
             await TerminalEmulator.writeToSession(
               session.nativeSessionId,
               resumeCmd + '\n'
             );
-            console.log('[Terminal] CLI auto-resume sent:', session.activeCli, promptDetected ? '(prompt detected)' : '(fallback timeout)');
+            console.log('[CLI-Resume] sent:', session.activeCli, promptDetected ? '(prompt detected)' : '(fallback timeout)');
           } catch (e) {
-            console.warn('[Terminal] CLI auto-resume failed:', e);
+            console.warn('[CLI-Resume] writeToSession failed:', e);
           }
         }
+      } else {
+        console.log('[CLI-Resume] skipped:', ptyAlive ? 'pty was alive (reconnect)' : 'no activeCli');
       }
     } catch (err) {
       console.error('[Terminal] Failed to create native session:', err);

@@ -56,6 +56,7 @@ import android.widget.Scroller;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
+import android.util.Log;
 import com.termux.terminal.KeyHandler;
 import com.termux.terminal.TerminalEmulator;
 import com.termux.terminal.TerminalSession;
@@ -389,9 +390,11 @@ public class TerminalView extends View {
                     if (!delta.isEmpty()) {
                         sendTextToTerminal(delta);
                     }
+                    Log.d("ShellyIME", "setComposing ASCII delta prev=\"" + mLastComposingSent + "\" new=\"" + newText + "\" delta=\"" + delta + "\"");
                     mLastComposingSent = newText;
                 } else {
                     // CJK or non-incremental change: erase previous and resend all
+                    Log.d("ShellyIME", "setComposing FULL erase prev=\"" + mLastComposingSent + "\" new=\"" + newText + "\" ascii=" + isAsciiOnly);
                     eraseComposingFromPty();
                     if (!newText.isEmpty()) {
                         sendTextToTerminal(newText);
@@ -408,6 +411,7 @@ public class TerminalView extends View {
 
             @Override
             public boolean finishComposingText() {
+                Log.d("ShellyIME", "finishComposing prev=\"" + mLastComposingSent + "\"");
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
                 // Composing text is already on the PTY — just clear tracking state
                 mLastComposingSent = "";
@@ -426,15 +430,17 @@ public class TerminalView extends View {
 
                 if (!mLastComposingSent.isEmpty() && commitStr.equals(mLastComposingSent)) {
                     // Composing text is already on the PTY — just finalize without resending
-                    // This avoids the DEL-erase + resend race over TCP PTY
+                    Log.d("ShellyIME", "commit NOOP (matches composing) text=\"" + commitStr + "\"");
                 } else if (!mLastComposingSent.isEmpty() && commitStr.startsWith(mLastComposingSent)) {
                     // Committed text extends composing — only send the delta
                     String delta = commitStr.substring(mLastComposingSent.length());
                     if (!delta.isEmpty()) {
                         sendTextToTerminal(delta);
                     }
+                    Log.d("ShellyIME", "commit DELTA prev=\"" + mLastComposingSent + "\" commit=\"" + commitStr + "\" delta=\"" + delta + "\"");
                 } else {
                     // Different text or no composing — erase and send fresh
+                    Log.d("ShellyIME", "commit FRESH prev=\"" + mLastComposingSent + "\" commit=\"" + commitStr + "\"");
                     eraseComposingFromPty();
                     if (!commitStr.isEmpty()) {
                         sendTextToTerminal(commitStr);
