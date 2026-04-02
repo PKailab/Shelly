@@ -358,7 +358,9 @@ export function useTermuxBridge() {
       `cd ${HOME}/shelly-bridge && nohup ${PREFIX}/bin/node server.js > /dev/null 2>&1 & `,
     ].join('');
 
+    console.log('[AutoRecovery] Sending runTermuxCommand to restart bridge...');
     const result = await runTermuxCommand({ command: startCmd, background: true });
+    console.log('[AutoRecovery] runTermuxCommand result:', JSON.stringify(result));
 
     if (!result.success) {
       // Native module failed — fallback: open Termux app and copy command

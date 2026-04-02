@@ -3,8 +3,11 @@ package expo.modules.termuxbridge
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+
+private const val TAG = "TermuxBridgeModule"
 
 class TermuxBridgeModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -32,21 +35,26 @@ class TermuxBridgeModule : Module() {
         putExtra("com.termux.RUN_COMMAND_BACKGROUND", background)
       }
 
+      Log.i(TAG, "runCommand: sending intent to RunCommandService, cmd=${command.take(80)}")
       try {
         context.startService(intent)
+        Log.i(TAG, "runCommand: startService succeeded")
         mapOf("success" to true)
       } catch (e: SecurityException) {
-        // Permission not granted
-        mapOf("success" to false, "error" to "PERMISSION_DENIED")
+        Log.e(TAG, "runCommand: PERMISSION_DENIED", e)
+        mapOf("success" to false, "error" to "PERMISSION_DENIED: ${e.message}")
       } catch (e: IllegalStateException) {
-        // App in background, try foreground service
+        Log.w(TAG, "runCommand: startService failed (background?), trying startForegroundService", e)
         try {
           context.startForegroundService(intent)
+          Log.i(TAG, "runCommand: startForegroundService succeeded")
           mapOf("success" to true)
         } catch (e2: Exception) {
-          mapOf("success" to false, "error" to e2.message)
+          Log.e(TAG, "runCommand: startForegroundService also failed", e2)
+          mapOf("success" to false, "error" to "FGS_FAILED: ${e2.message}")
         }
       } catch (e: Exception) {
+        Log.e(TAG, "runCommand: unexpected error", e)
         mapOf("success" to false, "error" to (e.message ?: "Unknown error"))
       }
     }
