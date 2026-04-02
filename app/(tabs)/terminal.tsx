@@ -25,7 +25,7 @@ import { NativeTerminalView } from '@/modules/terminal-view/src';
 import TerminalViewModule from '@/modules/terminal-view/src/TerminalViewModule';
 import TerminalEmulator from '@/modules/terminal-emulator/src/TerminalEmulatorModule';
 import { useTerminalOutput } from '@/hooks/use-terminal-output';
-import { startSessionMonitor, stopSessionMonitor, triggerImmediateCheck } from '@/lib/terminal-session-monitor';
+import { startSessionMonitor, stopSessionMonitor } from '@/lib/terminal-session-monitor';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation, t } from '@/lib/i18n';
@@ -90,6 +90,11 @@ export default function TerminalScreen() {
   // Bridge terminal output events to execution-log-store
   useTerminalOutput();
 
+  // Mutex: prevent concurrent ensureNativeSessions / createNativeSession calls
+  const sessionMutexRef = useRef(false);
+  // Track which sessions are currently being created (prevent double-creation)
+  const creatingSessions = useRef(new Set<string>());
+
   // Voice dialog mode state
   const [voiceChatVisible, setVoiceChatVisible] = useState(false);
 
@@ -151,6 +156,13 @@ export default function TerminalScreen() {
 
   // Create or reconnect a native session to pty-helper
   const createNativeSession = useCallback(async (session: TabSession) => {
+    // Per-session guard: prevent concurrent creation for the same session
+    if (creatingSessions.current.has(session.id)) {
+      console.log('[Terminal] createNativeSession: already in progress for', session.nativeSessionId);
+      return;
+    }
+    creatingSessions.current.add(session.id);
+
     const port = getPtyPort(session.tmuxSession);
     try {
       // 0. Only destroy if session exists but has no emulator buffer
@@ -288,11 +300,18 @@ export default function TerminalScreen() {
           s.id === session.id ? { ...s, sessionStatus: 'exited' as const, isAlive: false } : s
         ),
       }));
+    } finally {
+      creatingSessions.current.delete(session.id);
     }
   }, [runRawCommand]);
 
   // Recover a session: reconnect to existing pty-helper, or restart if dead
   const recoverSession = useCallback(async (session: TabSession) => {
+    // Skip if already being created/recovered
+    if (creatingSessions.current.has(session.id)) {
+      console.log('[Terminal] recoverSession: already in progress for', session.nativeSessionId);
+      return;
+    }
     setIsRecovering(true);
 
     // Mark as recovering
@@ -339,8 +358,10 @@ export default function TerminalScreen() {
   // when Android backgrounds the app. This silently reconnects or re-creates sessions.
   const ensureNativeSessions = useCallback(async () => {
     if (bridgeStatus !== 'connected') return;
-    // Don't run when hidden behind MultiPane — the MultiPane instance handles sessions
     if (isHiddenBehindMultiPane) return;
+    // Global mutex: prevent concurrent runs
+    if (sessionMutexRef.current) return;
+    sessionMutexRef.current = true;
 
     for (const session of sessions) {
       if (session.sessionStatus === 'starting' || session.sessionStatus === 'alive') {
@@ -382,20 +403,16 @@ export default function TerminalScreen() {
       } else if (session.sessionStatus === 'exited') {
         if (isRenderedInMultiPane) continue; // Let tab-side handle recovery
         console.log('[Terminal] ensureNativeSessions: session exited, recovering:', session.nativeSessionId);
-        recoverSession(session);
+        await recoverSession(session);
       }
     }
+    sessionMutexRef.current = false;
   }, [bridgeStatus, sessions, createNativeSession, recoverSession, isHiddenBehindMultiPane, isRenderedInMultiPane]);
 
   // Run on bridge connect/reconnect AND on initial mount (covers Split View
   // where a new TerminalScreen instance mounts while sessions are already alive)
   useEffect(() => {
     ensureNativeSessions();
-    // After bridge reconnection, kick session monitor into fast-check mode
-    // so dead pty-helpers are detected within seconds instead of 3 minutes
-    if (bridgeStatus === 'connected') {
-      triggerImmediateCheck();
-    }
   }, [bridgeStatus]);
 
   // Also run on mount — Split View creates a fresh TerminalScreen instance

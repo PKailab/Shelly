@@ -40,7 +40,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useTerminalStore, _pendingTmuxKills, _pendingTmuxClears } from '@/store/terminal-store';
 import { notifyCommandComplete } from '@/lib/command-notifier';
 import { runTermuxCommand } from '@/lib/termux-intent';
-import { isSessionAlive, ensureSession, sendKeysToSession, buildRecoveryCommand, killSession as killTmuxSession } from '@/lib/tmux-manager';
+import { sendKeysToSession, killSession as killTmuxSession } from '@/lib/tmux-manager';
 import { t } from '@/lib/i18n';
 
 /** コマンド文字列からCLI種別を検出する */
@@ -293,6 +293,8 @@ export function useTermuxBridge() {
 
     // Battery guard: only reconnect when in foreground, mode is termux, autoReconnect is on
     if (!autoReconnect || mode !== 'termux') return;
+    // Don't interfere with auto-recovery — it manages its own connect() calls
+    if (isAutoRecoveringRef.current) return;
     if (reconnectAttemptsRef.current >= MAX_RECONNECT) {
       // Instead of immediately exhausting, try auto-recovery first
       attemptAutoRecovery();
@@ -400,21 +402,8 @@ export function useTermuxBridge() {
           setAutoRecoveryFailed(false);
           setIsReconnectExhausted(false);
 
-          // === Layer 2: CLI session recovery ===
-          const { sessions } = useTerminalStore.getState();
-          for (const session of sessions) {
-            const tmuxName = session.tmuxSession;
-            const alive = await isSessionAlive(tmuxName, runRawCommand);
-            if (!alive && (session.activeCli || session.currentDir !== '/home/user')) {
-              // tmux died — create new session and auto-resume
-              await ensureSession(tmuxName, runRawCommand);
-              const recoveryCmd = buildRecoveryCommand(session.currentDir, session.activeCli);
-              if (recoveryCmd) {
-                await sendKeysToSession(tmuxName, recoveryCmd, runRawCommand);
-              }
-            }
-          }
-
+          // pty-helper sessions are recovered by ensureNativeSessions() in terminal.tsx
+          // (triggered by bridgeStatus → 'connected' effect). No tmux Layer 2 needed.
           return;
         }
         // Not connected yet, keep polling with exponential backoff
