@@ -236,6 +236,8 @@ export function useTermuxBridge() {
 
     ws.onclose = () => {
       clearTimeout(connTimeout);
+      // Ignore close events from stale WebSockets (replaced by a newer connect() call)
+      if (wsRef.current !== ws) return;
       setBridgeStatus('disconnected');
 
       // Flush buffered output and clear request handlers
@@ -250,7 +252,10 @@ export function useTermuxBridge() {
       clearCancelTimeout();
 
       handleAutoFallback();
-      scheduleReconnect();
+      // Don't trigger reconnect cascade during auto-recovery — poll() manages its own connect()
+      if (!isAutoRecoveringRef.current) {
+        scheduleReconnect();
+      }
     };
   }, []);
 
@@ -296,7 +301,8 @@ export function useTermuxBridge() {
     // Don't interfere with auto-recovery — it manages its own connect() calls
     if (isAutoRecoveringRef.current) return;
     if (reconnectAttemptsRef.current >= MAX_RECONNECT) {
-      // Instead of immediately exhausting, try auto-recovery first
+      // Prevent multiple scheduleReconnect calls from each triggering attemptAutoRecovery
+      reconnectAttemptsRef.current = MAX_RECONNECT + 1;
       attemptAutoRecovery();
       return;
     }
@@ -358,26 +364,29 @@ export function useTermuxBridge() {
       `cd ${HOME}/shelly-bridge && nohup ${PREFIX}/bin/node server.js > /dev/null 2>&1 & `,
     ].join('');
 
-    // Strategy 1: Try RunCommandService (works when Termux is in active standby bucket)
-    console.log('[AutoRecovery] Trying RunCommandService...');
-    const result = await runTermuxCommand({ command: startCmd, background: true });
-    console.log('[AutoRecovery] RunCommandService result:', JSON.stringify(result));
+    // Recovery cascade — try multiple strategies since RunCommandService
+    // is silently blocked on Android 14 Samsung (RARE standby bucket)
+    const TermuxBridgeModule = require('../modules/termux-bridge').default;
 
-    // Strategy 2: Always also launch Termux Activity as fallback.
-    // On Android 14 Samsung, RunCommandService silently fails when Termux is in
-    // RARE standby bucket. Activity launch always works and triggers .bashrc
-    // which auto-starts the bridge.
-    console.log('[AutoRecovery] Launching Termux Activity (triggers .bashrc bridge auto-start)...');
+    // Strategy 1: RunCommandService via context.startService()
+    console.log('[AutoRecovery] Strategy 1: RunCommandService...');
+    await runTermuxCommand({ command: startCmd, background: true });
+
+    // Strategy 2: am startservice via Runtime.exec() (may bypass standby restriction)
+    console.log('[AutoRecovery] Strategy 2: am startservice via shell...');
     try {
-      const TermuxBridgeModule = require('../modules/termux-bridge').default;
-      await TermuxBridgeModule.launchTermux();
+      const directResult = await TermuxBridgeModule.startBridgeDirect();
+      console.log('[AutoRecovery] startBridgeDirect result:', JSON.stringify(directResult));
     } catch (e) {
-      console.log('[AutoRecovery] Activity launch failed, trying URL scheme...');
-      try {
-        await Linking.openURL('com.termux://');
-      } catch {
-        // Nothing worked — fall through to polling
-      }
+      console.log('[AutoRecovery] startBridgeDirect failed:', e);
+    }
+
+    // Strategy 3: Launch Termux Activity (brings Termux to front, .bashrc starts bridge)
+    console.log('[AutoRecovery] Strategy 3: Launch Termux Activity...');
+    try {
+      await TermuxBridgeModule.launchTermux();
+    } catch {
+      try { await Linking.openURL('com.termux://'); } catch {}
     }
 
     // Step 2: Poll for bridge to come back online
@@ -387,10 +396,15 @@ export function useTermuxBridge() {
       if (pollCount > AUTO_RECOVERY_MAX_POLLS) {
         // Recovery round timed out — retry auto-recovery after a pause
         // (ゼロ状態ユーザーに「手動で再起動」は求めない)
+        // Keep isAutoRecoveringRef.current = true to block scheduleReconnect
+        // from stale onclose events during the cooldown window.
+        // Only the UI state is cleared so the banner can update.
         setIsAutoRecovering(false);
-        isAutoRecoveringRef.current = false;
         autoRecoveryTimerRef.current = setTimeout(() => {
           reconnectAttemptsRef.current = 0;
+          // ref is still true — attemptAutoRecovery() will see it and skip,
+          // so we must reset it right before calling.
+          isAutoRecoveringRef.current = false;
           attemptAutoRecovery();
         }, 10_000); // 10秒後にもう一度自動復旧を試行
         return;

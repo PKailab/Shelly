@@ -82,25 +82,77 @@ class TermuxBridgeModule : Module() {
      * is blocked by Android battery restrictions (standby bucket RARE).
      * Opening Termux triggers .bashrc which auto-starts the bridge.
      */
+    /**
+     * Launch Termux Activity — reliable fallback when RunCommandService
+     * is blocked by Android battery restrictions (standby bucket RARE).
+     * Uses CLEAR_TOP to force Termux to create a new session, triggering .bashrc.
+     * Then immediately brings Shelly back to front.
+     */
     AsyncFunction("launchTermux") {
       val context = appContext.reactContext
         ?: throw Exception("React context not available")
 
-      val intent = Intent(Intent.ACTION_MAIN).apply {
+      // Step 1: Launch Termux with CLEAR_TOP to force new session
+      val termuxIntent = Intent(Intent.ACTION_MAIN).apply {
         component = ComponentName(
           "com.termux",
           "com.termux.app.TermuxActivity"
         )
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
       }
 
       try {
-        context.startActivity(intent)
-        Log.i(TAG, "launchTermux: Activity launched successfully")
+        context.startActivity(termuxIntent)
+        Log.i(TAG, "launchTermux: Termux Activity launched")
+
+        // Step 2: After a short delay, bring Shelly back to front
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+          try {
+            val shellyIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            shellyIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            if (shellyIntent != null) {
+              context.startActivity(shellyIntent)
+              Log.i(TAG, "launchTermux: Shelly brought back to front")
+            }
+          } catch (e: Exception) {
+            Log.w(TAG, "launchTermux: failed to bring Shelly back", e)
+          }
+        }, 3000) // 3s delay for Termux to start + .bashrc to run
+
         mapOf("success" to true)
       } catch (e: Exception) {
         Log.e(TAG, "launchTermux: failed", e)
         mapOf("success" to false, "error" to (e.message ?: "Unknown error"))
+      }
+    }
+
+    /**
+     * Start bridge directly via 'am startservice' shell command.
+     * Bypasses context.startService() which can be silently dropped
+     * by Android 14 battery restrictions. Shell-level 'am' may have
+     * different delivery behavior.
+     */
+    AsyncFunction("startBridgeDirect") {
+      val cmd = arrayOf(
+        "/system/bin/am", "startservice",
+        "--user", "0",
+        "-n", "com.termux/.app.RunCommandService",
+        "-a", "com.termux.RUN_COMMAND",
+        "--es", "com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash",
+        "--esa", "com.termux.RUN_COMMAND_ARGUMENTS", "-c,cd /data/data/com.termux/files/home/shelly-bridge && nohup /data/data/com.termux/files/usr/bin/node server.js > /dev/null 2>&1 &",
+        "--es", "com.termux.RUN_COMMAND_WORKDIR", "/data/data/com.termux/files/home",
+        "--ez", "com.termux.RUN_COMMAND_BACKGROUND", "true"
+      )
+
+      try {
+        val process = Runtime.getRuntime().exec(cmd)
+        val exitCode = process.waitFor()
+        val error = process.errorStream.bufferedReader().readText().trim()
+        Log.i(TAG, "startBridgeDirect: exit=$exitCode err=$error")
+        mapOf("success" to (exitCode == 0 && !error.contains("not allowed")), "error" to error)
+      } catch (e: Exception) {
+        Log.e(TAG, "startBridgeDirect failed", e)
+        mapOf("success" to false, "error" to (e.message ?: "Unknown"))
       }
     }
 
