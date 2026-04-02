@@ -11,7 +11,7 @@ type RunCommand = (cmd: string, opts: { timeoutMs: number; reason: string }) => 
 export const CLI_RESUME_COMMANDS: Record<string, string | null> = {
   claude: 'claude --continue',
   gemini: 'gemini --resume latest',
-  codex: null,
+  codex: 'codex resume --last',
   cody: null,
 };
 
