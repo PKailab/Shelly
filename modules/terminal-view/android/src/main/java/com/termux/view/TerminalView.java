@@ -370,11 +370,33 @@ public class TerminalView extends View {
                 }
                 String newText = text != null ? text.toString() : "";
 
-                // Erase previous composing text from PTY, then send new one
-                eraseComposingFromPty();
-                if (!newText.isEmpty()) {
-                    sendTextToTerminal(newText);
+                // For ASCII-only text (English typing), Gboard uses composing mode
+                // for autocorrect/prediction. Over TCP-based PTY, the DEL-based
+                // erase-and-resend creates duplicates because DEL may be delayed.
+                // Solution: for ASCII-only composing, only send the *delta* (new chars
+                // appended since last composing text) instead of erase+resend all.
+                boolean isAsciiOnly = true;
+                for (int i = 0; i < newText.length(); i++) {
+                    if (newText.charAt(i) > 127) {
+                        isAsciiOnly = false;
+                        break;
+                    }
+                }
+
+                if (isAsciiOnly && newText.startsWith(mLastComposingSent)) {
+                    // ASCII composing: only send newly appended characters
+                    String delta = newText.substring(mLastComposingSent.length());
+                    if (!delta.isEmpty()) {
+                        sendTextToTerminal(delta);
+                    }
                     mLastComposingSent = newText;
+                } else {
+                    // CJK or non-incremental change: erase previous and resend all
+                    eraseComposingFromPty();
+                    if (!newText.isEmpty()) {
+                        sendTextToTerminal(newText);
+                        mLastComposingSent = newText;
+                    }
                 }
 
                 // No overlay needed — text is shown inline by the terminal
@@ -402,10 +424,21 @@ public class TerminalView extends View {
                 }
                 String commitStr = text != null ? text.toString() : "";
 
-                // Erase composing text, send committed text
-                eraseComposingFromPty();
-                if (!commitStr.isEmpty()) {
-                    sendTextToTerminal(commitStr);
+                if (!mLastComposingSent.isEmpty() && commitStr.equals(mLastComposingSent)) {
+                    // Composing text is already on the PTY — just finalize without resending
+                    // This avoids the DEL-erase + resend race over TCP PTY
+                } else if (!mLastComposingSent.isEmpty() && commitStr.startsWith(mLastComposingSent)) {
+                    // Committed text extends composing — only send the delta
+                    String delta = commitStr.substring(mLastComposingSent.length());
+                    if (!delta.isEmpty()) {
+                        sendTextToTerminal(delta);
+                    }
+                } else {
+                    // Different text or no composing — erase and send fresh
+                    eraseComposingFromPty();
+                    if (!commitStr.isEmpty()) {
+                        sendTextToTerminal(commitStr);
+                    }
                 }
 
                 mComposingText = "";
