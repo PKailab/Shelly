@@ -280,17 +280,20 @@ Read the full design philosophy: **[docs/DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILO
 
 This started as a personal tool. Community contributions are shaping it into a true OSS project.
 
-Code comments are primarily in Japanese. English translations welcome as PRs.
+**Looking for a first contribution?** Check the [`good first issue`](https://github.com/RYOITABASHI/Shelly/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) label:
 
-**Good first files to explore:**
+- [Set up Jest test framework](https://github.com/RYOITABASHI/Shelly/issues/5) — foundational, unblocks all test work
+- [Add unit tests for input-router.ts](https://github.com/RYOITABASHI/Shelly/issues/1) — pure functions, easy to test
+- [Add unit tests for command-safety.ts](https://github.com/RYOITABASHI/Shelly/issues/2) — security-critical, great for TDD
+- [Add unit tests for auto-savepoint.ts](https://github.com/RYOITABASHI/Shelly/issues/3) — git operations, secret detection
+- [Translate Japanese code comments to English](https://github.com/RYOITABASHI/Shelly/issues/4) — one file per PR is fine
+- [Flesh out CONTRIBUTING.md](https://github.com/RYOITABASHI/Shelly/issues/6) — development setup guide
+
+**Key files to explore:**
 - `lib/input-router.ts` — The brain. Classifies natural language into shell commands, AI requests, or @mentions
-- `lib/terminal-context.ts` — Cross-pane intelligence. Captures terminal output and injects it into AI prompts
 - `lib/command-safety.ts` — Risk assessment engine. Blocks dangerous commands with 5 severity levels
 - `lib/auto-savepoint.ts` — Watches for file changes and auto-commits. The "game save" system
-- `components/chat/ActionBlock.tsx` — Renders [▶ Run] / [Copy] buttons on AI-generated code blocks
 - `modules/terminal-view/android/.../ShellyTerminalView.kt` — The native terminal renderer (Kotlin + Android Canvas)
-
-> **Test suite:** Not yet established. Adding tests for `input-router`, `command-safety`, and `auto-savepoint` is a high-value contribution.
 
 If you find something that could be better — a cleaner pattern, a performance optimization, a bug fix — **please open an issue or PR**. That's exactly why this is open source.
 
