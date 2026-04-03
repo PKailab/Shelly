@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import * as ImagePicker from 'expo-image-picker';
 import {
   View,
   Text,
@@ -18,7 +17,6 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTerminalStore } from '@/store/terminal-store';
-import { useObsidianStore } from '@/store/obsidian-store';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { BRIDGE_SERVER_JS, BRIDGE_SERVER_VERSION } from '@/lib/bridge-bundle';
 import { CursorShape, BridgeStatus } from '@/store/types';
@@ -142,8 +140,6 @@ export default function SettingsScreen() {
     termuxSettings, updateTermuxSettings,
     bridgeStatus, connectionMode, setConnectionMode,
   } = useTerminalStore();
-  const { settings: obsidianSettings, saveSettings: saveObsidianSettings, loadSettings: loadObsidianSettings } = useObsidianStore();
-  React.useEffect(() => { loadObsidianSettings(); }, []);
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
 
@@ -712,24 +708,6 @@ export default function SettingsScreen() {
           })}
         </ScrollView>
 
-        <SettingRow label={t('settings.font_size_lock')} description={t('settings.font_size_lock_desc')}>
-          <Switch
-            value={settings.fontSizeLocked ?? false}
-            onValueChange={(v) => updateSettings({ fontSizeLocked: v })}
-            trackColor={{ false: '#2D2D2D', true: '#00D4AA50' }}
-            thumbColor={(settings.fontSizeLocked ?? false) ? '#00D4AA' : '#6B7280'}
-          />
-        </SettingRow>
-
-        <SettingRow label={t('settings.hide_keybar_hw')} description={t('settings.hide_keybar_hw_desc')}>
-          <Switch
-            value={settings.hideKeyBarWithHwKeyboard ?? false}
-            onValueChange={(v) => updateSettings({ hideKeyBarWithHwKeyboard: v })}
-            trackColor={{ false: '#2D2D2D', true: '#00D4AA50' }}
-            thumbColor={(settings.hideKeyBarWithHwKeyboard ?? false) ? '#00D4AA' : '#6B7280'}
-          />
-        </SettingRow>
-
         {/* ── Behavior ─────────────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.behavior_title')} />
 
@@ -1022,85 +1000,6 @@ export default function SettingsScreen() {
         </Pressable>
 
         {/* ── Glass Background ────────────────────────────────────── */}
-        <SectionHeader title={t('settings.glass_title')} subtitle={t('settings.glass_subtitle')} />
-        {/* 壁紙選択 */}
-        <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Wallpaper</Text>
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-            <Pressable
-              onPress={async () => {
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ['images'],
-                  allowsEditing: false,
-                  quality: 0.8,
-                });
-                if (!result.canceled && result.assets[0]) {
-                  updateSettings({ wallpaperUri: result.assets[0].uri });
-                }
-              }}
-              style={[styles.actionButton, { borderColor: '#4ADE8033', flex: 1 }]}
-            >
-              <MaterialIcons name="image" size={18} color="#4ADE80" />
-              <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
-                {settings.wallpaperUri ? 'Change wallpaper' : 'Select wallpaper'}
-              </Text>
-            </Pressable>
-            {settings.wallpaperUri ? (
-              <Pressable
-                onPress={() => updateSettings({ wallpaperUri: undefined })}
-                style={[styles.actionButton, { borderColor: '#F8717133', flex: 0 }]}
-              >
-                <MaterialIcons name="delete" size={18} color="#F87171" />
-              </Pressable>
-            ) : null}
-          </View>
-          <Text style={styles.wsUrlHint}>
-            {settings.wallpaperUri ? 'Wallpaper set — adjust opacity below' : 'Select an image from your photo library'}
-          </Text>
-        </View>
-        {/* 背景透明度 */}
-        <SettingRow
-          label={t('settings.bg_opacity_label')}
-          description={`Terminal background opacity: ${Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%`}
-        >
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => updateSettings({ backgroundOpacity: Math.max(0.1, Math.round(((settings.backgroundOpacity ?? 1.0) - 0.1) * 10) / 10) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{Math.round((settings.backgroundOpacity ?? 1.0) * 100)}%</Text>
-            <Pressable
-              onPress={() => updateSettings({ backgroundOpacity: Math.min(1.0, Math.round(((settings.backgroundOpacity ?? 1.0) + 0.1) * 10) / 10) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-        {/* ブラー強度 */}
-        <SettingRow
-          label={t('settings.blur_label')}
-          description={`Wallpaper blur amount: ${settings.blurIntensity ?? 0}`}
-        >
-          <View style={styles.stepper}>
-            <Pressable
-              onPress={() => updateSettings({ blurIntensity: Math.max(0, (settings.blurIntensity ?? 0) - 5) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{settings.blurIntensity ?? 0}</Text>
-            <Pressable
-              onPress={() => updateSettings({ blurIntensity: Math.min(100, (settings.blurIntensity ?? 0) + 5) })}
-              style={styles.stepBtn}
-            >
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-
         {/* ── Pro Features Block 1: Local LLM + LlamaCpp + MCP + System Prompt ── */}
         <ProGate>
         {/* ── Local LLM (Ollama) ─────────────────────────────────────────── */}
@@ -1578,74 +1477,6 @@ export default function SettingsScreen() {
           </View>
           <Text style={styles.wsUrlHint}>Codex command name in Termux (usually just &quot;codex&quot;)</Text>
         </View>
-        {/* ── Obsidian ────────────────────────────────────────────── */}
-        <SectionHeader title={t('settings.obsidian_title')} subtitle={t('settings.obsidian_subtitle')} />
-        <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>Vault Path</Text>
-          <View style={styles.wsUrlInputRow}>
-            <TextInput
-              style={[styles.wsUrlInput, { color: '#A78BFA' }]}
-              value={obsidianSettings.vaultPath}
-              onChangeText={(v) => saveObsidianSettings({ vaultPath: v.trim() })}
-              placeholder="/storage/emulated/0/ObsidianVault"
-              placeholderTextColor="#4B5563"
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
-            />
-          </View>
-          <Text style={styles.wsUrlHint}>
-            Full path to Obsidian Vault. Collected articles and papers are saved here.
-          </Text>
-        </View>
-        <SettingRow label={t('settings.auto_collect_label')} description={t('settings.auto_collect_desc')}>
-          <Pressable
-            style={[styles.segmentBtn, obsidianSettings.autoCollectEnabled && styles.segmentBtnActive]}
-            onPress={() => saveObsidianSettings({ autoCollectEnabled: !obsidianSettings.autoCollectEnabled })}
-          >
-            <Text style={[styles.segmentBtnText, obsidianSettings.autoCollectEnabled && styles.segmentBtnTextActive]}>
-              {obsidianSettings.autoCollectEnabled ? 'ON' : 'OFF'}
-            </Text>
-          </Pressable>
-        </SettingRow>
-        <SettingRow label={t('settings.collect_time_label')} description={t('settings.collect_time_desc')}>
-          <View style={styles.stepper}>
-            <Pressable onPress={() => saveObsidianSettings({ collectTimeHour: Math.max(0, obsidianSettings.collectTimeHour - 1) })} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{String(obsidianSettings.collectTimeHour).padStart(2, '0')}:00</Text>
-            <Pressable onPress={() => saveObsidianSettings({ collectTimeHour: Math.min(23, obsidianSettings.collectTimeHour + 1) })} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-        <SettingRow label={t('settings.max_items_label')} description={t('settings.max_items_desc')}>
-          <View style={styles.stepper}>
-            <Pressable onPress={() => saveObsidianSettings({ maxItemsPerDay: Math.max(3, obsidianSettings.maxItemsPerDay - 1) })} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{obsidianSettings.maxItemsPerDay}</Text>
-            <Pressable onPress={() => saveObsidianSettings({ maxItemsPerDay: Math.min(30, obsidianSettings.maxItemsPerDay + 1) })} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-        <SettingRow label={t('settings.collect_period_label')} description={t('settings.collect_period_desc')}>
-          <View style={styles.stepper}>
-            <Pressable onPress={() => saveObsidianSettings({ daysBack: Math.max(7, obsidianSettings.daysBack - 7) })} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{obsidianSettings.daysBack}d</Text>
-            <Pressable onPress={() => saveObsidianSettings({ daysBack: Math.min(90, obsidianSettings.daysBack + 7) })} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-        {obsidianSettings.lastCollectedAt && (
-          <Text style={[styles.wsUrlHint, { paddingHorizontal: 16, paddingBottom: 8 }]}>
-            Last collected: {new Date(obsidianSettings.lastCollectedAt).toLocaleString('en-US')}
-          </Text>
-        )}
         </ProGate>
 
 

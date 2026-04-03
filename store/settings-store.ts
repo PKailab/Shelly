@@ -26,8 +26,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   localLlmUrl: 'http://127.0.0.1:8080',
   localLlmModel: 'Qwen2.5-3B-Instruct-Q4_K_M',
   groqModel: 'llama-3.3-70b-versatile',
-  backgroundOpacity: 1.0,
-  blurIntensity: 0,
   teamMembers: {
     claude: true,
     gemini: true,
@@ -39,18 +37,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enableCommandSafety: true,
   safetyConfirmLevel: 'HIGH' as const,
   experienceMode: 'learning' as const,
-  enableObsidianRag: false,
-  obsidianVaultPath: '/storage/emulated/0/ObsidianVault',
-  ragMaxChunks: 5,
-  ragTargetMentions: ['claude', 'gemini', 'local'] as Array<'claude' | 'gemini' | 'local' | 'perplexity' | 'team'>,
   autoApproveLevel: 'safe' as const,
   defaultAgent: 'gemini-cli' as const,
   realtimeTranslateEnabled: false,
   llmInterpreterEnabled: false,
   externalKeyboardShortcuts: false,
   terminalTheme: 'shelly',
-  fontSizeLocked: false,
-  hideKeyBarWithHwKeyboard: false,
 };
 
 export const DEFAULT_TERMUX_SETTINGS: TermuxSettings = {

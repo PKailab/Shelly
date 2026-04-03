@@ -333,13 +333,6 @@ export type AppSettings = {
   cerebrasApiKey?: string;
   /** Cerebrasに使用するモデル (default: qwen-3-235b-a22b-instruct-2507) */
   cerebrasModel?: string;
-  // ─── ガラス背景・壁紙 ────────────────────────────────────────────────────────────
-  /** 背景の透明度 (0.0=完全透明 〜 1.0=不透明, default: 1.0) */
-  backgroundOpacity: number;
-  /** ガラスブラー効果の強度 (0=なし 〜 100, default: 0) */
-  blurIntensity: number;
-  /** 壁紙画像URI (file:// or null) */
-  wallpaperUri?: string;
   // ─── @team Table ────────────────────────────────────────────────────────────
   /** @teamに参加させるエージェントのON/OFF */
   teamMembers: {
@@ -360,15 +353,6 @@ export type AppSettings = {
   safetyConfirmLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM';
   /** 体験モード: 初心者向け詳細表示 / 経験者向け高速モード */
   experienceMode: 'learning' | 'fast';
-  // ─── Obsidian RAG ─────────────────────────────────────────────────────────────
-  /** Obsidian RAGを有効にする (default: false) */
-  enableObsidianRag: boolean;
-  /** Obsidian Vault のパス (例: /storage/emulated/0/ObsidianVault) */
-  obsidianVaultPath: string;
-  /** RAGで取得する最大ノート数 (default: 5) */
-  ragMaxChunks: number;
-  /** RAGを適用するAIメンション */
-  ragTargetMentions: Array<'claude' | 'gemini' | 'local' | 'perplexity' | 'team'>;
   // ─── CLI Permission Proxy ────────────────────────────────────────────────────
   /** Chatタブ経由でのCLI自動承認レベル (default: 'safe') */
   autoApproveLevel: 'none' | 'safe' | 'all';
@@ -384,8 +368,4 @@ export type AppSettings = {
   // ─── Terminal Appearance ──────────────────────────────────────────────────
   /** Terminal ANSI color theme (default: 'shelly') */
   terminalTheme: string;
-  /** Lock font size — disable pinch-zoom (default: false) */
-  fontSizeLocked: boolean;
-  /** Auto-hide key bar when hardware keyboard detected (default: false) */
-  hideKeyBarWithHwKeyboard: boolean;
 };
