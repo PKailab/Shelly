@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, AppState } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
@@ -46,6 +46,20 @@ export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
   React.useEffect(() => {
     if (isConnected) refreshUsage(readFileAdapter, listFilesAdapter);
   }, [isConnected]);
+
+  // Refresh usage on foreground resume
+  React.useEffect(() => {
+    const sub = AppState.addEventListener('change', (state: string) => {
+      if (state === 'active' && isConnected) {
+        useUsageStore.setState(s => ({
+          usageData: s.usageData ? { ...s.usageData, lastUpdated: 0 } : null,
+        }));
+        refreshUsage(readFileAdapter, listFilesAdapter);
+      }
+    });
+    return () => sub.remove();
+  }, [isConnected, readFileAdapter, listFilesAdapter, refreshUsage]);
+
   const session = useChatStore((s) =>
     s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null
   );
