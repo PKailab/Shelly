@@ -149,6 +149,11 @@ class GLTerminalRenderer(private val context: Context) : GLSurfaceView.Renderer 
         // Init post-processor
         postProcessor = PostProcessor(context)
 
+        // Init block chrome renderer
+        val chrome = BlockChromeRenderer(atlas)
+        chrome.init()
+        blockChromeRenderer = chrome
+
         dirtyFlags = DirtyFlags.ALL
     }
 
