@@ -5,6 +5,7 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo, useContext } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   findNodeHandle,
   Keyboard,
@@ -548,6 +549,26 @@ export default function TerminalScreen() {
     }
   }, [activeSession?.currentDir, runRawCommand]);
 
+  // Battery optimization exemption — prompt once on unexpected disconnect
+  const checkBatteryExemption = useCallback(async () => {
+    try {
+      const isExempted = await TerminalEmulator.isIgnoringBatteryOptimizations();
+      if (!isExempted) {
+        Alert.alert(
+          'Terminal Connection',
+          'To keep the terminal stable, allow Shelly to run in the background without battery restrictions.',
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Allow',
+              onPress: () => TerminalEmulator.requestBatteryOptimizationExemption(),
+            },
+          ]
+        );
+      }
+    } catch {}
+  }, []);
+
   // ProcessGuard: listen for session exits with signal 9 (SIGKILL)
   useEffect(() => {
     const sub = TerminalEmulator.addListener('onSessionExit', (event: { sessionId: string; exitCode: number; signal: number }) => {
@@ -557,9 +578,11 @@ export default function TerminalScreen() {
           setShowProcessGuard(true);
         }
       }
+      // Prompt battery exemption on session exit
+      checkBatteryExemption();
     });
     return () => sub.remove();
-  }, []);
+  }, [checkBatteryExemption]);
 
   // Handle reset requests from TerminalHeader
   const pendingResetId = useTerminalStore((s) => s.pendingResetSessionId);
