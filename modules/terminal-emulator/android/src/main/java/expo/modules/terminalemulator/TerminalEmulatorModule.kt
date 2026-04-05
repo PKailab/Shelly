@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -17,6 +18,31 @@ class TerminalEmulatorModule : Module() {
     }
 
     private val sessions get() = sessionRegistry
+
+    private var wakeLock: PowerManager.WakeLock? = null
+    private val wakeLockLock = Any()
+
+    private fun acquireWakeLock() {
+        synchronized(wakeLockLock) {
+            if (wakeLock != null) return
+            val context = appContext.reactContext ?: return
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "shelly:terminal").also {
+                it.acquire()
+            }
+            Log.i("TerminalEmulator", "WakeLock acquired")
+        }
+    }
+
+    private fun releaseWakeLock() {
+        synchronized(wakeLockLock) {
+            wakeLock?.let {
+                if (it.isHeld) it.release()
+                Log.i("TerminalEmulator", "WakeLock released")
+            }
+            wakeLock = null
+        }
+    }
 
     private fun emitEvent(name: String, body: Map<String, Any?>) {
         sendEvent(name, body)
@@ -52,6 +78,7 @@ class TerminalEmulatorModule : Module() {
             )
 
             sessions[sessionId] = session
+            acquireWakeLock()
             sessionId
         }
 
@@ -59,6 +86,7 @@ class TerminalEmulatorModule : Module() {
             val session = sessions.remove(sessionId)
                 ?: throw IllegalArgumentException("Session $sessionId not found")
             session.destroy()
+            if (sessions.isEmpty()) releaseWakeLock()
         }
 
         AsyncFunction("writeToSession") { sessionId: String, data: String ->
