@@ -49,6 +49,7 @@ class ShellyTerminalSession(
         val sock = Socket("127.0.0.1", port)
         sock.tcpNoDelay = true
         sock.keepAlive = true
+        sock.soTimeout = 0  // No read timeout — rely on TCP keepalive from pty-helper
         socket = sock
 
         // Initialize emulator with socket streams

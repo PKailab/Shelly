@@ -214,12 +214,22 @@ public final class TerminalSession extends TerminalOutput {
                     final byte[] buffer = new byte[4096];
                     while (true) {
                         int read = inputStream.read(buffer);
-                        if (read == -1) return;
+                        if (read == -1) {
+                            // EOF — pty-helper closed the connection (client disconnect).
+                            // Signal disconnect, NOT exit. The shell is still alive in pty-helper.
+                            mMainThreadHandler.sendMessage(
+                                mMainThreadHandler.obtainMessage(MSG_PROCESS_EXITED, 0)
+                            );
+                            return;
+                        }
                         if (!mProcessToTerminalIOQueue.write(buffer, 0, read)) return;
                         mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
                     }
+                } catch (java.net.SocketTimeoutException e) {
+                    // Read timeout — not a real disconnect, just no data. This shouldn't
+                    // happen with soTimeout=0 but handle it gracefully anyway.
                 } catch (Exception e) {
-                    // Connection closed — signal session exit
+                    // Connection closed — signal session exit for reconnect
                     mMainThreadHandler.sendMessage(
                         mMainThreadHandler.obtainMessage(MSG_PROCESS_EXITED, 0)
                     );
