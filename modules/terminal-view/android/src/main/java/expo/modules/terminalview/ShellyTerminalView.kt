@@ -1,5 +1,6 @@
 package expo.modules.terminalview
 
+import android.app.ActivityManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -13,6 +14,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
+import expo.modules.terminalview.gl.GLTerminalView
+import expo.modules.terminalview.gl.GLTerminalRenderer
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TextStyle
@@ -54,6 +57,8 @@ class ShellyTerminalView(
     private var isViewVisible = true
     private var currentSessionId: String? = null
     private var currentShellySession: ShellyTerminalSession? = null
+    private var glTerminalView: GLTerminalView? = null
+    private var useGPU = false
 
     // Track last synced size to avoid redundant resize calls
     private var lastSyncedCols = -1
@@ -129,6 +134,23 @@ class ShellyTerminalView(
         terminalView.setTextSize(defaultPx)
         terminalView.setTypeface(defaultTypeface)
 
+        // Wire block start detection for GL renderer
+        blockDetector.onBlockStarted = lambda@{ command ->
+            val gl = glTerminalView ?: return@lambda
+            val emulator = terminalView.mEmulator ?: gl.renderer.session?.terminalSession?.emulator ?: return@lambda
+            val cursorRow = emulator.mCursorRow
+            val topRow = emulator.screen.activeTranscriptRows
+            val absoluteRow = topRow + cursorRow
+
+            gl.renderer.addBlock(GLTerminalRenderer.BlockRange(
+                commandStartRow = absoluteRow,
+                outputStartRow = absoluteRow + 1,
+                endRow = -1, exitCode = -1,
+                command = command,
+                isCollapsed = false, isRunning = true
+            ))
+        }
+
         Log.i(TAG, "init: TerminalView added as direct child")
     }
 
@@ -178,13 +200,17 @@ class ShellyTerminalView(
     fun attachShellySession(shellySession: ShellyTerminalSession, sessionId: String) {
         currentShellySession = shellySession
         currentSessionId = sessionId
-        terminalView.attachSession(shellySession.terminalSession)
 
-        // Wire up screen update callback so TerminalView redraws on new output.
-        // onTextChanged is called from TerminalSession's I/O thread,
-        // so we post to main thread for safe UI update.
-        shellySession.onScreenUpdateCallback = {
-            terminalView.post { terminalView.onScreenUpdated() }
+        if (useGPU && glTerminalView != null) {
+            glTerminalView?.attachSession(shellySession, inputHandler)
+            shellySession.onScreenUpdateCallback = {
+                glTerminalView?.post { glTerminalView?.renderer?.onScreenUpdated() }
+            }
+        } else {
+            terminalView.attachSession(shellySession.terminalSession)
+            shellySession.onScreenUpdateCallback = {
+                terminalView.post { terminalView.onScreenUpdated() }
+            }
         }
 
         // Post updateSize to ensure layout is complete
@@ -304,6 +330,46 @@ class ShellyTerminalView(
         detachCurrentSession()
     }
 
+    fun setGpuRendering(enabled: Boolean) {
+        if (enabled == useGPU) return
+        useGPU = enabled && checkGLES30Support()
+
+        if (useGPU) {
+            if (glTerminalView == null) {
+                glTerminalView = GLTerminalView(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+                addView(glTerminalView)
+            }
+            terminalView.visibility = View.GONE
+            glTerminalView?.visibility = View.VISIBLE
+
+            currentShellySession?.let { session ->
+                glTerminalView?.attachSession(session, inputHandler)
+            }
+
+            glTerminalView?.onBlockLongPressEvent = { command, startRow, endRow, exitCode ->
+                onBlockLongPress(mapOf(
+                    "command" to command,
+                    "startRow" to startRow,
+                    "endRow" to endRow,
+                    "exitCode" to exitCode
+                ))
+            }
+        } else {
+            terminalView.visibility = View.VISIBLE
+            glTerminalView?.visibility = View.GONE
+        }
+    }
+
+    private fun checkGLES30Support(): Boolean {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        return (am?.deviceConfigurationInfo?.reqGlEsVersion ?: 0) >= 0x30000
+    }
+
     // ===== View Commands =====
 
     fun scrollToBottomCommand() {
@@ -339,6 +405,13 @@ class ShellyTerminalView(
         terminalView.requestFocus()
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         imm?.showSoftInput(terminalView, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    fun scrollToRowCommand(row: Int) {
+        glTerminalView?.scrollToRow(row) ?: run {
+            terminalView.setTopRow(-row)
+            terminalView.invalidate()
+        }
     }
 
     // ===== TerminalViewClient Implementation =====
@@ -381,6 +454,7 @@ class ShellyTerminalView(
     // Expo EventDispatchers — emit to JS
     private val onResize by EventDispatcher()
     private val onScrollStateChanged by EventDispatcher()
+    private val onBlockLongPress by EventDispatcher()
 
     /**
      * Called by TerminalView when the emulator is (re)set after updateSize().
