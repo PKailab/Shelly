@@ -14,6 +14,12 @@ android {
     versionName "0.1.0"
   }
 
+  sourceSets {
+    main {
+      assets.srcDirs += 'src/main/assets'
+    }
+  }
+
   lint {
     abortOnError false
   }
