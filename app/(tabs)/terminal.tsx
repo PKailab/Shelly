@@ -35,6 +35,9 @@ import { useActiveSession, useTerminalStore, getPtyPort } from '@/store/terminal
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { MultiPaneContext } from '@/components/multi-pane/PaneSlot';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
+import { UsagePanel } from '@/components/UsagePanel';
+import { useUsageStore } from '@/store/usage-store';
+import type { ReadFileFn, ListFilesFn } from '@/lib/usage-parser';
 // tmux-manager kept for user-facing tmux commands (optional use)
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -80,7 +83,23 @@ export default function TerminalScreen() {
   const activeSession = useActiveSession();
   const { removeSession, sessions, settings } = useTerminalStore();
   const bridgeStatus = useTerminalStore((s) => s.bridgeStatus);
-  const { runRawCommand } = useTermuxBridge();
+  const { runRawCommand, readFile: bridgeReadFile, listFiles: bridgeListFiles, isConnected: bridgeConnected } = useTermuxBridge();
+  const { refresh: refreshUsage } = useUsageStore();
+
+  // Bridge adapters for usage parser
+  const readFileAdapter: ReadFileFn = React.useCallback(async (path: string) => {
+    const result = await bridgeReadFile(path, 'utf8');
+    return result.ok ? result.content : null;
+  }, [bridgeReadFile]);
+  const listFilesAdapter: ListFilesFn = React.useCallback(async (dir: string) => {
+    const result = await bridgeListFiles(dir, { includeHidden: true });
+    if (!result.ok) return [];
+    return result.entries.map((e: any) => ({ name: e.name, mtime: e.mtime }));
+  }, [bridgeListFiles]);
+
+  React.useEffect(() => {
+    if (bridgeConnected) refreshUsage(readFileAdapter, listFilesAdapter);
+  }, [bridgeConnected]);
   const isMultiPane = useMultiPaneStore((s) => s.isMultiPane);
   // Detect if this instance is rendered inside MultiPaneContainer (via PaneSlot context)
   // vs. rendered by the Tabs navigator (hidden underneath the overlay)
@@ -639,6 +658,7 @@ export default function TerminalScreen() {
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: keyboardHeight, backgroundColor: c.background }]}>
       {/* Session Tab Header */}
       <TerminalHeader />
+      <UsagePanel readFile={readFileAdapter} listFiles={listFilesAdapter} />
 
       {/* quickBar removed — JP input + reload now integrated into TerminalHeader */}
 

@@ -18,6 +18,7 @@ import { ConnectionMode, BridgeStatus } from '@/store/types';
 import { FullscreenTerminal } from './FullscreenTerminal';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
+import { UsageIndicator } from '@/components/UsageIndicator';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { SPRING_CONFIGS } from '@/hooks/use-motion';
@@ -313,6 +314,9 @@ export function TerminalHeader() {
       >
         <MaterialIcons name="open-in-full" size={14} color={colors.inactive} />
       </Pressable>
+
+      {/* Usage cost */}
+      <UsageIndicator />
 
       {/* Connection mode badge — compact in split view */}
       <Animated.View style={badgeAnimStyle}>

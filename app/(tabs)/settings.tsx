@@ -58,6 +58,24 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
+function UsageAlertToggle() {
+  const alertEnabled = useUsageStore((s) => s.alertEnabled);
+  return (
+    <View style={styles.settingRow}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.settingLabelText}>Enable usage alerts</Text>
+        <Text style={styles.sectionSubtitle}>Notify when daily cost exceeds limit</Text>
+      </View>
+      <Switch
+        value={alertEnabled}
+        onValueChange={(v) => useUsageStore.getState().setAlertSettings({ alertEnabled: v })}
+        trackColor={{ false: '#333', true: '#00D4AA44' }}
+        thumbColor={alertEnabled ? '#00D4AA' : '#666'}
+      />
+    </View>
+  );
+}
+
 /** Wraps Pro-only sections: grayed out with lock icon when Free */
 function ProGate({ children }: { children: React.ReactNode }) {
   const pro = isPro();
@@ -1485,18 +1503,7 @@ export default function SettingsScreen() {
 
         {/* ── Usage Alerts ─────────────────────────────────────────────────── */}
         <SectionHeader title="Usage Alerts" subtitle="Claude Code cost notifications" />
-        <View style={styles.settingRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.settingLabelText}>Enable usage alerts</Text>
-            <Text style={styles.sectionSubtitle}>Notify when daily cost exceeds limit</Text>
-          </View>
-          <Switch
-            value={useUsageStore.getState().alertEnabled}
-            onValueChange={(v) => useUsageStore.getState().setAlertSettings({ alertEnabled: v })}
-            trackColor={{ false: '#333', true: '#00D4AA44' }}
-            thumbColor={useUsageStore.getState().alertEnabled ? '#00D4AA' : '#666'}
-          />
-        </View>
+        <UsageAlertToggle />
 
         {/* ── Data ─────────────────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.data_title')} />
