@@ -38,6 +38,7 @@ import { isGitHubConfigured } from '@/lib/github-auth';
 import { hasRemoteOrigin } from '@/lib/github-push';
 import type { ActionsWizardData } from '@/store/chat-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useUsageStore } from '@/store/usage-store';
 
 
 const CURSOR_OPTIONS: { value: CursorShape; label: string; preview: string }[] = [
@@ -1481,6 +1482,21 @@ export default function SettingsScreen() {
 
 
         </>)}
+
+        {/* ── Usage Alerts ─────────────────────────────────────────────────── */}
+        <SectionHeader title="Usage Alerts" subtitle="Claude Code cost notifications" />
+        <View style={styles.settingRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.settingLabel}>Enable usage alerts</Text>
+            <Text style={styles.settingHint}>Notify when daily cost exceeds limit</Text>
+          </View>
+          <Switch
+            value={useUsageStore.getState().alertEnabled}
+            onValueChange={(v) => useUsageStore.getState().setAlertSettings({ alertEnabled: v })}
+            trackColor={{ false: '#333', true: '#00D4AA44' }}
+            thumbColor={useUsageStore.getState().alertEnabled ? '#00D4AA' : '#666'}
+          />
+        </View>
 
         {/* ── Data ─────────────────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.data_title')} />

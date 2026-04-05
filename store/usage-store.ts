@@ -51,6 +51,17 @@ export const useUsageStore = create<UsageState & UsageActions>()(
         try {
           const data = await parseUsage(readFile, listFiles);
           set({ usageData: data, isLoading: false });
+          // Check alerts
+          const updated = get();
+          if (updated.alertEnabled && data) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (data.todayTotal.totalCost > updated.alertDailyCostLimit && updated.lastAlertedDate !== todayStr) {
+              set({ lastAlertedDate: todayStr });
+              import('@/lib/usage-alert').then(m => m.sendUsageAlert(
+                `Daily cost $${data.todayTotal.totalCost.toFixed(2)} exceeded $${updated.alertDailyCostLimit} limit`
+              ));
+            }
+          }
         } catch (e: any) {
           set({ error: e.message || 'Failed to load usage', isLoading: false });
         }
@@ -63,6 +74,17 @@ export const useUsageStore = create<UsageState & UsageActions>()(
         try {
           const data = await parseUsage(readFile, listFiles);
           set({ usageData: data, isLoading: false });
+          // Check alerts
+          const updated = get();
+          if (updated.alertEnabled && data) {
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (data.todayTotal.totalCost > updated.alertDailyCostLimit && updated.lastAlertedDate !== todayStr) {
+              set({ lastAlertedDate: todayStr });
+              import('@/lib/usage-alert').then(m => m.sendUsageAlert(
+                `Daily cost $${data.todayTotal.totalCost.toFixed(2)} exceeded $${updated.alertDailyCostLimit} limit`
+              ));
+            }
+          }
         } catch (e: any) {
           set({ error: e.message || 'Failed to load usage', isLoading: false });
         }
