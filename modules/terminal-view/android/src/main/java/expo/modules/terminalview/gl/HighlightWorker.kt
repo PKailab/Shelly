@@ -16,8 +16,11 @@ class HighlightWorker(private val cache: HighlightCache) {
     fun highlightRows(buffer: TerminalBuffer, startRow: Int, endRow: Int) {
         executor.submit {
             for (row in startRow..endRow) {
-                val highlights = SyntaxHighlighter.highlightRowForGpu(buffer, row)
-                cache.put(row, highlights)
+                try {
+                    val termRow = buffer.mLines[buffer.externalToInternalRow(row)] ?: continue
+                    val highlights = SyntaxHighlighter.highlightRowForGpu(termRow, buffer.mColumns)
+                    cache.put(row, highlights)
+                } catch (_: Exception) {}
             }
         }
     }

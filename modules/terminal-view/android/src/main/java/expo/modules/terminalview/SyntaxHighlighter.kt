@@ -1,6 +1,5 @@
 package expo.modules.terminalview
 
-import com.termux.terminal.TerminalBuffer
 import com.termux.terminal.TerminalRow
 import com.termux.terminal.TextStyle
 import com.termux.terminal.WcWidth
@@ -297,58 +296,69 @@ object SyntaxHighlighter {
 
     /**
      * Thread-safe overload for GPU rendering path (HighlightWorker).
+     * Accepts a TerminalRow and column count directly (caller resolves buffer access).
      * Returns per-cell foreground color override array.
      * Each element is an ANSI color index (0-255), or -1 for "no override".
      *
      * Uses LOCAL arrays for column mapping to avoid data races with the
      * main-thread Canvas path.
      */
-    fun highlightRowForGpu(buffer: TerminalBuffer, row: Int): IntArray {
-        val cols = buffer.columns
-        val result = IntArray(cols) { -1 }
-
-        val terminalRow = try { buffer.getRow(row) } catch (_: Exception) { null }
-            ?: return result
-
-        // Thread-local column mapping (NOT the shared object fields)
-        val localColToTextIdx = IntArray(cols)
-        val localTextIdxToCol = IntArray(cols * 2)
-
-        // Extract text with column mapping
-        val sb = StringBuilder(cols)
-        var textIdx = 0
-        for (col in 0 until cols) {
-            localColToTextIdx[col] = textIdx
-            if (textIdx < localTextIdxToCol.size) {
-                localTextIdxToCol[textIdx] = col
-            }
-            val cp = terminalRow.getCodePoint(col)
-            if (cp == 0) {
-                sb.append(' ')
-            } else {
-                sb.appendCodePoint(cp)
-            }
-            textIdx++
-        }
-        val text = sb.toString()
+    fun highlightRowForGpu(row: TerminalRow, columns: Int): IntArray {
+        val result = IntArray(columns) { -1 }
 
         // Check if row has any explicit ANSI colors — skip if so
-        for (col in 0 until cols) {
-            val style = terminalRow.getStyle(col)
-            val fg = com.termux.terminal.TextStyle.decodeForeColor(style)
-            if (fg != com.termux.terminal.TextStyle.COLOR_INDEX_FOREGROUND) {
+        for (col in 0 until columns) {
+            val style = row.getStyle(col)
+            val fg = TextStyle.decodeForeColor(style)
+            if (fg != TextStyle.COLOR_INDEX_FOREGROUND) {
                 return result
             }
         }
 
-        // Apply the same highlight patterns as the main highlighter
+        // Thread-local column mapping (NOT the shared object fields)
+        val localColToTextIdx = IntArray(columns)
+        val localTextIdxToCol = IntArray(columns * 2)
+
+        // Extract text with column mapping using mText/spaceUsed
+        val line = row.mText
+        val spaceUsed = row.spaceUsed
+        val sb = StringBuilder(columns)
+        var charIdx = 0
+        var col = 0
+        var textIdx = 0
+        while (col < columns && charIdx < spaceUsed) {
+            localColToTextIdx[col] = textIdx
+            if (textIdx < localTextIdxToCol.size) localTextIdxToCol[textIdx] = col
+            val c = line[charIdx]
+            val isHigh = Character.isHighSurrogate(c)
+            val codePoint = if (isHigh && charIdx + 1 < spaceUsed)
+                Character.toCodePoint(c, line[charIdx + 1])
+            else c.code
+            sb.append(Character.toChars(codePoint))
+            textIdx++
+            charIdx += if (isHigh) 2 else 1
+            val w = WcWidth.width(codePoint)
+            if (w > 1 && col + 1 < columns) {
+                col++
+                localColToTextIdx[col] = textIdx
+            }
+            col++
+        }
+        while (col < columns) {
+            localColToTextIdx[col] = textIdx
+            sb.append(' ')
+            textIdx++
+            col++
+        }
+        val text = sb.toString()
+
         // Command pattern (after $ / # / %)
         val cmdMatch = Regex("""^[\$#%>]\s+(\S+)""").find(text)
         if (cmdMatch != null) {
             val range = cmdMatch.groups[1]!!.range
             for (i in range) {
-                val col = if (i < localColToTextIdx.size) localTextIdxToCol.getOrElse(i) { i } else i
-                if (col in result.indices) result[col] = COLOR_COMMAND
+                val c2 = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
+                if (c2 in result.indices) result[c2] = COLOR_COMMAND
             }
         }
 
@@ -356,8 +366,8 @@ object SyntaxHighlighter {
         Regex("""(?:^|\s)(--?\w[\w-]*)""").findAll(text).forEach { match ->
             val range = match.groups[1]!!.range
             for (i in range) {
-                val col = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
-                if (col in result.indices) result[col] = COLOR_OPTION
+                val c2 = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
+                if (c2 in result.indices) result[c2] = COLOR_OPTION
             }
         }
 
@@ -365,8 +375,8 @@ object SyntaxHighlighter {
         Regex("""(?:^|\s)([~/.][\w/.@:-]+)""").findAll(text).forEach { match ->
             val range = match.groups[1]!!.range
             for (i in range) {
-                val col = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
-                if (col in result.indices) result[col] = COLOR_PATH
+                val c2 = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
+                if (c2 in result.indices) result[c2] = COLOR_PATH
             }
         }
 
@@ -374,8 +384,8 @@ object SyntaxHighlighter {
         Regex("""(?i)\b(error|fail|fatal|denied|refused|not found|exception)\b""").findAll(text).forEach { match ->
             val range = match.range
             for (i in range) {
-                val col = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
-                if (col in result.indices) result[col] = COLOR_ERROR
+                val c2 = if (i < localTextIdxToCol.size) localTextIdxToCol.getOrElse(i) { i } else i
+                if (c2 in result.indices) result[c2] = COLOR_ERROR
             }
         }
 

@@ -104,12 +104,21 @@ class CellBatcher(private var cols: Int, private var rows: Int, private val atla
             }
 
             val absRow = topRow + row
-            val termRow = buffer.getRow(absRow)
+            val termRow = buffer.mLines[buffer.externalToInternalRow(absRow)]
             val highlights = highlightCache.getHighlights(absRow)
 
             for (col in 0 until cols) {
                 val cellIndex = row * cols + col
-                val codepoint = termRow?.getCodePoint(col) ?: ' '.code
+                val codepoint = if (termRow != null) {
+                    val charIdx = termRow.findStartOfColumn(col)
+                    val spaceUsed = termRow.getSpaceUsed()
+                    if (charIdx < spaceUsed) {
+                        val c = termRow.mText[charIdx]
+                        if (Character.isHighSurrogate(c) && charIdx + 1 < spaceUsed)
+                            Character.toCodePoint(c, termRow.mText[charIdx + 1])
+                        else c.code
+                    } else ' '.code
+                } else ' '.code
                 val style = termRow?.getStyle(col) ?: 0L
 
                 // Decode colors from style (pass directly — matches existing SyntaxHighlighter usage)
@@ -178,7 +187,7 @@ class CellBatcher(private var cols: Int, private var rows: Int, private val atla
                 GLES30.GL_TRIANGLES,
                 indicesPerRow,
                 GLES30.GL_UNSIGNED_SHORT,
-                ((offset + quadOffset) * 2).toLong()
+                (offset + quadOffset) * 2
             )
         }
     }

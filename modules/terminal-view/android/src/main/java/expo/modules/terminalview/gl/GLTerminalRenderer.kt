@@ -229,8 +229,8 @@ class GLTerminalRenderer(private val context: Context) : GLSurfaceView.Renderer 
             cursorShader.setUniform1f("u_scrollOffset", scrollAnimator.scrollOffset)
             cursorShader.setUniform1f("u_cursorAlpha", cursorAnimator.alpha)
             // Draw cursor quad at cursor position
-            val cursorCol = emulator.cursorCol
-            val cursorRow = emulator.cursorRow
+            val cursorCol = emulator.getCursorCol()
+            val cursorRow = emulator.getCursorRow()
             cursorAnimator.moveTo(cursorCol * atlas.cellWidth, cursorRow * atlas.cellHeight)
             // (cursor quad drawing delegated to a small helper — omitted for brevity,
             //  uses same vertex format as CellBatcher)

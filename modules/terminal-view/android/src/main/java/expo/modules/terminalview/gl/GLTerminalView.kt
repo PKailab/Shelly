@@ -191,10 +191,17 @@ class GLTerminalView(context: Context) : GLSurfaceView(context) {
         val endRow = if (block.endRow >= 0) block.endRow else startRow
         synchronized(session) {
             for (r in startRow..endRow) {
-                val row = session.screen.getRow(r) ?: continue
+                val row = session.screen.mLines[session.screen.externalToInternalRow(r)] ?: continue
                 for (c in 0 until session.mColumns) {
-                    val cp = row.getCodePoint(c)
-                    if (cp > 0) sb.appendCodePoint(cp)
+                    val charIdx = row.findStartOfColumn(c)
+                    val spaceUsed = row.getSpaceUsed()
+                    val cp = if (charIdx < spaceUsed) {
+                        val ch = row.mText[charIdx]
+                        if (Character.isHighSurrogate(ch) && charIdx + 1 < spaceUsed)
+                            Character.toCodePoint(ch, row.mText[charIdx + 1])
+                        else ch.code
+                    } else 0
+                    if (cp > 0x20) sb.appendCodePoint(cp)
                 }
                 if (r < endRow) sb.append('\n')
             }

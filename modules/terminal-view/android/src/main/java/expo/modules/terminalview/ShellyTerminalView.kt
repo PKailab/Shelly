@@ -138,7 +138,7 @@ class ShellyTerminalView(
         blockDetector.onBlockStarted = lambda@{ command ->
             val gl = glTerminalView ?: return@lambda
             val emulator = terminalView.mEmulator ?: gl.renderer.session?.terminalSession?.emulator ?: return@lambda
-            val cursorRow = emulator.mCursorRow
+            val cursorRow = emulator.getCursorRow()
             val topRow = emulator.screen.activeTranscriptRows
             val absoluteRow = topRow + cursorRow
 
