@@ -211,7 +211,7 @@ uniform float u_curvature;          // Barrel distortion amount
 
 ### 5.4 Block Fold/Unfold Animation
 - `BlockDetector.kt` detects command boundaries via OSC 133
-- Block boundary rows (start/end) are stored in `GLTerminalRenderer.blockRanges: List<IntRange>`
+- Block boundary rows (start/end) are stored in `GLTerminalRenderer.blockRanges: List<BlockRange>` (see Command Blocks Kotlin spec for `BlockRange` data class)
 - `BlockDetector.onBlockCompleted` callback pushes to `blockRanges` (thread-safe via `synchronized`)
 - When Command Block collapses: affected rows slide up with easing (200ms)
 - When expanding: rows slide down
