@@ -59,6 +59,7 @@ import { buildCliResumeCommand } from '@/lib/cli-recovery';
 import type { TabSession, SessionStatus } from '@/store/types';
 import { useChatStore } from '@/store/chat-store';
 import { generateId } from '@/lib/id';
+import { BlockList } from '@/components/terminal/BlockList';
 
 // ─── Status type for StatusBadge ─────────────────────────────────────────────
 
@@ -126,6 +127,9 @@ export default function TerminalScreen() {
   // FirstMate: first-time onboarding overlay
   const [showFirstMate, setShowFirstMate] = useState(false);
   const firstMateChecked = useRef(false);
+
+  // Block History panel toggle
+  const [showBlockHistory, setShowBlockHistory] = useState(false);
 
   // Scroll state — show FAB when user scrolls up
   const [isScrolledUp, setIsScrolledUp] = useState(false);
@@ -722,6 +726,20 @@ export default function TerminalScreen() {
             onOutput={() => {}}
             onBlockCompleted={(e) => {
               const { command, output, exitCode } = e.nativeEvent;
+              if (command && command.trim()) {
+                const { addEntryBlock, activeSessionId } = useTerminalStore.getState();
+                addEntryBlock({
+                  id: generateId(),
+                  sessionId: activeSessionId ?? '',
+                  command: command.trim(),
+                  output: (output || '').split('\n').map((line: string) => ({ text: line, type: 'stdout' as const })),
+                  timestamp: Date.now(),
+                  exitCode: typeof exitCode === 'number' ? exitCode : 0,
+                  isRunning: false,
+                  blockStatus: exitCode !== 0 ? 'error' : 'done',
+                  connectionMode: 'termux',
+                });
+              }
             }}
             onUrlDetected={(e) => {
               const { url, type } = e.nativeEvent;
@@ -761,6 +779,41 @@ export default function TerminalScreen() {
             Restoring session...
           </Text>
         </View>
+      )}
+
+      {/* Block History Panel — toggleable overlay over terminal */}
+      {showBlockHistory && activeSession && (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 20, backgroundColor: c.background }]}>
+          {/* Panel Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.surface }}>
+            <Text style={{ color: c.foreground, fontFamily: 'monospace', fontSize: 13, fontWeight: '700', flex: 1 }}>
+              Block History
+            </Text>
+            <TouchableOpacity onPress={() => setShowBlockHistory(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialIcons name="close" size={20} color={c.muted} />
+            </TouchableOpacity>
+          </View>
+          <BlockList
+            blocks={activeSession.blocks}
+            entries={activeSession.entries}
+            currentDir={activeSession.currentDir}
+            onRerun={(command) => {
+              setShowBlockHistory(false);
+              sendToTerminal(command + '\n');
+            }}
+          />
+        </View>
+      )}
+
+      {/* Block History Toggle FAB */}
+      {isConnected && !showBlockHistory && (
+        <TouchableOpacity
+          onPress={() => setShowBlockHistory(true)}
+          style={[styles.blockHistoryFab, { backgroundColor: c.surface, borderColor: withAlpha(c.accent, 0.3) }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <MaterialIcons name="history" size={16} color={c.accent} />
+        </TouchableOpacity>
       )}
 
       {/* Japanese Input Proxy removed — NativeTerminalView handles inline JP input directly */}
@@ -871,5 +924,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 20,
+  },
+
+  // Block History FAB
+  blockHistoryFab: {
+    position: 'absolute',
+    right: 12,
+    bottom: 160,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 15,
   },
 });
