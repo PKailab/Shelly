@@ -247,37 +247,41 @@ class ShellyTerminalSession(
 
     private fun startHeartbeat() {
         stopHeartbeat()
-        heartbeatThread = Thread("Heartbeat-$sessionId") {
-            while (shouldReconnect && !Thread.currentThread().isInterrupted) {
-                try {
-                    Thread.sleep(HEARTBEAT_INTERVAL_MS)
-                } catch (_: InterruptedException) {
-                    break
-                }
-                // Send heartbeat
-                synchronized(socketLock) {
+        val thread = object : Thread("Heartbeat-$sessionId") {
+            override fun run() {
+                while (shouldReconnect && !isInterrupted) {
                     try {
-                        socket?.getOutputStream()?.write(HEARTBEAT_CMD.toByteArray(Charsets.UTF_8))
-                        socket?.getOutputStream()?.flush()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Heartbeat send failed: ${e.message}")
-                        try { socket?.close() } catch (_: Exception) {}
-                        break
+                        sleep(HEARTBEAT_INTERVAL_MS)
+                    } catch (_: InterruptedException) {
+                        return
                     }
-                }
-                // Check for response timeout
-                if (System.currentTimeMillis() - lastDataReceived > HEARTBEAT_TIMEOUT_MS) {
-                    Log.w(TAG, "Heartbeat timeout (${HEARTBEAT_TIMEOUT_MS}ms), triggering reconnect")
+                    // Send heartbeat
+                    var sendFailed = false
                     synchronized(socketLock) {
-                        try { socket?.close() } catch (_: Exception) {}
+                        try {
+                            socket?.getOutputStream()?.write(HEARTBEAT_CMD.toByteArray(Charsets.UTF_8))
+                            socket?.getOutputStream()?.flush()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Heartbeat send failed: ${e.message}")
+                            try { socket?.close() } catch (_: Exception) {}
+                            sendFailed = true
+                        }
                     }
-                    break
+                    if (sendFailed) return
+                    // Check for response timeout
+                    if (System.currentTimeMillis() - lastDataReceived > HEARTBEAT_TIMEOUT_MS) {
+                        Log.w(TAG, "Heartbeat timeout (${HEARTBEAT_TIMEOUT_MS}ms), triggering reconnect")
+                        synchronized(socketLock) {
+                            try { socket?.close() } catch (_: Exception) {}
+                        }
+                        return
+                    }
                 }
             }
-        }.also {
-            it.isDaemon = true
-            it.start()
         }
+        thread.isDaemon = true
+        thread.start()
+        heartbeatThread = thread
     }
 
     private fun stopHeartbeat() {
