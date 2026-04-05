@@ -12,6 +12,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { getActiveLlmLabel } from '@/hooks/use-tool-discovery';
+import { UsageIndicator } from '@/components/UsageIndicator';
 
 function getActiveChat(settings: {
   cerebrasApiKey?: string;
@@ -99,6 +100,10 @@ export function StatusIndicator({ bridgeOnly }: StatusIndicatorProps = {}) {
           </View>
         </>
       )}
+
+      {/* Usage cost badge */}
+      <Text style={styles.separator}>·</Text>
+      <UsageIndicator />
     </View>
   );
 }
