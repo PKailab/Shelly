@@ -306,7 +306,15 @@ export function useTermuxBridge() {
     if (reconnectAttemptsRef.current >= MAX_RECONNECT) {
       // Prevent multiple scheduleReconnect calls from each triggering attemptAutoRecovery
       reconnectAttemptsRef.current = MAX_RECONNECT + 1;
-      attemptAutoRecovery();
+      // Auto-recovery via RunCommandService can cause Termux Activity to come
+      // to foreground (disruptive screen switch). Only attempt silent WebSocket
+      // reconnect here — full recovery (RunCommandService) is triggered by
+      // terminal.tsx ensureNativeSessions() when Terminal tab is active.
+      console.log('[AutoRecovery] Silent reconnect only (no RunCommandService)');
+      setTimeout(() => {
+        reconnectAttemptsRef.current = 0;
+        connect();
+      }, 2000);
       return;
     }
     if (appStateRef.current !== 'active') return; // don't reconnect in background
