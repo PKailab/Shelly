@@ -107,6 +107,8 @@ class GLTerminalRenderer(private val context: Context) : GLSurfaceView.Renderer 
     fun onScreenUpdated() {
         markDirty(DirtyFlags.CONTENT)
         // Trigger background highlighting for visible rows
+        // Guard: highlightWorker is lateinit — skip if GL not yet initialized
+        if (!::highlightWorker.isInitialized) return
         val emulator = session?.terminalSession?.emulator ?: return
         val topRow = -(emulator.screen.activeTranscriptRows)
         highlightWorker.highlightRows(emulator.screen, topRow, topRow + rows)

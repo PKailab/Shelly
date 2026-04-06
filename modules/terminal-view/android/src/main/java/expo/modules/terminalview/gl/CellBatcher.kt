@@ -110,16 +110,18 @@ class CellBatcher(private var cols: Int, private var rows: Int, private val atla
             for (col in 0 until cols) {
                 val cellIndex = row * cols + col
                 val codepoint = if (termRow != null) {
-                    val charIdx = termRow.findStartOfColumn(col)
-                    val spaceUsed = termRow.getSpaceUsed()
-                    if (charIdx < spaceUsed) {
-                        val c = termRow.mText[charIdx]
-                        if (Character.isHighSurrogate(c) && charIdx + 1 < spaceUsed)
-                            Character.toCodePoint(c, termRow.mText[charIdx + 1])
-                        else c.code
-                    } else ' '.code
+                    try {
+                        val charIdx = termRow.findStartOfColumn(col)
+                        val spaceUsed = termRow.getSpaceUsed()
+                        if (charIdx in 0 until spaceUsed) {
+                            val c = termRow.mText[charIdx]
+                            if (Character.isHighSurrogate(c) && charIdx + 1 < spaceUsed)
+                                Character.toCodePoint(c, termRow.mText[charIdx + 1])
+                            else c.code
+                        } else ' '.code
+                    } catch (_: Exception) { ' '.code }
                 } else ' '.code
-                val style = termRow?.getStyle(col) ?: 0L
+                val style = try { termRow?.getStyle(col) ?: 0L } catch (_: Exception) { 0L }
 
                 // Decode colors from style (pass directly — matches existing SyntaxHighlighter usage)
                 val fg = TextStyle.decodeForeColor(style)
