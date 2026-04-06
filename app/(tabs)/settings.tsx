@@ -150,9 +150,41 @@ const statusBadgeStyles = StyleSheet.create({
   },
 });
 
+// ─── Error Boundary ──────────────────────────────────────────────────────────
+
+class SettingsErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: '#F44336', fontSize: 16, fontWeight: 'bold', marginBottom: 8 }}>Settings Error</Text>
+          <Text style={{ color: '#999', fontSize: 12, textAlign: 'center' }}>{this.state.error}</Text>
+          <Pressable
+            onPress={() => this.setState({ hasError: false, error: '' })}
+            style={{ marginTop: 16, backgroundColor: '#222', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+          >
+            <Text style={{ color: '#00D4AA' }}>Retry</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function SettingsScreen() {
+function SettingsScreenInner() {
   const {
     settings, updateSettings,
     sessions, clearSession,
@@ -1843,6 +1875,14 @@ export default function SettingsScreen() {
         onComplete={() => setShowAuthWizard(false)}
       />
     </View>
+  );
+}
+
+export default function SettingsScreen() {
+  return (
+    <SettingsErrorBoundary>
+      <SettingsScreenInner />
+    </SettingsErrorBoundary>
   );
 }
 

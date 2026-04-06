@@ -303,12 +303,10 @@ export default function TerminalScreen() {
         });
       }
 
-      // 3. Send Ctrl+L only if reconnecting to existing pty-helper (not fresh start)
-      if (ptyAlive) {
-        try {
-          await TerminalEmulator.writeToSession(session.nativeSessionId, '\x0c');
-        } catch {}
-      }
+      // 3. Send Ctrl+L to trigger shell prompt redraw after connection/reconnection
+      try {
+        await TerminalEmulator.writeToSession(session.nativeSessionId, '\x0c');
+      } catch {}
 
 
       // 4. Start foreground service to prevent task-kill
