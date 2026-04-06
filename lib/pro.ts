@@ -21,10 +21,10 @@ let runtimeOverride: boolean | null = null;
 
 /**
  * Check if Pro features are enabled.
- * Runtime override takes precedence over build-time flag.
+ * All features free until 200 active users reached.
  */
 export function isPro(): boolean {
-  return runtimeOverride ?? BUILD_PRO;
+  return true;
 }
 
 /**
