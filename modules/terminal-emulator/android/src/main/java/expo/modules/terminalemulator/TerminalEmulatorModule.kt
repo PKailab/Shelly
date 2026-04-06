@@ -249,43 +249,47 @@ class TerminalEmulatorModule : Module() {
 
                 // Step 2: If not extracted, extract from APK ourselves
                 result.append("\n== Extraction ==\n")
-                if (!file.exists()) {
-                    val extractedBash = java.io.File(context.filesDir, "libbash.so")
-                    if (!extractedBash.exists() || extractedBash.length() == 0L) {
-                        result.append("extracting_from_apk=true\n")
-                        val entry = zipFile.getEntry("lib/arm64-v8a/libbash.so")
+                val libDir = java.io.File(context.filesDir, "termux-libs")
+                libDir.mkdirs()
+
+                // Map of APK entry name -> extracted file name
+                val libs = mapOf(
+                    "lib/arm64-v8a/libbash.so" to "libbash.so",
+                    "lib/arm64-v8a/libandroid-support.so" to "libandroid-support.so",
+                    "lib/arm64-v8a/libiconv.so" to "libiconv.so",
+                    "lib/arm64-v8a/libreadline8.so" to "libreadline.so.8",
+                    "lib/arm64-v8a/libncursesw6.so" to "libncursesw.so.6"
+                )
+
+                for ((apkEntry, fileName) in libs) {
+                    val outFile = java.io.File(libDir, fileName)
+                    if (!outFile.exists() || outFile.length() == 0L) {
+                        val entry = zipFile.getEntry(apkEntry)
                         if (entry != null) {
-                            result.append("apk_entry_size=${entry.size}\n")
-                            result.append("apk_entry_method=${if (entry.method == 0) "STORED" else "DEFLATED"}\n")
                             zipFile.getInputStream(entry).use { input ->
-                                extractedBash.outputStream().use { output ->
+                                outFile.outputStream().use { output ->
                                     input.copyTo(output)
                                 }
                             }
-                            extractedBash.setExecutable(true, false)
-                            result.append("extracted_size=${extractedBash.length()}\n")
-                            result.append("extracted_canExec=${extractedBash.canExecute()}\n")
-                            result.append("extracted_path=${extractedBash.absolutePath}\n")
-
-                            // SELinux context of extracted file
-                            try {
-                                val lsProc = Runtime.getRuntime().exec(arrayOf("ls", "-lZ", extractedBash.absolutePath))
-                                val lsOut = lsProc.inputStream.bufferedReader().readText().trim()
-                                lsProc.waitFor()
-                                result.append("extracted_ls_Z=$lsOut\n")
-                            } catch (_: Exception) {}
+                            outFile.setExecutable(true, false)
+                            result.append("extracted $fileName (${outFile.length()}b)\n")
                         } else {
-                            result.append("apk_entry_not_found=true\n")
-                            zipFile.close()
-                            return@AsyncFunction mapOf("success" to false, "result" to result.toString())
+                            result.append("NOT FOUND in APK: $apkEntry\n")
                         }
                     } else {
-                        result.append("already_extracted=true size=${extractedBash.length()}\n")
+                        result.append("exists $fileName (${outFile.length()}b)\n")
                     }
+                }
+                zipFile.close()
+
+                val extractedBash = java.io.File(libDir, "libbash.so")
+                if (!file.exists()) {
                     bashPath = extractedBash.absolutePath
                     file = extractedBash
                 }
-                zipFile.close()
+                val libDirPath = libDir.absolutePath
+                result.append("libDir=$libDirPath\n")
+                result.append("libDir_contents=${libDir.listFiles()?.map { it.name }}\n")
 
                 result.append("\n== Exec ==\n")
                 result.append("bashPath=$bashPath\n")
@@ -330,10 +334,12 @@ class TerminalEmulatorModule : Module() {
                     try {
                         val linker = "/system/bin/linker64"
                         result.append("linker_exists=${java.io.File(linker).exists()}\n")
+                        result.append("LD_LIBRARY_PATH=$libDirPath\n")
                         val pb2 = ProcessBuilder(linker, bashPath, "-c", "echo EXECVE_OK; uname -a")
                         pb2.environment()["HOME"] = "/data/data/com.termux/files/home"
                         pb2.environment()["TERM"] = "xterm-256color"
                         pb2.environment()["PATH"] = "/system/bin:/vendor/bin"
+                        pb2.environment()["LD_LIBRARY_PATH"] = libDirPath
                         pb2.directory(context.filesDir)
                         pb2.redirectErrorStream(true)
                         val proc2 = pb2.start()
