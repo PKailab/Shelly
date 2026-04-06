@@ -203,6 +203,35 @@ class TerminalEmulatorModule : Module() {
             null
         }
 
+        // Phase 0: execve verification test
+        AsyncFunction("testExecve") {
+            val context = appContext.reactContext ?: return@AsyncFunction mapOf("success" to false, "error" to "no context")
+            val nativeLibDir = context.applicationInfo.nativeLibraryDir
+            val bashPath = "$nativeLibDir/libbash.so"
+            val result = StringBuilder()
+            try {
+                val file = java.io.File(bashPath)
+                result.append("path=$bashPath\n")
+                result.append("exists=${file.exists()}\n")
+                result.append("canExecute=${file.canExecute()}\n")
+                result.append("size=${file.length()}\n")
+                // Try to actually execve via ProcessBuilder
+                val pb = ProcessBuilder(bashPath, "-c", "echo EXECVE_OK; uname -a")
+                pb.environment()["HOME"] = "/data/data/com.termux/files/home"
+                pb.environment()["TERM"] = "xterm-256color"
+                pb.redirectErrorStream(true)
+                val proc = pb.start()
+                val output = proc.inputStream.bufferedReader().readText()
+                val exitCode = proc.waitFor()
+                result.append("output=$output\n")
+                result.append("exitCode=$exitCode\n")
+                mapOf("success" to true, "result" to result.toString())
+            } catch (e: Exception) {
+                result.append("error=${e.javaClass.simpleName}: ${e.message}\n")
+                mapOf("success" to false, "result" to result.toString())
+            }
+        }
+
         AsyncFunction("scheduleAgent") { agentId: String, intervalMs: Long, triggerAtMs: Long ->
             val context = appContext.reactContext ?: return@AsyncFunction null
             val requestCode = getAgentRequestCode(context, agentId)

@@ -53,6 +53,17 @@ export default function RootLayout() {
       }
     }).catch(console.warn);
 
+    // Phase 0: execve verification test (Plan B)
+    (async () => {
+      try {
+        const TE = (await import('@/modules/terminal-emulator/src/TerminalEmulatorModule')).default;
+        const result = await TE.testExecve();
+        console.log('[Phase0-ExecveTest]', JSON.stringify(result));
+      } catch (e) {
+        console.log('[Phase0-ExecveTest] FAILED:', e);
+      }
+    })();
+
     // Initialize reduce-motion detection for sound/animation system
     useSoundStore.getState().initReduceMotion();
 

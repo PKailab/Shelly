@@ -23,6 +23,7 @@ declare class TerminalEmulatorModuleType extends NativeModule {
   updateSessionNotification(info: string): Promise<void>;
   isIgnoringBatteryOptimizations(): Promise<boolean>;
   requestBatteryOptimizationExemption(): Promise<void>;
+  testExecve(): Promise<{ success: boolean; result?: string; error?: string }>;
   scheduleAgent(agentId: string, intervalMs: number, triggerAtMs: number): Promise<void>;
   cancelAgent(agentId: string): Promise<void>;
 }
