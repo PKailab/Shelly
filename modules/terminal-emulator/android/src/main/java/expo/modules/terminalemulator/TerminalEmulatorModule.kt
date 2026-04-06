@@ -208,22 +208,55 @@ class TerminalEmulatorModule : Module() {
             val context = appContext.reactContext ?: return@AsyncFunction mapOf("success" to false, "error" to "no context")
             val result = StringBuilder()
             try {
+                // === Diagnostics ===
+                result.append("== Environment ==\n")
+                result.append("sdk=${android.os.Build.VERSION.SDK_INT}\n")
+                result.append("abi=${android.os.Build.SUPPORTED_ABIS.joinToString(",")}\n")
+                result.append("packageName=${context.packageName}\n")
+                result.append("filesDir=${context.filesDir}\n")
+                result.append("dataDir=${context.applicationInfo.dataDir}\n")
+
+                // SELinux context of this process
+                try {
+                    val seProc = Runtime.getRuntime().exec(arrayOf("cat", "/proc/self/attr/current"))
+                    val seContext = seProc.inputStream.bufferedReader().readText().trim()
+                    seProc.waitFor()
+                    result.append("selinux_context=$seContext\n")
+                } catch (_: Exception) {
+                    result.append("selinux_context=unknown\n")
+                }
+
+                // APK contents check
+                val apkPath = context.applicationInfo.sourceDir
+                result.append("apkPath=$apkPath\n")
+                val zipFile = java.util.zip.ZipFile(apkPath)
+                val soEntries = zipFile.entries().asSequence()
+                    .filter { it.name.contains("libbash") }
+                    .map { "${it.name} (${it.size}b, compressed=${it.compressedSize}b, method=${it.method})" }
+                    .toList()
+                result.append("apk_libbash_entries=${soEntries.joinToString("; ").ifEmpty { "NONE" }}\n")
+
                 // Step 1: Try nativeLibraryDir first
                 val nativeLibDir = context.applicationInfo.nativeLibraryDir
                 var bashPath = "$nativeLibDir/libbash.so"
                 var file = java.io.File(bashPath)
+                result.append("\n== nativeLibDir ==\n")
                 result.append("nativeLibDir=$nativeLibDir\n")
                 result.append("exists_in_nativeLib=${file.exists()}\n")
+                // List what IS in nativeLibDir
+                val nativeLibFiles = java.io.File(nativeLibDir).listFiles()?.map { it.name } ?: emptyList()
+                result.append("nativeLib_contents=(${nativeLibFiles.size} files) ${nativeLibFiles.take(10).joinToString(", ")}\n")
 
                 // Step 2: If not extracted, extract from APK ourselves
+                result.append("\n== Extraction ==\n")
                 if (!file.exists()) {
                     val extractedBash = java.io.File(context.filesDir, "libbash.so")
                     if (!extractedBash.exists() || extractedBash.length() == 0L) {
                         result.append("extracting_from_apk=true\n")
-                        val apkPath = context.applicationInfo.sourceDir
-                        val zipFile = java.util.zip.ZipFile(apkPath)
                         val entry = zipFile.getEntry("lib/arm64-v8a/libbash.so")
                         if (entry != null) {
+                            result.append("apk_entry_size=${entry.size}\n")
+                            result.append("apk_entry_method=${if (entry.method == 0) "STORED" else "DEFLATED"}\n")
                             zipFile.getInputStream(entry).use { input ->
                                 extractedBash.outputStream().use { output ->
                                     input.copyTo(output)
@@ -231,33 +264,59 @@ class TerminalEmulatorModule : Module() {
                             }
                             extractedBash.setExecutable(true, false)
                             result.append("extracted_size=${extractedBash.length()}\n")
+                            result.append("extracted_canExec=${extractedBash.canExecute()}\n")
+                            result.append("extracted_path=${extractedBash.absolutePath}\n")
+
+                            // SELinux context of extracted file
+                            try {
+                                val lsProc = Runtime.getRuntime().exec(arrayOf("ls", "-lZ", extractedBash.absolutePath))
+                                val lsOut = lsProc.inputStream.bufferedReader().readText().trim()
+                                lsProc.waitFor()
+                                result.append("extracted_ls_Z=$lsOut\n")
+                            } catch (_: Exception) {}
                         } else {
                             result.append("apk_entry_not_found=true\n")
                             zipFile.close()
                             return@AsyncFunction mapOf("success" to false, "result" to result.toString())
                         }
-                        zipFile.close()
+                    } else {
+                        result.append("already_extracted=true size=${extractedBash.length()}\n")
                     }
                     bashPath = extractedBash.absolutePath
                     file = extractedBash
                 }
+                zipFile.close()
 
+                result.append("\n== Exec ==\n")
                 result.append("bashPath=$bashPath\n")
                 result.append("exists=${file.exists()}\n")
                 result.append("canExecute=${file.canExecute()}\n")
+                result.append("canRead=${file.canRead()}\n")
                 result.append("size=${file.length()}\n")
+
+                // Check file type via `file` command
+                try {
+                    val fileProc = Runtime.getRuntime().exec(arrayOf("file", bashPath))
+                    val fileOut = fileProc.inputStream.bufferedReader().readText().trim()
+                    fileProc.waitFor()
+                    result.append("file_type=$fileOut\n")
+                } catch (_: Exception) {
+                    result.append("file_type=unknown\n")
+                }
 
                 // Step 3: Try to actually execve via ProcessBuilder
                 val pb = ProcessBuilder(bashPath, "-c", "echo EXECVE_OK; uname -a")
                 pb.environment()["HOME"] = "/data/data/com.termux/files/home"
                 pb.environment()["TERM"] = "xterm-256color"
+                pb.environment()["PATH"] = "/system/bin:/vendor/bin"
+                pb.directory(context.filesDir)
                 pb.redirectErrorStream(true)
                 val proc = pb.start()
                 val output = proc.inputStream.bufferedReader().readText()
                 val exitCode = proc.waitFor()
                 result.append("output=$output\n")
                 result.append("exitCode=$exitCode\n")
-                mapOf("success" to true, "result" to result.toString())
+                mapOf("success" to (exitCode == 0 && output.contains("EXECVE_OK")), "result" to result.toString())
             } catch (e: Exception) {
                 result.append("error=${e.javaClass.simpleName}: ${e.message}\n")
                 mapOf("success" to false, "result" to result.toString())
