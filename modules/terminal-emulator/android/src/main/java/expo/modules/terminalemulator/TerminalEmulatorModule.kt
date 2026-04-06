@@ -206,16 +206,48 @@ class TerminalEmulatorModule : Module() {
         // Phase 0: execve verification test
         AsyncFunction("testExecve") {
             val context = appContext.reactContext ?: return@AsyncFunction mapOf("success" to false, "error" to "no context")
-            val nativeLibDir = context.applicationInfo.nativeLibraryDir
-            val bashPath = "$nativeLibDir/libbash.so"
             val result = StringBuilder()
             try {
-                val file = java.io.File(bashPath)
-                result.append("path=$bashPath\n")
+                // Step 1: Try nativeLibraryDir first
+                val nativeLibDir = context.applicationInfo.nativeLibraryDir
+                var bashPath = "$nativeLibDir/libbash.so"
+                var file = java.io.File(bashPath)
+                result.append("nativeLibDir=$nativeLibDir\n")
+                result.append("exists_in_nativeLib=${file.exists()}\n")
+
+                // Step 2: If not extracted, extract from APK ourselves
+                if (!file.exists()) {
+                    val extractedBash = java.io.File(context.filesDir, "libbash.so")
+                    if (!extractedBash.exists() || extractedBash.length() == 0L) {
+                        result.append("extracting_from_apk=true\n")
+                        val apkPath = context.applicationInfo.sourceDir
+                        val zipFile = java.util.zip.ZipFile(apkPath)
+                        val entry = zipFile.getEntry("lib/arm64-v8a/libbash.so")
+                        if (entry != null) {
+                            zipFile.getInputStream(entry).use { input ->
+                                extractedBash.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            extractedBash.setExecutable(true, false)
+                            result.append("extracted_size=${extractedBash.length()}\n")
+                        } else {
+                            result.append("apk_entry_not_found=true\n")
+                            zipFile.close()
+                            return@AsyncFunction mapOf("success" to false, "result" to result.toString())
+                        }
+                        zipFile.close()
+                    }
+                    bashPath = extractedBash.absolutePath
+                    file = extractedBash
+                }
+
+                result.append("bashPath=$bashPath\n")
                 result.append("exists=${file.exists()}\n")
                 result.append("canExecute=${file.canExecute()}\n")
                 result.append("size=${file.length()}\n")
-                // Try to actually execve via ProcessBuilder
+
+                // Step 3: Try to actually execve via ProcessBuilder
                 val pb = ProcessBuilder(bashPath, "-c", "echo EXECVE_OK; uname -a")
                 pb.environment()["HOME"] = "/data/data/com.termux/files/home"
                 pb.environment()["TERM"] = "xterm-256color"
