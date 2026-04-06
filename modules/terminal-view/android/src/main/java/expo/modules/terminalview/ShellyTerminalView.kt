@@ -337,9 +337,9 @@ class ShellyTerminalView(
         if (useGPU) {
             if (glTerminalView == null) {
                 glTerminalView = GLTerminalView(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.MATCH_PARENT
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
                     )
                 }
                 addView(glTerminalView)

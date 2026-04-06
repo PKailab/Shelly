@@ -44,9 +44,16 @@ class GLTerminalView(context: Context) : GLSurfaceView(context) {
 
     init {
         setEGLContextClientVersion(3)
+        // Transparent background — prevent white flash before first draw
+        setEGLConfigChooser(8, 8, 8, 8, 0, 0)
+        holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+        setZOrderOnTop(false)  // Stay below other views but render properly
         setRenderer(renderer)
         renderMode = RENDERMODE_WHEN_DIRTY
         preserveEGLContextOnPause = true
+
+        // Black background to match terminal
+        setBackgroundColor(0xFF000000.toInt())
 
         isFocusable = true
         isFocusableInTouchMode = true
