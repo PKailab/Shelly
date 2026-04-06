@@ -368,6 +368,8 @@ export type AppSettings = {
   // ─── Terminal Appearance ──────────────────────────────────────────────────
   /** Terminal ANSI color theme (default: 'shelly') */
   terminalTheme: string;
+  /** Enable OpenGL ES 3.0 GPU hardware acceleration for terminal rendering */
+  gpuRendering?: boolean;
 };
 
 // ─── Background Agents ──────────────────────────────────────────────────────

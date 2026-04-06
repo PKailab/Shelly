@@ -763,6 +763,18 @@ export default function SettingsScreen() {
         </SettingRow>
 
         <SettingRow
+          label="GPU Rendering"
+          description="OpenGL ES 3.0 hardware acceleration for the terminal"
+        >
+          <Switch
+            value={settings.gpuRendering ?? false}
+            onValueChange={(v) => updateSettings({ gpuRendering: v })}
+            trackColor={{ false: '#2D2D2D', true: '#00D4AA50' }}
+            thumbColor={(settings.gpuRendering ?? false) ? '#00D4AA' : '#6B7280'}
+          />
+        </SettingRow>
+
+        <SettingRow
           label={t('settings.experience_label')}
           description={
             (settings.experienceMode ?? 'learning') === 'learning'

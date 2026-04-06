@@ -721,6 +721,7 @@ export default function TerminalScreen() {
             cursorShape={settings.cursorShape || 'block'}
             cursorBlink={true}
             colorScheme={terminalColorScheme}
+            gpuRendering={settings.gpuRendering ?? false}
             style={[styles.terminalView, { flex: showSplitPreview ? splitRatio : 1 }]}
             onScrollStateChanged={(e) => setIsScrolledUp(e.nativeEvent.isScrolledUp)}
             onOutput={() => {}}

@@ -45,6 +45,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   llmInterpreterEnabled: false,
   externalKeyboardShortcuts: false,
   terminalTheme: 'shelly',
+  gpuRendering: false,
 };
 
 export const DEFAULT_TERMUX_SETTINGS: TermuxSettings = {
