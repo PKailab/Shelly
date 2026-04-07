@@ -212,8 +212,9 @@ export default function TerminalScreen() {
           s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
         ),
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Terminal] createNativeSession failed:', err);
+      Alert.alert('Terminal Error', String(err?.message || err));
       useTerminalStore.setState((state) => ({
         sessions: state.sessions.map((s) =>
           s.id === session.id ? { ...s, sessionStatus: 'exited' as const, isAlive: false } : s
