@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 2
+    private const val BASHRC_VERSION = 3
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -54,11 +54,17 @@ object HomeInitializer {
             sb.appendLine("_run() { /system/bin/linker64 \"\$@\"; }")
             sb.appendLine()
 
-            // Node and git as functions
+            // Tool functions
             sb.appendLine("node() { _run $libDir/node \"\$@\"; }")
             sb.appendLine("git() { _run $libDir/git \"\$@\"; }")
             sb.appendLine("npm() { _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js \"\$@\"; }")
             sb.appendLine("npx() { _run $libDir/node $libDir/node_modules/npm/bin/npx-cli.js \"\$@\"; }")
+            sb.appendLine("python3() { PYTHONHOME=$libDir/python3.13 _run $libDir/python3 \"\$@\"; }")
+            sb.appendLine("python() { python3 \"\$@\"; }")
+            sb.appendLine("pip() { python3 -m pip \"\$@\"; }")
+            sb.appendLine("pip3() { pip \"\$@\"; }")
+            sb.appendLine("curl() { _run $libDir/curl \"\$@\"; }")
+            sb.appendLine("ssh() { _run $libDir/ssh \"\$@\"; }")
             sb.appendLine()
 
             // Coreutils applets as functions

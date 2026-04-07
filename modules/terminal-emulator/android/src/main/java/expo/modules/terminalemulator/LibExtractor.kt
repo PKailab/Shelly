@@ -30,7 +30,28 @@ object LibExtractor {
         "lib/arm64-v8a/libgit.so" to "git",
         "lib/arm64-v8a/libpcre2_8.so" to "libpcre2-8.so",
         // coreutils
-        "lib/arm64-v8a/libcoreutils.so" to "coreutils"
+        "lib/arm64-v8a/libcoreutils.so" to "coreutils",
+        // python
+        "lib/arm64-v8a/libpython3.so" to "python3",
+        "lib/arm64-v8a/libpython313.so" to "libpython3.13.so",
+        // curl + deps
+        "lib/arm64-v8a/libcurl_bin.so" to "curl",
+        "lib/arm64-v8a/libcurl.so" to "libcurl.so",
+        "lib/arm64-v8a/libnghttp3.so" to "libnghttp3.so",
+        "lib/arm64-v8a/libngtcp2_crypto_ossl.so" to "libngtcp2_crypto_ossl.so",
+        "lib/arm64-v8a/libngtcp2.so" to "libngtcp2.so",
+        "lib/arm64-v8a/libnghttp2.so" to "libnghttp2.so",
+        "lib/arm64-v8a/libssh2.so" to "libssh2.so",
+        // ssh + deps
+        "lib/arm64-v8a/libssh_bin.so" to "ssh",
+        "lib/arm64-v8a/libldns.so" to "libldns.so",
+        "lib/arm64-v8a/libgssapi_krb5.so" to "libgssapi_krb5.so.2",
+        "lib/arm64-v8a/libkrb5.so" to "libkrb5.so.3",
+        "lib/arm64-v8a/libk5crypto.so" to "libk5crypto.so.3",
+        "lib/arm64-v8a/libcom_err.so" to "libcom_err.so.3",
+        "lib/arm64-v8a/libkrb5support.so" to "libkrb5support.so.0",
+        "lib/arm64-v8a/libandroid-glob.so" to "libandroid-glob.so",
+        "lib/arm64-v8a/libresolv_wrapper.so" to "libresolv_wrapper.so"
     )
 
     fun getLibDir(context: Context): File =
@@ -85,6 +106,35 @@ object LibExtractor {
             }
         }
 
+        // Extract python stdlib from assets
+        extractTarGzAsset(context, "python3.tar.gz", libDir, "python3.13")
+
+        // Extract pip from assets → python3.13/site-packages/pip/
+        val sitePackages = File(libDir, "python3.13/site-packages")
+        extractTarGzAsset(context, "pip.tar.gz", sitePackages, "pip")
+
         return libDir
+    }
+
+    private fun extractTarGzAsset(context: Context, assetName: String, destDir: File, checkDir: String) {
+        if (File(destDir, checkDir).exists()) return
+        try {
+            val tempTar = File(context.cacheDir, assetName)
+            context.assets.open(assetName).use { input ->
+                tempTar.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            destDir.mkdirs()
+            val pb = ProcessBuilder("/system/bin/tar", "xzf", tempTar.absolutePath, "-C", destDir.absolutePath)
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            proc.inputStream.bufferedReader().readText()
+            proc.waitFor()
+            tempTar.delete()
+            Log.i(TAG, "$assetName extracted to ${File(destDir, checkDir).absolutePath}")
+        } catch (e: Exception) {
+            Log.e(TAG, "$assetName extraction failed: ${e.message}")
+        }
     }
 }
