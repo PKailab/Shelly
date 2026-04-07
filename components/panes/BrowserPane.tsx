@@ -1,15 +1,18 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   Text,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import WebView, { WebViewNavigation } from 'react-native-webview';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/lib/theme-engine';
+import { useBrowserStore } from '@/store/browser-store';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,11 +80,17 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
   const theme = useTheme();
   const { background, surface, surfaceAlt, foreground, muted, accent, border } = theme.colors;
 
+  const { bookmarks, addBookmark, loadBookmarks } = useBrowserStore();
+
   const webviewRef = useRef<WebView>(null);
   const [inputUrl, setInputUrl] = useState(initialUrl === 'about:blank' ? '' : initialUrl);
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+
+  useEffect(() => {
+    loadBookmarks();
+  }, []);
 
   // Called when the user commits the URL bar
   const handleSubmit = useCallback(() => {
@@ -173,6 +182,55 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
         />
       </View>
 
+      {/* ── Bookmarks bar ───────────────────────────────────────────── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.bookmarksBar, { backgroundColor: surfaceAlt, borderBottomColor: border }]}
+        contentContainerStyle={styles.bookmarksBarContent}
+      >
+        {bookmarks.map((bm) => (
+          <TouchableOpacity
+            key={bm.url}
+            style={[styles.bookmarkPill, { borderColor: border, backgroundColor: surface }]}
+            onPress={() => {
+              setInputUrl(bm.url);
+              setCurrentUrl(bm.url);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={bm.label}
+          >
+            <MaterialIcons
+              name={bm.icon as any}
+              size={13}
+              color={accent}
+              style={{ marginRight: 3 }}
+            />
+            <Text style={[styles.bookmarkLabel, { color: foreground }]} numberOfLines={1}>
+              {bm.label.length > 8 ? bm.label.slice(0, 8) : bm.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+
+        {/* [+] add current URL */}
+        <TouchableOpacity
+          style={[styles.bookmarkPill, styles.bookmarkAddPill, { borderColor: accent, backgroundColor: surface }]}
+          onPress={() => {
+            const url = currentUrl && currentUrl !== 'about:blank' ? currentUrl : normalizeUrl(inputUrl);
+            if (!url || url === 'about:blank') return;
+            // derive a short label from hostname
+            let label = url;
+            try { label = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+            if (label.length > 8) label = label.slice(0, 8);
+            addBookmark({ label, url, icon: 'bookmark' });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Add bookmark"
+        >
+          <Text style={[styles.bookmarkLabel, { color: accent }]}>[+]</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
       {/* ── WebView ─────────────────────────────────────────────────── */}
       {currentUrl === 'about:blank' ? (
         <View style={[styles.blankScreen, { backgroundColor: background }]}>
@@ -240,6 +298,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     fontFamily: 'monospace',
     fontSize: 13,
+  },
+  bookmarksBar: {
+    height: 40,
+    borderBottomWidth: 1,
+    flexGrow: 0,
+  },
+  bookmarksBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    gap: 6,
+    height: 40,
+  },
+  bookmarkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 26,
+    paddingHorizontal: 8,
+    borderRadius: 13,
+    borderWidth: 1,
+  },
+  bookmarkAddPill: {
+    borderStyle: 'dashed',
+  },
+  bookmarkLabel: {
+    fontFamily: 'monospace',
+    fontSize: 11,
   },
   webview: {
     flex: 1,
