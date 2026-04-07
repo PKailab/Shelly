@@ -167,7 +167,10 @@ export async function runPhase1Setup(
     const ok = await testBridgeConnection(wsUrl, 3000);
     if (ok) {
       onProgress({ step: 'connected', elapsedSeconds: elapsed });
-      useTerminalStore.getState().setConnectionMode('termux');
+      // Only switch to termux mode if not already in native mode (Plan B)
+      if (useTerminalStore.getState().connectionMode !== 'native') {
+        useTerminalStore.getState().setConnectionMode('termux');
+      }
       return { success: true };
     }
 

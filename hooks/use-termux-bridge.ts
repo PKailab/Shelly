@@ -182,6 +182,10 @@ export function useTermuxBridge() {
   // ── Connect ────────────────────────────────────────────────────────────────
 
   const connect = useCallback(() => {
+    // Native mode (Plan B) doesn't use WebSocket bridge at all
+    const currentMode = useTerminalStore.getState().connectionMode;
+    if (currentMode !== 'termux') return;
+
     const { wsUrl, timeoutSeconds } = useTerminalStore.getState().termuxSettings;
 
     // Close existing connection cleanly
@@ -343,6 +347,8 @@ export function useTermuxBridge() {
   };
 
   const attemptAutoRecovery = useCallback(async () => {
+    // Native mode doesn't use Termux bridge — skip recovery entirely
+    if (useTerminalStore.getState().connectionMode !== 'termux') return;
     // Prevent double-triggering (use ref to avoid stale closure)
     if (isAutoRecoveringRef.current) return;
     isAutoRecoveringRef.current = true;
@@ -681,7 +687,9 @@ export function useTermuxBridge() {
   // ── Effect: connect/disconnect based on mode ───────────────────────────────
 
   useEffect(() => {
-    if (connectionMode === 'termux') {
+    // Double-check store directly — the closed-over connectionMode may be stale
+    const storeMode = useTerminalStore.getState().connectionMode;
+    if (storeMode === 'termux' && connectionMode === 'termux') {
       reconnectAttemptsRef.current = 0;
       connect();
     } else {
