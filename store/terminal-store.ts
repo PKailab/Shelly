@@ -14,35 +14,20 @@ import {
 import { executeCommand } from '@/lib/pseudo-shell';
 import { useSettingsStore } from './settings-store';
 
-/** Pending tmux sessions to kill (consumed by useTermuxBridge on next tick) */
-export const _pendingTmuxKills: string[] = [];
-
-/** Pending tmux sessions to clear scrollback (consumed by useTermuxBridge on next tick) */
-export const _pendingTmuxClears: string[] = [];
-
-// ─── Multi-session tmux pool ────────────────────────────────────────────────
+// ─── Multi-session pool ────────────────────────────────────────────────
 
 const MAX_SESSIONS = 4;
-const TMUX_NAMES = ['shelly-1', 'shelly-2', 'shelly-3', 'shelly-4'];
+const SESSION_NAMES = ['shelly-1', 'shelly-2', 'shelly-3', 'shelly-4'];
 
-/** Base TCP port for pty-helper PTY bridges. Each session gets BASE + index. */
-const PTY_BASE_PORT = 18200;
-
-/** Get the TCP port for a given session name (for pty-helper). */
-export function getPtyPort(sessionName: string): number {
-  const idx = TMUX_NAMES.indexOf(sessionName);
-  return PTY_BASE_PORT + (idx >= 0 ? idx : 0);
-}
-
-function allocateTmuxName(sessions: TabSession[]): string | null {
-  const used = new Set(sessions.map((s) => s.tmuxSession));
-  for (const name of TMUX_NAMES) {
+function allocateSessionName(sessions: TabSession[]): string | null {
+  const used = new Set(sessions.map((s) => s.nativeSessionId));
+  for (const name of SESSION_NAMES) {
     if (!used.has(name)) return name;
   }
   return null;
 }
 
-function createSession(id: string, name: string, tmuxName: string = TMUX_NAMES[0]): TabSession {
+function createSession(id: string, name: string, sessionName: string = SESSION_NAMES[0]): TabSession {
   return {
     id,
     name,
@@ -52,8 +37,8 @@ function createSession(id: string, name: string, tmuxName: string = TMUX_NAMES[0
     commandHistory: [],
     historyIndex: -1,
     activeCli: null,
-    tmuxSession: tmuxName,
-    nativeSessionId: tmuxName,
+    tmuxSession: sessionName,
+    nativeSessionId: sessionName,
     sessionStatus: 'starting',
     isAlive: false,
   };
@@ -193,12 +178,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   addSession: () => {
     const { sessions } = get();
     if (sessions.length >= MAX_SESSIONS) return;
-    const tmuxName = allocateTmuxName(sessions);
-    if (!tmuxName) return;
+    const sessionName = allocateSessionName(sessions);
+    if (!sessionName) return;
     const id = `session-${Date.now()}`;
     const name = `Terminal ${sessions.length + 1}`;
     set((state) => ({
-      sessions: [...state.sessions, createSession(id, name, tmuxName)],
+      sessions: [...state.sessions, createSession(id, name, sessionName)],
       activeSessionId: id,
     }));
     get().saveSessionState();
@@ -207,10 +192,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   removeSession: (id: string) => {
     const { sessions, activeSessionId } = get();
     if (sessions.length <= 1) return;
-    const removed = sessions.find((s) => s.id === id);
-    if (removed?.tmuxSession) {
-      _pendingTmuxKills.push(removed.tmuxSession);
-    }
     const newSessions = sessions.filter((s) => s.id !== id);
     const newActive = activeSessionId === id ? newSessions[0].id : activeSessionId;
     set({ sessions: newSessions, activeSessionId: newActive });
@@ -234,10 +215,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       const { useExecutionLogStore } = require('@/store/execution-log-store');
       useExecutionLogStore.getState().clearTerminalOutput();
     } catch {}
-    // Clear tmux scrollback buffer + screen so old output doesn't persist
-    if (session?.tmuxSession) {
-      _pendingTmuxClears.push(session.tmuxSession);
-    }
     get().saveSessionState();
   },
 
