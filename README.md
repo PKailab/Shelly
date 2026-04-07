@@ -1,30 +1,38 @@
+<p align="center">
+  <img src="docs/images/shelly-logo.png" alt="Shelly" width="120">
+</p>
+
 <h1 align="center">Shelly</h1>
 
+<h3 align="center">
+  <code>Terminal + AI + Browser + Markdown</code><br>
+  <sub>One screen. Four panes. Zero friction.</sub>
+</h3>
+
 <p align="center">
-  A single-screen terminal IDE for Android — terminal, AI, browser, and markdown in a flexible pane layout.
+  <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-Android-00D4AA?style=flat-square&logo=android&logoColor=white">
+  <img alt="Built with" src="https://img.shields.io/badge/built%20with-Claude%20Code-D4A574?style=flat-square">
+  <img alt="Expo" src="https://img.shields.io/badge/Expo%2054-000020?style=flat-square&logo=expo&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white">
+  <img alt="Lines" src="https://img.shields.io/badge/100k%2B%20lines-of%20code-333?style=flat-square">
 </p>
 
 <p align="center">
-  <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Android-blue">
-  <img alt="Built with" src="https://img.shields.io/badge/built%20with-Claude%20Code-orange">
+  <a href="#quick-start"><b>Quick Start</b></a> &nbsp;&middot;&nbsp;
+  <a href="#the-copy-paste-problem"><b>Why Shelly?</b></a> &nbsp;&middot;&nbsp;
+  <a href="#features"><b>Features</b></a> &nbsp;&middot;&nbsp;
+  <a href="#architecture"><b>Architecture</b></a> &nbsp;&middot;&nbsp;
+  <a href="#contributing"><b>Contributing</b></a>
 </p>
 
-<p align="center">
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#the-copy-paste-problem">Why Shelly?</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#the-story">Story</a> ·
-  <a href="#architecture">Architecture</a> ·
-  <a href="#known-limitations">Limitations</a> ·
-  <a href="#security">Security</a> ·
-  <a href="#privacy">Privacy</a> ·
-  <a href="#contributing">Contributing</a>
-</p>
+<br>
 
 <p align="center">
-  <img src="docs/images/hero.jpg" alt="Shelly — terminal, AI, and browser in a single screen" width="720">
+  <img src="docs/images/hero.jpg" alt="Shelly — terminal, AI, browser, and markdown in a single screen" width="720">
 </p>
+
+<br>
 
 ---
 
@@ -91,12 +99,18 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 
 ## Features
 
+> **91 features.** Here are the ones that matter most.
+
 ### Highlights
 
-- **Cross-pane intelligence** — Say "fix the error on the right." AI reads your terminal, suggests a fix, one tap to execute. No copy-paste. No tab switching.
-- **Native terminal emulator** — JNI forkpty (C + Kotlin), same-process, zero IPC. Sessions survive app switching. The only React Native app with an embedded native terminal.
-- **4 pane types in one screen** — Terminal, AI, Browser (WebView + bookmarks + background audio), Markdown viewer. Arrange up to 4 panes freely.
-- **Natural language everything** — Talk, type, or speak. 12 AI agents, auto-routed or `@mention`-selected.
+| | |
+|---|---|
+| **Cross-pane intelligence** | Say "fix the error." AI reads your terminal, suggests a fix, one tap to run. Zero copy-paste. |
+| **Native PTY (JNI forkpty)** | Kotlin + C, same-process, zero IPC. The only React Native app with an embedded native terminal. |
+| **4 pane types** | Terminal, AI, Browser (+ background audio), Markdown. Split up to 4 panes freely. |
+| **12 AI agents** | Claude, Gemini, Codex, Groq, Cerebras, Perplexity, Local LLM... auto-routed or `@mention`. |
+| **Voice input** | Speak your commands or AI prompts. Full VoiceChain with TTS response. |
+| **CRT mode** | Scanlines + phosphor green + flicker. Retro 8-bit sounds. Pixel fonts. Just for fun. |
 
 <details>
 <summary><strong>Layout System (5 features)</strong></summary>
@@ -228,27 +242,25 @@ As far as we know, this is the **only React Native app in the world** with an em
 ### Screen Layout
 
 ```
-┌──────────────────────────────────────────────────────┐
-│  AgentBar (top)                                       │
-│  agent switcher · search · settings                   │
-├──────────┬───────────────────────────────────────────┤
-│          │                                            │
-│ Sidebar  │   PaneContainer                            │
-│          │                                            │
-│ Repos    │   ┌─────────────────┬────────────────────┐ │
-│ Files    │   │  Terminal Pane  │   AI Pane          │ │
-│ Tasks    │   │                 │                    │ │
-│ Ports    │   │  native PTY     │  streaming LLM     │ │
-│ Profiles │   │  (JNI forkpty)  │  context-aware     │ │
-│          │   ├─────────────────┼────────────────────┤ │
-│          │   │  Browser Pane   │  Markdown Pane     │ │
-│          │   │                 │                    │ │
-│          │   │  WebView        │  renderer/viewer   │ │
-│          │   └─────────────────┴────────────────────┘ │
-├──────────┴───────────────────────────────────────────┤
-│  ContextBar (bottom)                                  │
-│  cwd · git branch · connection status                 │
-└──────────────────────────────────────────────────────┘
+ ╔══════════════════════════════════════════════════════════╗
+ ║  Agent Bar          [Claude] [Gemini] [Local]  [Q] [⚙]  ║
+ ╠═══════╦══════════════════════╦═══════════════════════════╣
+ ║       ║                      ║                           ║
+ ║  S    ║   Terminal Pane      ║   AI Pane                 ║
+ ║  i    ║                      ║                           ║
+ ║  d    ║   $ npm run build    ║   "Fix the error →"       ║
+ ║  e    ║   Error: missing...  ║   The module './utils'... ║
+ ║  b    ║                      ║   [▶ Run fix]             ║
+ ║  a    ╠══════════════════════╬═══════════════════════════╣
+ ║  r    ║                      ║                           ║
+ ║       ║   Browser Pane       ║   Markdown Pane           ║
+ ║  ───  ║   localhost:3000     ║   README.md               ║
+ ║  Repos║                      ║                           ║
+ ║  Files║   [YouTube] [GitHub] ║   # Getting Started       ║
+ ║  Tasks║                      ║   ...                     ║
+ ╠═══════╩══════════════════════╩═══════════════════════════╣
+ ║  Context Bar     ~/Shelly  main ↑2  node v22  Native     ║
+ ╚══════════════════════════════════════════════════════════╝
 ```
 
 ### Cross-Pane Intelligence
