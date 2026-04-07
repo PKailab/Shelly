@@ -203,8 +203,8 @@ export default function TerminalScreen() {
         cols: 80,
       });
 
-      // Start foreground service to prevent task-kill
-      await TerminalEmulator.startSessionService();
+      // Start foreground service to prevent task-kill (may fail if Service class missing)
+      try { await TerminalEmulator.startSessionService(); } catch (_) {}
 
       // Update session status
       useTerminalStore.setState((state) => ({
