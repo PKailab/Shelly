@@ -51,7 +51,7 @@ export function ContextBar() {
       {/* Git branch */}
       {gitBranch && (
         <View style={[styles.segment, { marginLeft: 8 }]}>
-          <MaterialIcons name="call_split" size={11} color={c.accent} />
+          <MaterialIcons name="call-split" size={11} color={c.accent} />
           <Text style={[styles.text, { color: c.accent }]}>{gitBranch}</Text>
         </View>
       )}
