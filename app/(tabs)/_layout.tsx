@@ -14,6 +14,7 @@ import { QuickTerminal } from "@/components/QuickTerminal";
 import { SetupWizard, isSetupWizardComplete } from "@/components/SetupWizard";
 import { BridgeRecoveryBanner } from "@/components/BridgeRecoveryBanner";
 import { useTerminalStore } from "@/store/terminal-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useI18n } from "@/lib/i18n";
 import { useTheme, useThemeStore } from "@/lib/theme-engine";
 import { useA11yStore } from "@/lib/accessibility";
@@ -44,9 +45,16 @@ export default function TabLayout() {
     usePluginStore.getState().loadPlugins();
     if (!_setupChecked) {
       _setupChecked = true;
-      isSetupWizardComplete().then((done) => {
-        if (!done) setShowSetupWizard(true);
-      });
+      // Native mode (Plan B) doesn't need Termux setup — skip wizard entirely
+      const mode = useTerminalStore.getState().connectionMode;
+      if (mode === 'native') {
+        // Mark as complete so it never triggers again
+        AsyncStorage.setItem('@shelly/setup_wizard_complete', 'true').catch(() => {});
+      } else {
+        isSetupWizardComplete().then((done) => {
+          if (!done) setShowSetupWizard(true);
+        });
+      }
     }
   }, []);
 

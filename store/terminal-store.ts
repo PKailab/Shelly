@@ -340,7 +340,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       timestamp: Date.now(),
       exitCode: null,
       isRunning: true,
-      connectionMode: 'termux',
+      connectionMode: get().connectionMode,
     };
 
     const newHistory = command.trim()

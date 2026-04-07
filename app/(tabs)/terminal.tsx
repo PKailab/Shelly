@@ -512,7 +512,7 @@ export default function TerminalScreen() {
                   exitCode: typeof exitCode === 'number' ? exitCode : 0,
                   isRunning: false,
                   blockStatus: exitCode !== 0 ? 'error' : 'done',
-                  connectionMode: 'termux',
+                  connectionMode: useTerminalStore.getState().connectionMode,
                 });
               }
             }}
