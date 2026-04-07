@@ -16,6 +16,7 @@ import { matchKeybinding, type KeyAction } from '@/lib/keybindings';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useCommandPaletteStore } from '@/hooks/use-command-palette';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { CrtOverlay } from '@/components/CrtOverlay';
 
 export function ShellLayout() {
   const theme = useTheme();
@@ -132,6 +133,9 @@ export function ShellLayout() {
       {wizardChecked && (
         <WelcomeWizard visible={showWizard} onComplete={() => setShowWizard(false)} />
       )}
+
+      {/* CRT effect — must be last so it renders on top of everything */}
+      <CrtOverlay />
     </View>
   );
 }
