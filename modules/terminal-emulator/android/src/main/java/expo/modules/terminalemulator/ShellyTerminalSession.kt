@@ -102,7 +102,8 @@ class ShellyTerminalSession(
 
     fun isAlive(): Boolean {
         return try {
-            android.os.Process.getUidForPid(childPid) != -1
+            // Check if /proc/<pid> exists — works for child processes
+            java.io.File("/proc/$childPid").exists()
         } catch (_: Exception) {
             false
         }
