@@ -3,8 +3,12 @@ import { create } from 'zustand';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type PaneTab =
-  | 'index'
   | 'terminal'
+  | 'ai'
+  | 'browser'
+  | 'markdown'
+  // Legacy (kept for pane-registry compat during migration)
+  | 'index'
   | 'projects'
   | 'settings';
 
@@ -147,6 +151,8 @@ type MultiPaneActions = {
   setSplitRatio: (splitId: string, ratio: number) => void;
   /** Update maxPanes */
   setMaxPanes: (max: number) => void;
+  /** Initialize for shell layout — always on, starts with 1 terminal pane */
+  initShell: () => void;
 
   // ── Backwards compat (used by _layout.tsx, TerminalHeader, etc.) ──
   /** @deprecated Use root tree instead */
@@ -261,6 +267,13 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
 
     setMaxPanes: (max) => {
       set({ maxPanes: Math.max(2, Math.min(6, max)) });
+    },
+
+    initShell: () => {
+      const { root } = get();
+      // Only initialize if not already active
+      if (root) return;
+      set({ isMultiPane: true, root: makeLeaf('terminal') });
     },
 
     // ── Backwards compat actions ──
