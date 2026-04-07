@@ -5,12 +5,15 @@ import android.os.Looper
 import android.util.Log
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
-import java.net.Socket
+import java.io.FileDescriptor
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 class ShellyTerminalSession(
-    private val sessionId: String,
+    val sessionId: String,
     private val emitEvent: (name: String, body: Map<String, Any?>) -> Unit,
-    private val port: Int,
+    private val masterFd: Int,
+    private val childPid: Int,
     rows: Int,
     cols: Int,
     private val appContext: android.content.Context
@@ -20,11 +23,6 @@ class ShellyTerminalSession(
         private const val TAG = "ShellyTerminalSession"
         private const val BATCH_INTERVAL_MS = 16L
         private const val MAX_OUTPUT_BYTES = 64 * 1024
-        private const val RESIZE_PREFIX = "\u001bPTYR"
-        private const val HEARTBEAT_PREFIX = "\u001bPTYH"
-        private const val HEARTBEAT_CMD = "\u001bPTYH\n"
-        private const val HEARTBEAT_INTERVAL_MS = 15_000L
-        private const val HEARTBEAT_TIMEOUT_MS = 45_000L
     }
 
     private val outputBuffer = StringBuilder()
@@ -32,40 +30,38 @@ class ShellyTerminalSession(
     @Volatile private var flushScheduled = false
     private var lastTranscriptLength = 0
 
-    // Reconnection state
-    @Volatile private var isReconnecting = false
-    @Volatile private var shouldReconnect = true
-    private var reconnectThread: Thread? = null
-    private val socketLock = Any()
-
-    private var heartbeatThread: Thread? = null
-    @Volatile private var lastDataReceived = System.currentTimeMillis()
-
-    private var socket: Socket? = null
     val terminalSession: TerminalSession
 
     init {
-        // Create TerminalSession with dummy args — we use initializeWithStreams, not fork/exec
+        // Create FileDescriptor from raw fd
+        val fdField = FileDescriptor::class.java.getDeclaredField("descriptor")
+        fdField.isAccessible = true
+        val fd = FileDescriptor()
+        fdField.setInt(fd, masterFd)
+
+        val inputStream = FileInputStream(fd)
+        val outputStream = FileOutputStream(fd)
+
+        // Create TerminalSession with dummy args — we use initializeWithStreams
         terminalSession = TerminalSession(
             "/bin/true", "/", arrayOf(), arrayOf(), null, this
         )
-
-        // Connect to pty-helper via TCP (localhost only).
-        // TCP is used because Shelly and Termux run under different Android UIDs,
-        // and Unix Domain Sockets enforce file permissions + SELinux which block cross-UID access.
-        val sock = Socket("127.0.0.1", port)
-        sock.tcpNoDelay = true
-        sock.keepAlive = true
-        sock.soTimeout = 0  // No read timeout — rely on TCP keepalive from pty-helper
-        socket = sock
-
-        // Initialize emulator with socket streams
-        val inputStream = sock.getInputStream()
-        val outputStream = sock.getOutputStream()
         terminalSession.initializeWithStreams(inputStream, outputStream, cols, rows, 1, 1)
-        startHeartbeat()
 
-        Log.i(TAG, "Session $sessionId connected to pty-helper on port $port")
+        // Wait for child exit on background thread
+        Thread({
+            val exitCode = ShellyJNI.waitFor(childPid)
+            batchHandler.post {
+                batchHandler.removeCallbacks(flushRunnable)
+                flushOutputBuffer()
+                emitEvent("onSessionExit", mapOf("sessionId" to sessionId, "exitCode" to exitCode))
+            }
+        }, "WaitFor-$sessionId").apply {
+            isDaemon = true
+            start()
+        }
+
+        Log.i(TAG, "Session $sessionId created (masterFd=$masterFd, childPid=$childPid)")
     }
 
     private val flushRunnable = Runnable { flushOutputBuffer() }
@@ -91,7 +87,6 @@ class ShellyTerminalSession(
         val data = outputBuffer.toString()
         outputBuffer.clear()
         emitEvent("onSessionOutput", mapOf("sessionId" to sessionId, "data" to data))
-        // Notify TerminalView to redraw (batched, not per-character)
         onScreenUpdateCallback?.invoke()
     }
 
@@ -101,200 +96,22 @@ class ShellyTerminalSession(
     }
 
     fun resize(rows: Int, cols: Int) {
+        ShellyJNI.setPtyWindowSize(masterFd, rows, cols)
         terminalSession.updateSize(cols, rows, 1, 1)
     }
 
-    /**
-     * Send resize command to pty-helper via the inline escape protocol.
-     * pty-helper intercepts this and calls ioctl(TIOCSWINSZ) on the PTY fd.
-     * The command never reaches the shell.
-     */
-    fun sendResizeCommand(cols: Int, rows: Int) {
-        try {
-            val cmd = "${RESIZE_PREFIX}${cols};${rows}\n"
-            synchronized(socketLock) {
-                socket?.getOutputStream()?.write(cmd.toByteArray(Charsets.UTF_8))
-                socket?.getOutputStream()?.flush()
-            }
-            Log.i(TAG, "sendResizeCommand: ${cols}x${rows}")
-        } catch (e: Exception) {
-            Log.w(TAG, "sendResizeCommand failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Reconnect to pty-helper — replaces only the TCP socket and I/O threads.
-     * The TerminalEmulator (scroll buffer) is preserved via replaceStreams().
-     */
-    private fun reconnectSocket(): Boolean {
-        synchronized(socketLock) {
-            try {
-                // Close old socket
-                try { socket?.close() } catch (_: Exception) {}
-                socket = null
-
-                val sock = Socket("127.0.0.1", port)
-                sock.tcpNoDelay = true
-                sock.keepAlive = true
-                socket = sock
-
-                val inputStream = sock.getInputStream()
-                val outputStream = sock.getOutputStream()
-
-                // Use replaceStreams — preserves TerminalEmulator buffer
-                terminalSession.replaceStreams(inputStream, outputStream)
-
-                Log.i(TAG, "Session $sessionId reconnected to pty-helper on port $port")
-                lastDataReceived = System.currentTimeMillis()
-                startHeartbeat()
-                return true
-            } catch (e: Exception) {
-                Log.w(TAG, "Session $sessionId reconnect failed: ${e.message}")
-                try { socket?.close() } catch (_: Exception) {}
-                socket = null
-                return false
-            }
-        }
-    }
-
-    private fun startReconnectLoop() {
-        if (isReconnecting) return
-        isReconnecting = true
-        stopHeartbeat()
-
-        val thread = object : Thread("ReconnectLoop-$sessionId") {
-            override fun run() {
-                var backoffMs = 0L  // First attempt is immediate
-
-                while (shouldReconnect && isReconnecting) {
-                    if (backoffMs > 0) {
-                        try { sleep(backoffMs) } catch (_: InterruptedException) { break }
-                    }
-
-                    Log.d(TAG, "Session $sessionId: reconnect attempt (backoff=${backoffMs}ms)")
-
-                    if (reconnectSocket()) {
-                        isReconnecting = false
-
-                        batchHandler.post {
-                            // Re-send current terminal size
-                            try {
-                                val emulator = terminalSession.emulator
-                                if (emulator != null) {
-                                    sendResizeCommand(emulator.mColumns, emulator.mRows)
-                                }
-                            } catch (_: Exception) {}
-
-                            // Refresh screen
-                            try { write("\u000c") } catch (_: Exception) {}
-                            onScreenUpdateCallback?.invoke()
-                        }
-                        return
-                    }
-
-                    // Exponential backoff: 0 → 100 → 200 → 400 → ... → 5000ms max
-                    backoffMs = if (backoffMs == 0L) 100L else minOf(backoffMs * 2, 5000L)
-                }
-
-                // shouldReconnect set to false — session destroyed
-                isReconnecting = false
-                if (!shouldReconnect) return
-
-                Log.w(TAG, "Session $sessionId: reconnect loop ended (shouldReconnect=$shouldReconnect)")
-                batchHandler.post {
-                    emitEvent("onSessionExit", mapOf("sessionId" to sessionId, "exitCode" to -1))
-                }
-            }
-        }
-        thread.isDaemon = true
-        thread.start()
-        reconnectThread = thread
-    }
-
     fun isAlive(): Boolean {
-        // If reconnecting with a preserved emulator, report alive
-        if (isReconnecting && hasEmulator()) return true
-
-        val sock = synchronized(socketLock) { socket } ?: return false
-        if (sock.isClosed) return false
         return try {
-            sock.sendUrgentData(0xFF)
-            true
-        } catch (e: Exception) {
+            android.os.Process.getUidForPid(childPid) != -1
+        } catch (_: Exception) {
             false
         }
     }
 
-    /** Check if the TerminalEmulator instance exists (buffer is preserved in memory). */
-    fun hasEmulator(): Boolean {
-        return terminalSession.emulator != null
-    }
-
-    fun destroy() {
-        stopHeartbeat()
-        shouldReconnect = false
-        isReconnecting = false
-        reconnectThread?.interrupt()
-        reconnectThread = null
-        batchHandler.removeCallbacks(flushRunnable)
-        flushOutputBuffer()
-        terminalSession.finishIfRunning()
-        synchronized(socketLock) {
-            try { socket?.close() } catch (_: Exception) {}
-            socket = null
-        }
-    }
-
-    private fun startHeartbeat() {
-        stopHeartbeat()
-        val thread = object : Thread("Heartbeat-$sessionId") {
-            override fun run() {
-                while (shouldReconnect && !isInterrupted) {
-                    try {
-                        sleep(HEARTBEAT_INTERVAL_MS)
-                    } catch (_: InterruptedException) {
-                        return
-                    }
-                    // Send heartbeat
-                    var sendFailed = false
-                    synchronized(socketLock) {
-                        try {
-                            socket?.getOutputStream()?.write(HEARTBEAT_CMD.toByteArray(Charsets.UTF_8))
-                            socket?.getOutputStream()?.flush()
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Heartbeat send failed: ${e.message}")
-                            try { socket?.close() } catch (_: Exception) {}
-                            sendFailed = true
-                        }
-                    }
-                    if (sendFailed) return
-                    // Check for response timeout
-                    if (System.currentTimeMillis() - lastDataReceived > HEARTBEAT_TIMEOUT_MS) {
-                        Log.w(TAG, "Heartbeat timeout (${HEARTBEAT_TIMEOUT_MS}ms), triggering reconnect")
-                        synchronized(socketLock) {
-                            try { socket?.close() } catch (_: Exception) {}
-                        }
-                        return
-                    }
-                }
-            }
-        }
-        thread.isDaemon = true
-        thread.start()
-        heartbeatThread = thread
-    }
-
-    private fun stopHeartbeat() {
-        heartbeatThread?.interrupt()
-        heartbeatThread = null
-    }
+    fun hasEmulator(): Boolean = terminalSession.emulator != null
 
     fun getTitle(): String = terminalSession.title ?: ""
 
-    /**
-     * Write text directly to the terminal emulator's screen (not to pty-helper).
-     * Used to restore previous screen content on reconnection.
-     */
     fun writeToEmulator(text: String) {
         val emulator = terminalSession.emulator ?: return
         val bytes = text.toByteArray(Charsets.UTF_8)
@@ -310,13 +127,19 @@ class ShellyTerminalSession(
         return if (lines.size > maxLines) lines.takeLast(maxLines).joinToString("\n") else fullText
     }
 
+    fun destroy() {
+        batchHandler.removeCallbacks(flushRunnable)
+        flushOutputBuffer()
+        terminalSession.finishIfRunning()
+        try { ShellyJNI.close(masterFd) } catch (_: Exception) {}
+        try { android.os.Process.killProcess(childPid) } catch (_: Exception) {}
+    }
+
     // --- TerminalSessionClient implementation ---
 
-    /** Callback to notify TerminalView to redraw. Set by ShellyTerminalView.attachShellySession(). */
     var onScreenUpdateCallback: (() -> Unit)? = null
 
     override fun onTextChanged(changedSession: TerminalSession) {
-        lastDataReceived = System.currentTimeMillis()
         val emulator = changedSession.emulator ?: return
         val screen = emulator.screen
         val fullText = screen.transcriptText ?: return
@@ -329,8 +152,6 @@ class ShellyTerminalSession(
             lastTranscriptLength = currentLength
             if (fullText.isNotEmpty()) appendToOutputBuffer(fullText)
         }
-        // Immediately trigger native view redraw so output appears without delay.
-        // The JS event emission remains batched in flushOutputBuffer() for efficiency.
         onScreenUpdateCallback?.invoke()
     }
 
@@ -339,12 +160,6 @@ class ShellyTerminalSession(
     }
 
     override fun onSessionFinished(finishedSession: TerminalSession) {
-        if (shouldReconnect && !isReconnecting) {
-            Log.i(TAG, "Session $sessionId: socket lost, starting reconnect loop")
-            startReconnectLoop()
-            return
-        }
-        // Only emit exit event if we're not trying to reconnect
         batchHandler.removeCallbacks(flushRunnable)
         flushOutputBuffer()
         emitEvent("onSessionExit", mapOf("sessionId" to sessionId, "exitCode" to finishedSession.exitStatus))
@@ -369,14 +184,13 @@ class ShellyTerminalSession(
             }
         }
     }
+
     override fun onBell(session: TerminalSession) {
         emitEvent("onBell", mapOf("sessionId" to sessionId))
     }
     override fun onColorsChanged(session: TerminalSession) {}
     override fun onTerminalCursorStateChange(state: Boolean) {}
-    override fun setTerminalShellPid(session: TerminalSession, pid: Int) {
-        Log.d(TAG, "Session $sessionId fd-based (no local PID)")
-    }
+    override fun setTerminalShellPid(session: TerminalSession, pid: Int) {}
     override fun getTerminalCursorStyle(): Int = 0
     override fun logError(tag: String, message: String) { Log.e(tag, message) }
     override fun logWarn(tag: String, message: String) { Log.w(tag, message) }

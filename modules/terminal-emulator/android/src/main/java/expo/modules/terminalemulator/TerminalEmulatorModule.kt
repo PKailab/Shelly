@@ -65,25 +65,44 @@ class TerminalEmulatorModule : Module() {
         AsyncFunction("createSession") { config: Map<String, Any?> ->
             val sessionId = config["sessionId"] as? String
                 ?: throw IllegalArgumentException("sessionId is required")
-            val port = (config["port"] as? Number)?.toInt()
-                ?: throw IllegalArgumentException("port is required")
             val rows = (config["rows"] as? Number)?.toInt() ?: 24
             val cols = (config["cols"] as? Number)?.toInt() ?: 80
 
             if (sessions.containsKey(sessionId)) {
-                // Session already exists — return it instead of crashing.
-                // This happens when the view is re-created during screen transitions
-                // (e.g. split view) but the underlying session is still alive.
                 return@AsyncFunction sessionId
+            }
+
+            val context = appContext.reactContext ?: throw IllegalStateException("No React context")
+
+            // Extract bundled libs from APK & initialize home directory
+            val libDir = LibExtractor.extractAll(context)
+            val homeDir = HomeInitializer.initialize(context)
+
+            // Create PTY via JNI forkpty + linker64
+            val resultArray = IntArray(2)
+            ShellyJNI.createSubprocess(
+                "/system/bin/linker64",
+                LibExtractor.getBashPath(context),
+                libDir.absolutePath,
+                homeDir.absolutePath,
+                rows, cols,
+                resultArray
+            )
+            val masterFd = resultArray[0]
+            val childPid = resultArray[1]
+
+            if (masterFd < 0) {
+                throw RuntimeException("Failed to create PTY subprocess")
             }
 
             val session = ShellyTerminalSession(
                 sessionId = sessionId,
                 emitEvent = ::emitEvent,
-                port = port,
+                masterFd = masterFd,
+                childPid = childPid,
                 rows = rows,
                 cols = cols,
-                appContext = appContext.reactContext ?: throw IllegalStateException("No React context")
+                appContext = context
             )
 
             sessions[sessionId] = session
