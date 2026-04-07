@@ -36,7 +36,7 @@ export const PANE_REGISTRY: Record<PaneTab, PaneEntry> = {
   markdown: {
     title: 'Markdown',
     icon: 'description',
-    getComponent: () => () => React.createElement(StubPane, { label: 'Markdown Pane' }),
+    getComponent: () => require('@/components/panes/MarkdownPane').default,
   },
   // Legacy — kept for backwards compat during migration
   index: {
