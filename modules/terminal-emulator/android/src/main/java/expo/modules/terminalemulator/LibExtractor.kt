@@ -52,6 +52,9 @@ object LibExtractor {
         "lib/arm64-v8a/libkrb5support.so" to "libkrb5support.so.0",
         "lib/arm64-v8a/libandroid-glob.so" to "libandroid-glob.so",
         "lib/arm64-v8a/libresolv_wrapper.so" to "libresolv_wrapper.so",
+        // coreutils extra deps
+        "lib/arm64-v8a/libandroid-selinux.so" to "libandroid-selinux.so",
+        "lib/arm64-v8a/libgmp.so" to "libgmp.so",
         // ripgrep
         "lib/arm64-v8a/librg.so" to "rg",
         // jq + deps
