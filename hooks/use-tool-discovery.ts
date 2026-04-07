@@ -17,7 +17,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useTerminalStore } from '@/store/terminal-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import { checkOllamaConnection } from '@/lib/local-llm';
 import type { ToolStatus } from '@/lib/shelly-system-prompt';
 
@@ -84,41 +84,38 @@ export function useToolDiscovery() {
   const mountedRef = useRef(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastLlmStatusRef = useRef<boolean>(false);
-  const { runRawCommand } = useTermuxBridge();
+  const { runRawCommand } = useNativeExec();
 
   const checkAll = useCallback(async () => {
     if (!mountedRef.current) return;
 
-    const { settings, updateSettings, bridgeStatus } = useTerminalStore.getState();
-    const bridgeConnected = bridgeStatus === 'connected';
+    const { settings, updateSettings } = useTerminalStore.getState();
     const tools: ToolStatus[] = [];
 
-    // ── CLI検出（ブリッジ接続時のみ） ──────────────────────────────
-    if (bridgeConnected) {
-      for (const tool of CLI_TOOLS) {
-        try {
-          const result = await runRawCommand(tool.command, { reason: 'tool-discovery' });
-          const installed = result.exitCode === 0 &&
-            result.stdout.trim().length > 0 &&
-            !result.stdout.includes('not found');
-          tools.push({ id: tool.id, installed });
-        } catch {
-          tools.push({ id: tool.id, installed: false });
-        }
+    // ── CLI検出 ──────────────────────────────────────────────────
+    for (const tool of CLI_TOOLS) {
+      try {
+        const result = await runRawCommand(tool.command, { reason: 'tool-discovery' });
+        const installed = result.exitCode === 0 &&
+          result.stdout.trim().length > 0 &&
+          !result.stdout.includes('not found');
+        tools.push({ id: tool.id, installed });
+      } catch {
+        tools.push({ id: tool.id, installed: false });
       }
+    }
 
-      if (!mountedRef.current) return;
+    if (!mountedRef.current) return;
 
-      // defaultAgentの自動選択（設定済みCLIが消えた場合のみ）
-      const currentAgent = settings.defaultAgent;
-      const currentAgentInstalled = tools.find((t) => t.id === currentAgent)?.installed;
+    // defaultAgentの自動選択（設定済みCLIが消えた場合のみ）
+    const currentAgent = settings.defaultAgent;
+    const currentAgentInstalled = tools.find((t) => t.id === currentAgent)?.installed;
 
-      if (!currentAgentInstalled) {
-        const installedAgents = tools.filter((t) => t.installed).map((t) => t.id);
-        const best = FALLBACK_PRIORITY.find((a) => installedAgents.includes(a));
-        if (best) {
-          updateSettings({ defaultAgent: best });
-        }
+    if (!currentAgentInstalled) {
+      const installedAgents = tools.filter((t) => t.installed).map((t) => t.id);
+      const best = FALLBACK_PRIORITY.find((a) => installedAgents.includes(a));
+      if (best) {
+        updateSettings({ defaultAgent: best });
       }
     }
 

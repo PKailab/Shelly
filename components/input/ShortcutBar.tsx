@@ -146,7 +146,7 @@ export function ShortcutBar({
   const toastOpacity = useSharedValue(0);
   const toastTranslateY = useSharedValue(10);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { settings, connectionMode } = useTerminalStore();
+  const { settings } = useTerminalStore();
 
   const toastAnimStyle = useAnimatedStyle(() => ({
     opacity: toastOpacity.value,
@@ -172,11 +172,6 @@ export function ShortcutBar({
   }, [settings.hapticFeedback]);
 
   const handleCtrlC = useCallback(() => {
-    if (connectionMode === 'termux' && !isBridgeConnected) {
-      haptic(Haptics.ImpactFeedbackStyle.Medium);
-      showToast('not_connected');
-      return;
-    }
     if (!isRunning) {
       haptic(Haptics.ImpactFeedbackStyle.Light);
       showToast('no_running');
@@ -185,7 +180,7 @@ export function ShortcutBar({
     haptic(Haptics.ImpactFeedbackStyle.Medium);
     playSound('ctrl_c');
     onCtrlC?.();
-  }, [connectionMode, isBridgeConnected, isRunning, onCtrlC, haptic, showToast]);
+  }, [isRunning, onCtrlC, haptic, showToast]);
 
   const handlePress = useCallback((shortcut: ShortcutKey) => {
     if (shortcut.isAction && shortcut.key === 'ctrl_c') {

@@ -10,7 +10,7 @@ import { useCallback, useRef, useMemo, useEffect } from 'react';
 import { Linking } from 'react-native';
 import { useChatStore, type ChatMessage, type ChatAgent } from '@/store/chat-store';
 import { useTerminalStore } from '@/store/terminal-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import { orchestrateChatStream } from '@/lib/local-llm';
 import { detectGitIntent, generateGuide } from '@/lib/git-assistant';
 import { loadProjectContext } from '@/lib/project-context';
@@ -318,8 +318,7 @@ export function useAIDispatch() {
   useEffect(() => () => throttledUpdate.cleanup(), [throttledUpdate]);
   const updateMessage = throttledUpdate;
   const settings = useTerminalStore((s) => s.settings);
-  const connectionMode = useTerminalStore((s) => s.connectionMode);
-  const { sendCommand, runCommand: bridgeRunCommand, readFile: bridgeReadFile, writeFile: bridgeWriteFile, editFile: bridgeEditFile, listFiles: bridgeListFiles } = useTermuxBridge();
+  const { runCommand: bridgeRunCommand, readFile: bridgeReadFile, writeFile: bridgeWriteFile, editFile: bridgeEditFile, listFiles: bridgeListFiles } = useNativeExec();
   const terminalRunCommand = useTerminalStore((s) => s.runCommand);
 
   // AbortController for streaming cancellation
@@ -515,11 +514,7 @@ export function useAIDispatch() {
               agent: mapTargetToAgent(result.handledBy ?? '') ?? 'local',
               isStreaming: false,
             });
-            if (connectionMode === 'termux') {
-              sendCommand(result.delegatedCommand);
-            } else {
-              terminalRunCommand(result.delegatedCommand);
-            }
+            terminalRunCommand(result.delegatedCommand);
           } else if (result.response) {
             updateMessage(chatSessionId, msgId, { content: result.response, isStreaming: false });
           } else {
@@ -873,8 +868,8 @@ export function useAIDispatch() {
       streamingMsgRef.current = { sessionId: chatSessionId, msgId };
       const apiKey = settings.geminiApiKey ?? '';
 
-      // APIキーなし → Gemini CLIをTermux経由で実行
-      if (!apiKey && connectionMode === 'termux') {
+      // APIキーなし → Gemini CLIをネイティブ実行
+      if (!apiKey) {
         const termCtx = await getTerminalContextForPrompt(prompt, isWide ?? false);
         const contextualPrompt = promptWithFiles + toTextContext(messages) + termCtx;
         const escaped = contextualPrompt.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/`/g, '\\`').replace(/\$/g, '\\$');
@@ -916,14 +911,6 @@ export function useAIDispatch() {
             });
           }
         }
-        return { handled: true };
-      }
-
-      if (!apiKey) {
-        updateMessage(chatSessionId, msgId, {
-          content: t('dispatch.gemini_no_key'),
-          isStreaming: false, error: t('dispatch.api_key_not_set'),
-        });
         return { handled: true };
       }
 
@@ -1001,14 +988,7 @@ export function useAIDispatch() {
 
       try {
         const teamResult = await runTeamRoundtable(promptWithFiles, teamSettingsObj, {
-          runCommand: (cmd: string) => new Promise((resolve) => {
-            if (connectionMode === 'termux') {
-              sendCommand(cmd);
-              setTimeout(() => resolve('(CLI running)'), 3000);
-            } else {
-              resolve(`[Disconnected] ${cmd}`);
-            }
-          }),
+          runCommand: (cmd: string) => bridgeRunCommand(cmd).then((r) => r.stdout ?? '').catch(() => ''),
           perplexityApiKey: settings.perplexityApiKey,
           perplexityModel: settings.perplexityModel,
           geminiApiKey: settings.geminiApiKey,
@@ -1034,17 +1014,10 @@ export function useAIDispatch() {
       return { handled: true };
     }
 
-    // ── Claude (via Termux CLI) ──
+    // ── Claude (via native CLI) ──
     if (target === 'claude') {
       const msgId = addAssistantMessage(chatSessionId, 'claude');
       streamingMsgRef.current = { sessionId: chatSessionId, msgId };
-      if (connectionMode !== 'termux') {
-        updateMessage(chatSessionId, msgId, {
-          content: t('dispatch.claude_connect'),
-          isStreaming: false,
-        });
-        return { handled: true };
-      }
 
       try {
         const { buildChatModeClaudeCommand, detectPermissionPrompt, shouldAutoApprove } = await import('@/lib/cli-permission-proxy');
@@ -1096,17 +1069,10 @@ export function useAIDispatch() {
       return { handled: true };
     }
 
-    // ── Codex (via Termux CLI) ──
+    // ── Codex (via native CLI) ──
     if (target === 'codex') {
       const msgId = addAssistantMessage(chatSessionId, 'codex');
       streamingMsgRef.current = { sessionId: chatSessionId, msgId };
-      if (connectionMode !== 'termux') {
-        updateMessage(chatSessionId, msgId, {
-          content: t('dispatch.claude_connect'),
-          isStreaming: false,
-        });
-        return { handled: true };
-      }
 
       try {
         const codexCmd = settings.codexCmd ?? 'codex';
@@ -1161,15 +1127,6 @@ export function useAIDispatch() {
           content: t('dispatch.agent_no_key'),
           isStreaming: false,
           error: t('dispatch.api_key_not_set'),
-        });
-        return { handled: true };
-      }
-
-      if (connectionMode !== 'termux') {
-        updateMessage(chatSessionId, msgId, {
-          content: t('dispatch.agent_no_termux'),
-          isStreaming: false,
-          error: t('dispatch.termux_not_connected'),
         });
         return { handled: true };
       }
@@ -1231,8 +1188,8 @@ export function useAIDispatch() {
       const msgId = addAssistantMessage(chatSessionId, 'git');
       const intent = detectGitIntent(prompt);
       const guide = generateGuide(intent, prompt);
-      if (guide.prereqCommand && connectionMode === 'termux') {
-        sendCommand(guide.prereqCommand);
+      if (guide.prereqCommand) {
+        terminalRunCommand(guide.prereqCommand);
       }
       const stepsText = guide.steps?.map((s) =>
         s.type === 'command' ? `\`${s.command}\`\n${s.explanation}` : s.explanation
@@ -1250,8 +1207,7 @@ export function useAIDispatch() {
       const planProvider = settings.cerebrasApiKey ? 'cerebras'
         : settings.groqApiKey ? 'groq'
         : settings.localLlmEnabled ? 'local'
-        : connectionMode === 'termux' ? 'gemini-cli'
-        : null;
+        : 'gemini-cli';
 
       const msgId = addAssistantMessage(chatSessionId, planProvider === 'cerebras' ? 'cerebras' : planProvider === 'groq' ? 'groq' : 'gemini');
       streamingMsgRef.current = { sessionId: chatSessionId, msgId };
@@ -1301,7 +1257,7 @@ Example:
           const result = await bridgeRunCommand(`gemini "${fullPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`);
           accumulated = result.stdout || '';
         } else {
-          accumulated = `## Plan\n\n1. No AI provider available\n   - Configure Cerebras, Groq, or Local LLM in Settings\n   - Or connect Termux for CLI access`;
+          accumulated = `## Plan\n\n1. No AI provider available\n   - Configure Cerebras, Groq, or Local LLM in Settings\n   - Or install Gemini CLI for CLI access`;
         }
       } catch (e) {
         accumulated = accumulated || `## Plan\n\n1. Error generating plan\n   - ${String(e)}`;
@@ -1371,7 +1327,7 @@ Example:
                 useArenaStore.getState().updateCandidate(arenaId, candidateId, { response: accumulated });
               },
             );
-          } else if ((agent === 'claude' || agent === 'gemini') && connectionMode === 'termux') {
+          } else if (agent === 'claude' || agent === 'gemini') {
             const cli = agent === 'claude' ? 'claude' : 'gemini';
             try {
               const escaped = promptWithFiles.replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -1401,7 +1357,7 @@ Example:
     }
 
     return { handled: false };
-  }, [updateMessage, settings, connectionMode, sendCommand, terminalRunCommand, bridgeRunCommand, addAssistantMessage]);
+  }, [updateMessage, settings, terminalRunCommand, bridgeRunCommand, addAssistantMessage]);
 
   return { dispatch, cancelStreaming };
 }

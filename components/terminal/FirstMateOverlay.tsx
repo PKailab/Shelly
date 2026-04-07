@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useTerminalStore } from '@/store/terminal-store';
 import { useTranslation } from '@/lib/i18n';
 
 type Props = {
@@ -73,7 +73,7 @@ const STORAGE_KEY = 'firstmate_completed';
 export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClose }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { runRawCommand } = useTermuxBridge();
+  const { runCommand } = useTerminalStore();
   const [installing, setInstalling] = useState(false);
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
@@ -82,28 +82,11 @@ export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClos
     setInstalling(true);
 
     try {
-      // Step 1: Update packages
-      setStatus('Updating packages...');
-      setProgress(0.1);
-      await runRawCommand('pkg update -y 2>&1 | tail -3');
-
-      // Step 2: Storage permission
-      setStatus('Setting up storage access...');
-      setProgress(0.3);
-      await runRawCommand('termux-setup-storage 2>/dev/null || true');
-
-      // Step 3: Install goal packages
+      // Run goal packages via native terminal
       const pkgs = goal.packages.join(' ');
       setStatus(`Installing ${pkgs}...`);
       setProgress(0.5);
-      await runRawCommand(`pkg install -y ${pkgs} 2>&1 | tail -5`);
-
-      // Step 4: Post-setup commands
-      for (let i = 0; i < goal.postSetup.length; i++) {
-        setStatus(`Setting up ${goal.postSetup[i].split(' ').pop()}...`);
-        setProgress(0.7 + (i / goal.postSetup.length) * 0.2);
-        await runRawCommand(`${goal.postSetup[i]} 2>&1 | tail -3`);
-      }
+      runCommand(`pkg install -y ${pkgs}`);
 
       setProgress(1);
       setStatus('Done!');
@@ -122,7 +105,7 @@ export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClos
         setInstalling(false);
       }, 2000);
     }
-  }, [runRawCommand, onClose]);
+  }, [runCommand, onClose]);
 
   const handleSkip = useCallback(async () => {
     await AsyncStorage.setItem(STORAGE_KEY, 'true');

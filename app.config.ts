@@ -80,7 +80,6 @@ const config: ExpoConfig & { android?: any } = {
     "expo-dev-client",
     "expo-router",
     "./plugins/with-multi-window",
-    "./plugins/with-termux-permission",
     "./plugins/with-android-security",
     [
       "expo-audio",

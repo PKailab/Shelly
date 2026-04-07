@@ -249,11 +249,10 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
     ? block.output.slice(0, COLLAPSE_THRESHOLD)
     : block.output;
 
-  const isTermuxBlock = block.connectionMode === 'termux';
   const blockStatus: BlockStatus | undefined = block.blockStatus;
   const isCancelling = blockStatus === 'cancelling';
   const isCancelled = blockStatus === 'cancelled';
-  const canCancel = block.isRunning && isTermuxBlock && !isCancelling;
+  const canCancel = block.isRunning && !isCancelling;
 
   const outputText = useMemo(
     () => block.output.map((l) => l.text).join('\n'),
@@ -466,11 +465,6 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
             {/* Meta row: time + badges */}
             <View style={styles.userMetaRow}>
               <Text style={[styles.userTimestamp, { color: colors.hint }]}>{formatTimestamp(block.timestamp)}</Text>
-              {isTermuxBlock && (
-                <View style={[styles.termuxBadge, { backgroundColor: withAlpha(colors.command, 0.12), borderColor: withAlpha(colors.command, 0.25) }]}>
-                  <Text style={[styles.termuxBadgeText, { color: colors.command }]}>TERMUX</Text>
-                </View>
-              )}
               {block.isSavedSnippet && (
                 <Text style={[styles.snippetStar, { color: colors.warning }]}>{'\u2605'}</Text>
               )}
@@ -569,7 +563,7 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
                       <>
                         <RunningDots color={colors.warning} />
                         <Text style={[styles.runningLabel, { color: colors.muted }]}>
-                          {isTermuxBlock ? 'Termux\u5B9F\u884C\u4E2D' : '\u5B9F\u884C\u4E2D...'}
+                          {'\u5B9F\u884C\u4E2D...'}
                         </Text>
                       </>
                     )}
@@ -659,7 +653,7 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
       )}
 
       {/* LLM interpret area — only shown when learning mode is enabled */}
-      {llmInterpreterEnabled && isTermuxBlock && (block.isInterpreting || block.llmInterpretation || block.llmInterpretationStreaming) && (
+      {llmInterpreterEnabled && (block.isInterpreting || block.llmInterpretation || block.llmInterpretationStreaming) && (
         <Animated.View
           entering={FadeInDown.duration(200).delay(100).springify().damping(18)}
           style={styles.interpretRow}

@@ -7,24 +7,10 @@ export type ConnectionStatus = 'local' | 'ssh' | 'disconnected';
 
 /**
  * Active execution mode for the terminal.
- * - 'termux'     : WebSocket → Termux bridge
- * - 'disconnected': bridge configured but not connected
+ * - 'native'      : JNI forkpty + linker64 (Plan B, no Termux needed)
+ * - 'disconnected': session not yet started
  */
-export type ConnectionMode = 'termux' | 'disconnected';
-
-/** WebSocket connection health */
-export type BridgeStatus =
-  | 'idle'          // never connected
-  | 'connecting'    // WS handshake in progress
-  | 'connected'     // WS open, ready
-  | 'disconnected'  // WS closed cleanly
-  | 'error';        // WS error / timeout
-
-export type TermuxSettings = {
-  wsUrl: string;             // e.g. "ws://127.0.0.1:8765"
-  autoReconnect: boolean;
-  timeoutSeconds: number;    // command execution timeout
-};
+export type ConnectionMode = 'native' | 'disconnected';
 
 // ─── Output / Blocks ─────────────────────────────────────────────────────────
 
@@ -88,7 +74,7 @@ export type AiBlock = {
   /** 元のユーザー入力 */
   input: string;
   /** ルーティング先 */
-  target: 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'team' | 'browser' | 'git';
+  target: 'claude' | 'gemini' | 'local' | 'suggest' | 'perplexity' | 'team' | 'browser' | 'git';
   /** 入力レイヤー */
   layer: 'mention' | 'nl_with_tool' | 'natural' | 'command';
   /** 1行サマリー（常時表示） */
@@ -218,8 +204,8 @@ export type CreatorProject = {
   suggestions: string[];
   /** User-defined tags for filtering (e.g. ['school', 'website']) */
   tags?: string[];
-  /** Whether files were actually written to Termux filesystem */
-  termuxWritten?: boolean;
+  /** Whether files were actually written to filesystem */
+  filesWritten?: boolean;
 };
 
 /** Sort order for project history */

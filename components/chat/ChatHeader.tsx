@@ -5,16 +5,14 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useChatStore } from '@/store/chat-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { StatusIndicator } from '@/components/StatusIndicator';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import { UsagePanel } from '@/components/UsagePanel';
-import { useUsageStore } from '@/store/usage-store';
-import type { ReadFileFn, ListFilesFn } from '@/lib/usage-parser';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { SaveBadge } from '@/components/SaveBadge';
@@ -26,45 +24,14 @@ type ChatHeaderProps = {
 
 export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
   const { colors } = useTheme();
-  const { isConnected, readFile: bridgeReadFile, listFiles: bridgeListFiles } = useTermuxBridge();
   const { createSession } = useChatStore();
-  const { refresh: refreshUsage } = useUsageStore();
-
-  // Bridge adapters for usage parser
-  const readFileAdapter: ReadFileFn = React.useCallback(async (path: string) => {
-    const result = await bridgeReadFile(path, 'utf8');
-    return result.ok ? result.content : null;
-  }, [bridgeReadFile]);
-
-  const listFilesAdapter: ListFilesFn = React.useCallback(async (dir: string) => {
-    const result = await bridgeListFiles(dir, { includeHidden: true });
-    if (!result.ok) return [];
-    return result.entries.map((e: any) => ({ name: e.name, mtime: e.mtime }));
-  }, [bridgeListFiles]);
-
-  // Refresh usage on mount when connected
-  React.useEffect(() => {
-    if (isConnected) refreshUsage(readFileAdapter, listFilesAdapter);
-  }, [isConnected]);
-
-  // Refresh usage on foreground resume
-  React.useEffect(() => {
-    const sub = AppState.addEventListener('change', (state: string) => {
-      if (state === 'active' && isConnected) {
-        useUsageStore.setState(s => ({
-          usageData: s.usageData ? { ...s.usageData, lastUpdated: 0 } : null,
-        }));
-        refreshUsage(readFileAdapter, listFilesAdapter);
-      }
-    });
-    return () => sub.remove();
-  }, [isConnected, readFileAdapter, listFilesAdapter, refreshUsage]);
 
   const session = useChatStore((s) =>
     s.sessions.find((sess) => sess.id === s.activeSessionId) ?? null
   );
   const layout = useDeviceLayout();
   const { isMultiPane, toggleMultiPane } = useMultiPaneStore();
+  const { readFile: readFileAdapter, listFiles: listFilesAdapter } = useNativeExec();
 
   const handleNewChat = () => {
     createSession('New Chat');
@@ -77,7 +44,7 @@ export function ChatHeader({ onVoiceChat }: ChatHeaderProps = {}) {
           <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>
             {session?.title ?? 'Shelly'}
           </Text>
-          <View style={[styles.statusDot, { backgroundColor: isConnected ? '#4ADE80' : colors.inactive }]} />
+          <View style={[styles.statusDot, { backgroundColor: '#4ADE80' }]} />
           <SaveBadge />
         </View>
         <View style={styles.rightActions}>

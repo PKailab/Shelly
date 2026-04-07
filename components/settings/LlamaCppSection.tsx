@@ -74,7 +74,7 @@ export function LlamaCppSection({
 
   const handleSetup = useCallback(async () => {
     if (!isConnected) {
-      Alert.alert('Not connected', 'Connect to Termux Bridge first.\nStart shelly-bridge in Termux.');
+      Alert.alert('Not connected', 'Terminal is not connected.');
       return;
     }
 
@@ -119,7 +119,7 @@ export function LlamaCppSection({
 
   const handleDownload = useCallback(async (model: LlamaCppModel) => {
     if (!isConnected) {
-      Alert.alert('Not connected', 'Connect to Termux Bridge first.');
+      Alert.alert('Not connected', 'Terminal is not connected.');
       return;
     }
     setLoadingModelId(model.id);
@@ -137,7 +137,7 @@ export function LlamaCppSection({
 
   const handleStartServer = useCallback(async (model: LlamaCppModel) => {
     if (!isConnected) {
-      Alert.alert('Not connected', 'Connect to Termux Bridge first.');
+      Alert.alert('Not connected', 'Terminal is not connected.');
       return;
     }
     const script = buildDaemonStartScript(model);

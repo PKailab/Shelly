@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect , useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -13,9 +13,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useTerminalStore } from '@/store/terminal-store';
 import { usePreviewStore } from '@/store/preview-store';
-import { ConnectionMode, BridgeStatus } from '@/store/types';
-
-import { FullscreenTerminal } from './FullscreenTerminal';
+import { ConnectionMode } from '@/store/types';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { UsageIndicator } from '@/components/UsageIndicator';
@@ -36,11 +34,10 @@ type ModeConfig = {
 
 const MODE_CONFIG: Record<ConnectionMode, ModeConfig> = {
   native:       { icon: 'terminal',  colorKey: 'command',  label: 'Native',   description: 'JNI Terminal' },
-  termux:       { icon: 'terminal',  colorKey: 'command',  label: 'Termux',   description: 'Termux WebSocket' },
   disconnected: { icon: 'cloud-off', colorKey: 'inactive', label: 'Off',      description: '\u672A\u63A5\u7D9A' },
 };
 
-const MODE_CYCLE: ConnectionMode[] = ['native', 'termux', 'disconnected'];
+const MODE_CYCLE: ConnectionMode[] = ['native', 'disconnected'];
 
 // ─── BlinkingCursor ─────────────────────────────────────────────────────────
 
@@ -65,50 +62,6 @@ function BlinkingCursor({ color }: { color: string }) {
   );
 }
 
-// ─── BridgeDot ──────────────────────────────────────────────────────────────
-
-function BridgeDot({ status, colors }: { status: BridgeStatus; colors: ReturnType<typeof useTheme>['colors'] }) {
-  const scale = useSharedValue(1);
-
-  const dotColor =
-    status === 'connected'   ? colors.success :
-    status === 'connecting'  ? colors.warning :
-    status === 'error'       ? colors.error :
-    colors.inactive;
-
-  useEffect(() => {
-    if (status === 'connecting') {
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1.3, { duration: 400 }),
-          withTiming(1, { duration: 400 }),
-        ),
-        -1,
-        false,
-      );
-    } else {
-      scale.value = withSpring(1, SPRING_CONFIGS.quick);
-    }
-  }, [status]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <Animated.View style={[dotStyles.dot, { backgroundColor: dotColor }, animStyle]} />
-  );
-}
-
-const dotStyles = StyleSheet.create({
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginLeft: 2,
-  },
-});
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function TerminalHeader() {
@@ -120,14 +73,12 @@ export function TerminalHeader() {
     removeSession,
     setActiveSession,
     connectionMode,
-    bridgeStatus,
     setConnectionMode,
     settings,
   } = useTerminalStore();
   const router = useRouter();
   const layout = useDeviceLayout();
   const { isMultiPane, toggleMultiPane } = useMultiPaneStore();
-  const [fullscreenVisible, setFullscreenVisible] = useState(false);
 
   const previewOpen = usePreviewStore((s) => s.isOpen);
   const hasNewContent = usePreviewStore((s) => s.hasNewContent);
@@ -167,20 +118,6 @@ export function TerminalHeader() {
       withSpring(1, SPRING_CONFIGS.snappy),
     );
 
-    if (nextMode === 'termux') {
-      const { wsUrl } = useTerminalStore.getState().termuxSettings;
-      if (!wsUrl || wsUrl === 'ws://127.0.0.1:8765') {
-        Alert.alert(
-          'Termux\u30E2\u30FC\u30C9\u306B\u5207\u66FF',
-          `WebSocket URL: ${wsUrl}\n\nTermux\u3067\u30D6\u30EA\u30C3\u30B8\u30B5\u30FC\u30D0\u3092\u8D77\u52D5\u3057\u3066\u304B\u3089\u63A5\u7D9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002\n\u8A2D\u5B9A\u3067\u5909\u66F4\u3067\u304D\u307E\u3059\u3002`,
-          [
-            { text: '\u30AD\u30E3\u30F3\u30BB\u30EB', style: 'cancel' },
-            { text: '\u63A5\u7D9A\u3059\u308B', onPress: () => setConnectionMode(nextMode) },
-          ]
-        );
-        return;
-      }
-    }
     setConnectionMode(nextMode);
   }, [connectionMode, settings.hapticFeedback, setConnectionMode, badgeScale]);
 
@@ -303,19 +240,6 @@ export function TerminalHeader() {
         )}
       </Pressable>
 
-      {/* Fullscreen terminal button */}
-      <Pressable
-        onPress={() => {
-          if (settings.hapticFeedback) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          }
-          setFullscreenVisible(true);
-        }}
-        style={styles.fullscreenButton}
-      >
-        <MaterialIcons name="open-in-full" size={14} color={colors.inactive} />
-      </Pressable>
-
       {/* Usage cost */}
       <UsageIndicator />
 
@@ -328,10 +252,6 @@ export function TerminalHeader() {
           style={[
             styles.statusContainer,
             { backgroundColor: colors.surface, borderColor: colors.borderLight },
-            connectionMode === 'termux' && {
-              borderColor: withAlpha(colors.command, 0.27),
-              backgroundColor: withAlpha(colors.command, 0.03),
-            },
             connectionMode === 'disconnected' && {
               borderColor: colors.borderLight,
               opacity: 0.6,
@@ -344,17 +264,8 @@ export function TerminalHeader() {
               {modeConfig.label}
             </Text>
           )}
-          {connectionMode === 'termux' && (
-            <BridgeDot status={bridgeStatus} colors={colors} />
-          )}
         </Pressable>
       </Animated.View>
-
-      <FullscreenTerminal
-        visible={fullscreenVisible}
-        wsUrl={useTerminalStore.getState().termuxSettings.wsUrl || 'ws://127.0.0.1:8765'}
-        onClose={() => setFullscreenVisible(false)}
-      />
     </View>
   );
 }

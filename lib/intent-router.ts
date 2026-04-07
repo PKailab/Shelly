@@ -25,7 +25,7 @@ import { getToolById } from './env-manager';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RoutingTool = 'claude-code' | 'gemini-cli' | 'codex' | 'local-llm' | 'groq' | 'termux';
+export type RoutingTool = 'claude-code' | 'gemini-cli' | 'codex' | 'local-llm' | 'groq';
 
 export interface RoutingDecision {
   tool: RoutingTool;
@@ -66,11 +66,6 @@ function buildRoutingPrompt(toolStatuses: ToolStatus[]): string {
       name: 'Local LLM',
       strengths: 'General questions, conversations, simple consultations, concept explanations. Works offline with privacy. Cannot generate or execute code.',
     },
-    {
-      id: 'termux',
-      name: 'Termux Command',
-      strengths: 'Simple file operations (ls, mkdir, cp, mv, rm), package management, shell script execution. Direct command execution without AI.',
-    },
   ];
 
   const statusLines = toolDescriptions.map((t) => {
@@ -90,7 +85,7 @@ ${statusLines}
 2. For compound tasks (research+implementation), choose the tool best for the primary work
 3. Even uninstalled tools can be selected if optimal (setup will be offered)
 4. Simple conversation/questions should use local-llm (no external tool needed)
-5. Simple file operations (ls, mkdir etc.) should use termux directly
+5. Simple file operations (ls, mkdir etc.) can be delegated to any available CLI
 6. Prefer installed tools over uninstalled ones when capabilities are similar
 
 # Output format (always return this exact JSON format)
@@ -142,7 +137,7 @@ function parseRoutingResponse(content: string): { tool: RoutingTool; reason: str
 
   try {
     const parsed = JSON.parse(jsonMatch[0]);
-    const validTools: RoutingTool[] = ['claude-code', 'gemini-cli', 'codex', 'local-llm', 'groq', 'termux'];
+    const validTools: RoutingTool[] = ['claude-code', 'gemini-cli', 'codex', 'local-llm', 'groq'];
     if (validTools.includes(parsed.tool)) {
       return { tool: parsed.tool, reason: parsed.reason || '' };
     }
@@ -202,7 +197,7 @@ function buildDecision(
  * - chat → groq (if API key set) > local-llm > best CLI
  * - code → claude-code > codex > gemini-cli
  * - research → gemini-cli (best for search)
- * - file_ops → termux
+ * - file_ops → best available CLI
  * - unknown → best installed CLI
  */
 function fallbackRoute(
@@ -244,7 +239,7 @@ function fallbackRoute(
     chat: defaultAgent,
     code: codeTool,
     research: 'gemini-cli',
-    file_ops: 'termux',
+    file_ops: defaultAgent,
     unknown: defaultAgent,
   };
 
@@ -252,7 +247,7 @@ function fallbackRoute(
     chat: `Responding via ${defaultLabel}`,
     code: hasClaude ? 'Code task — delegating to Claude Code' : `Code task — using ${defaultLabel}`,
     research: 'Research task — delegating to Gemini CLI',
-    file_ops: 'File operation — executing directly',
+    file_ops: `File operation — using ${defaultLabel}`,
     unknown: `Using ${defaultLabel}`,
   };
 
@@ -271,7 +266,6 @@ export function formatRoutingMessage(decision: RoutingDecision): string {
     'codex': 'Codex CLI',
     'groq': 'Groq',
     'local-llm': 'Local LLM',
-    'termux': 'Terminal',
   };
 
   const label = toolLabels[decision.tool];

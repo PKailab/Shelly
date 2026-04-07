@@ -29,7 +29,7 @@ import { useChatStore, type ChatMessage, type ChatAgent } from '@/store/chat-sto
 import { ChatMessageList } from '@/components/chat/ChatMessageList';
 import { ChatHeader } from '@/components/chat/ChatHeader';
 import { CommandInput, type ImageAttachment, type FileAttachment } from '@/components/input/CommandInput';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import { useAIDispatch } from '@/hooks/use-ai-dispatch';
 import { parseInput } from '@/lib/input-router';
 import { explainCommandIntent } from '@/lib/llm-interpreter';
@@ -75,7 +75,6 @@ export default function ChatScreen() {
     runCommand,
     navigateHistory,
     loadSettings,
-    connectionMode,
     pendingCommand,
     settings,
     setLastInputMode,
@@ -150,16 +149,11 @@ export default function ChatScreen() {
     if (!chatLoaded || onboardingChecked.current) return;
     onboardingChecked.current = true;
     getOnboardingStep().then(async (step) => {
-      // If setup wizard is already complete, skip chat onboarding entirely
-      // (prevents "let's set up AI" messages in subsequent sessions)
+      // Skip to complete on first run — no setup wizard needed in Plan B
       if (step === 'welcome') {
-        const { isSetupWizardComplete } = await import('@/components/SetupWizard');
-        const wizardDone = await isSetupWizardComplete();
-        if (wizardDone) {
-          setOnboardingStep('complete');
-          setOnboardingStepState('complete');
-          return;
-        }
+        setOnboardingStep('complete');
+        setOnboardingStepState('complete');
+        return;
       }
       setOnboardingStepState(step);
       // Auto-add welcome message if onboarding just starting
@@ -178,8 +172,9 @@ export default function ChatScreen() {
   messagesRef.current = messages;
   const isAnyStreaming = useMemo(() => messages.some(m => m.isStreaming), [messages]);
 
-  // ── Bridge ──
-  const { sendCommand, sendStdin, cancelCurrent, isConnected: isBridgeConnected, runCommand: bridgeRunCommand, hasActiveCommand } = useTermuxBridge();
+  // ── Native exec ──
+  const { runCommand: bridgeRunCommand } = useNativeExec();
+  const isBridgeConnected = true;
 
   // ── AI dispatch (extracted from handleSend) ──
   const { dispatch: aiDispatch, cancelStreaming } = useAIDispatch();
@@ -315,15 +310,15 @@ export default function ChatScreen() {
 
   // ── Sync cwd when chat session has a projectPath ──
   useEffect(() => {
-    if (!isBridgeConnected || !chatSession?.projectPath) return;
-    // Send cd to bridge server to sync working directory (escape path for shell)
+    if (!chatSession?.projectPath) return;
+    // Execute cd to sync working directory (escape path for shell)
     const escapedPath = chatSession.projectPath.replace(/'/g, "'\\''");
     bridgeRunCommand(`cd '${escapedPath}'`).catch(() => {});
-  }, [chatSessionId, chatSession?.projectPath, isBridgeConnected]);
+  }, [chatSessionId, chatSession?.projectPath]);
 
   // ── Project context ──
   useEffect(() => {
-    if (!isBridgeConnected || !settings.localLlmEnabled) return;
+    if (!settings.localLlmEnabled) return;
     const cwd = activeSession.currentDir;
     let cancelled = false;
     loadProjectContext(cwd, execForContext).then(async (ctx) => {
@@ -345,7 +340,7 @@ export default function ChatScreen() {
       }
     });
     return () => { cancelled = true; };
-  }, [isBridgeConnected, settings.localLlmEnabled, activeSession.currentDir]);
+  }, [settings.localLlmEnabled, activeSession.currentDir]);
 
   // ── Safety dialog state ──
   const [safetyDialog, setSafetyDialog] = useState<{
@@ -391,12 +386,8 @@ export default function ChatScreen() {
   }, [safetyDialog?.visible, safetyDialog?.command, settings.experienceMode, settings.localLlmEnabled, settings.localLlmUrl, settings.localLlmModel]);
 
   const executeCommandSafely = useCallback((command: string) => {
-    if (connectionMode === 'termux') {
-      sendCommand(command);
-    } else {
-      runCommand(command);
-    }
-  }, [connectionMode, sendCommand, runCommand]);
+    runCommand(command);
+  }, [runCommand]);
 
   // ── Chat message helpers ──
   const addUserMessage = useCallback((text: string): string => {
@@ -494,9 +485,9 @@ export default function ChatScreen() {
 
     setLastInputMode(parsed.layer === 'command' ? 'shell' : 'natural');
 
-    // ── Demo mode: mock responses when Termux & AI are unavailable ──
+    // ── Demo mode: mock responses when no AI is configured ──
     const hasAnyApi = settings.geminiApiKey || settings.localLlmEnabled || settings.perplexityApiKey;
-    if (!isBridgeConnected && !hasAnyApi) {
+    if (!hasAnyApi) {
       // Determine agent for demo AI mocks
       const demoAgent: ChatAgent | undefined = parsed.layer === 'mention'
         ? (parsed.target === 'claude' ? 'claude' : parsed.target === 'gemini' ? 'gemini' : parsed.target === 'perplexity' ? 'perplexity' : parsed.target === 'local' ? 'local' : undefined)
@@ -595,63 +586,55 @@ export default function ChatScreen() {
       const msgId = addAssistantMessage(undefined);
       updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: t('chat.cmd_running') });
 
-      if (connectionMode === 'termux') {
-        try {
-          const result = await bridgeRunCommand(parsed.prompt);
-          const output = result.stdout || '';
-          const stderr = result.stderr ? `\n--- stderr ---\n${result.stderr}` : '';
-          updateMessage(chatSessionId, msgId, {
-            content: output + stderr,
-            isStreaming: false,
-            executions: [{
-              command: parsed.prompt,
-              output: output + stderr,
-              exitCode: result.exitCode,
-              isCollapsed: (output + stderr).split('\n').length > 10,
-            }],
-          });
-          // Advance onboarding after first successful command
-          if (onboardingStep === 'welcome' && result.exitCode === 0) {
-            setOnboardingStep('after_first_cmd');
-            setOnboardingStepState('after_first_cmd');
-            // Add onboarding message
-            addMessage(chatSessionId, {
-              id: generateId(),
-              role: 'assistant',
-              content: t('onboarding.after_cmd'),
-              timestamp: Date.now(),
-            });
-          }
-          // Log to shared execution log (visible in Terminal tab)
-          useExecutionLogStore.getState().addEntry({
-            source: 'chat',
+      try {
+        const result = await bridgeRunCommand(parsed.prompt);
+        const output = result.stdout || '';
+        const stderr = result.stderr ? `\n--- stderr ---\n${result.stderr}` : '';
+        updateMessage(chatSessionId, msgId, {
+          content: output + stderr,
+          isStreaming: false,
+          executions: [{
             command: parsed.prompt,
-            output: (output + stderr).slice(0, 500),
+            output: output + stderr,
             exitCode: result.exitCode,
-          });
-
-          // ── Auto-check: propose or poll after successful git push ──
-          if (result.exitCode === 0 && /^git\s+push\b/.test(parsed.prompt)) {
-            const offered = await AsyncStorage.getItem('shelly_autocheck_offered').catch(() => null);
-            if (offered === 'true') {
-              // CI already configured — poll for results
-              startWorkflowPoll();
-            } else {
-              maybeShowAutoCheckProposal();
-            }
-          }
-        } catch (err) {
-          updateMessage(chatSessionId, msgId, {
-            content: '',
-            error: `Error: ${err instanceof Error ? err.message : String(err)}`,
-            isStreaming: false,
+            isCollapsed: (output + stderr).split('\n').length > 10,
+          }],
+        });
+        // Advance onboarding after first successful command
+        if (onboardingStep === 'welcome' && result.exitCode === 0) {
+          setOnboardingStep('after_first_cmd');
+          setOnboardingStepState('after_first_cmd');
+          // Add onboarding message
+          addMessage(chatSessionId, {
+            id: generateId(),
+            role: 'assistant',
+            content: t('onboarding.after_cmd'),
+            timestamp: Date.now(),
           });
         }
-      } else {
+        // Log to shared execution log (visible in Terminal tab)
+        useExecutionLogStore.getState().addEntry({
+          source: 'chat',
+          command: parsed.prompt,
+          output: (output + stderr).slice(0, 500),
+          exitCode: result.exitCode,
+        });
+
+        // ── Auto-check: propose or poll after successful git push ──
+        if (result.exitCode === 0 && /^git\s+push\b/.test(parsed.prompt)) {
+          const offered = await AsyncStorage.getItem('shelly_autocheck_offered').catch(() => null);
+          if (offered === 'true') {
+            // CI already configured — poll for results
+            startWorkflowPoll();
+          } else {
+            maybeShowAutoCheckProposal();
+          }
+        }
+      } catch (err) {
         updateMessage(chatSessionId, msgId, {
-          content: t('chat.connect_termux'),
+          content: '',
+          error: `Error: ${err instanceof Error ? err.message : String(err)}`,
           isStreaming: false,
-          error: t('chat.not_connected'),
         });
       }
       return;
@@ -813,7 +796,7 @@ export default function ChatScreen() {
         console.error('[handleSend] Failed to display error:', innerErr);
       }
     }
-  }, [chatSessionId, connectionMode, sendCommand, activeSession.id, activeSession.currentDir, settings, addMessage, updateMessage, setLastInputMode, router, addUserMessage, addAssistantMessage, bridgeRunCommand, execForContext, aiDispatch, isBridgeConnected, activeCliSession, setActiveCliSession]);
+  }, [chatSessionId, activeSession.id, activeSession.currentDir, settings, addMessage, updateMessage, setLastInputMode, router, addUserMessage, addAssistantMessage, bridgeRunCommand, execForContext, aiDispatch, activeCliSession, setActiveCliSession]);
 
   // ── Regenerate: re-send the user message that preceded an assistant message ──
   const handleRegenerate = useCallback((assistantMsgId: string) => {
@@ -862,13 +845,12 @@ export default function ChatScreen() {
   }, [chatSessionId, deleteMessage, cancelStreaming]);
 
   const handleCancel = useCallback(() => {
-    cancelCurrent();
     cancelStreaming();
     if (demoTimerRef.current) {
       clearTimeout(demoTimerRef.current);
       demoTimerRef.current = null;
     }
-  }, [cancelCurrent, cancelStreaming]);
+  }, [cancelStreaming]);
 
   // ── Actions Wizard handlers ──
   const handleWizardUpdate = useCallback((messageId: string, data: ActionsWizardData) => {
@@ -1150,7 +1132,7 @@ export default function ChatScreen() {
                     }
                     addUserMessage(`$ ${cmd}`);
                     // Execute and show result in chat (not terminal-store)
-                    if (chatSessionId && connectionMode === 'termux') {
+                    if (chatSessionId) {
                       const msgId = addAssistantMessage(undefined);
                       updateMessage(chatSessionId, msgId, { isStreaming: true, streamingText: t('chat.cmd_running') });
                       bridgeRunCommand(cmd).then((result) => {
@@ -1172,8 +1154,6 @@ export default function ChatScreen() {
                           isStreaming: false,
                         });
                       });
-                    } else {
-                      executeCommandSafely(cmd);
                     }
                   }}
                 >
@@ -1207,9 +1187,9 @@ export default function ChatScreen() {
             onStopGenerating={handleCancel}
             isStreaming={isAnyStreaming}
             projectDir={currentDir || undefined}
-            runCommand={isBridgeConnected ? savepointExec : undefined}
-            sendToTerminal={isBridgeConnected ? sendCommand : undefined}
-            runCommandInBackground={isBridgeConnected ? runCommandInBackground : undefined}
+            runCommand={savepointExec}
+            sendToTerminal={undefined}
+            runCommandInBackground={runCommandInBackground}
             onWizardUpdate={handleWizardUpdate}
             onWizardComplete={handleWizardComplete}
             onAutoCheckEnable={handleAutoCheckEnable}
@@ -1236,9 +1216,9 @@ export default function ChatScreen() {
           onHistoryUp={handleHistoryUp}
           onHistoryDown={handleHistoryDown}
           onCtrlC={handleCancel}
-          onStdin={hasActiveCommand ? sendStdin : undefined}
-          isRunning={isAnyStreaming || hasActiveCommand}
-          isBridgeConnected={isBridgeConnected}
+          onStdin={undefined}
+          isRunning={isAnyStreaming}
+          isBridgeConnected={true}
           showShortcutBar={settings.externalKeyboardShortcuts ?? false}
         />
       </KeyboardAvoidingView>

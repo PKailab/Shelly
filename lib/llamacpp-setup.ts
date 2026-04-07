@@ -331,9 +331,8 @@ export function estimateTotalSetupTime(steps: LlamaCppSetupStep[]): number {
 }
 
 /**
- * shelly-bridge + llama-server を1コマンドで起動するスクリプトを生成する。
- * Termuxのマルチウィンドウ不要。llama-serverをnohupでバックグラウンド起動後、
- * shelly-bridgeをフォアグラウンドで起動する（Ctrl+Cで両方停止）。
+ * llama-server を起動するスクリプトを生成する。
+ * Termuxのマルチウィンドウ不要。llama-serverをバックグラウンドで起動する。
  */
 export function buildStartAllScript(model: LlamaCppModel): string {
   const logFile = `${MODELS_DIR}/llama-server.log`;
@@ -342,16 +341,14 @@ export function buildStartAllScript(model: LlamaCppModel): string {
 
   return [
     `#!/data/data/com.termux/files/usr/bin/bash`,
-    `# Shelly 一括起動スクリプト`,
-    `# llama-server + shelly-bridge を1コマンドで起動`,
+    `# Shelly llama-server 起動スクリプト`,
     ``,
     `# 1. 既存プロセスを停止`,
     `pkill -f llama-server 2>/dev/null || true`,
-    `pkill -f "node.*server.js" 2>/dev/null || true`,
     `sleep 1`,
     ``,
     `# 2. llama-serverをバックグラウンドで起動`,
-    `echo "[1/2] llama-serverを起動中..."`,
+    `echo "llama-serverを起動中..."`,
     `nohup ${startCmd} > "${logFile}" 2>&1 &`,
     `echo $! > "${pidFile}"`,
     `echo "llama-server started (PID: $(cat ${pidFile}))"`,
@@ -366,15 +363,8 @@ export function buildStartAllScript(model: LlamaCppModel): string {
     `  sleep 1`,
     `done`,
     ``,
-    `# 4. shelly-bridgeをフォアグラウンドで起動`,
-    `echo "[2/2] shelly-bridgeを起動中..."`,
-    `echo "Ctrl+C で両方停止できます"`,
-    `node ~/shelly-bridge/server.js`,
-    ``,
-    `# 5. bridge停止時にllama-serverも停止`,
-    `echo "shelly-bridge stopped. Stopping llama-server..."`,
-    `pkill -f llama-server 2>/dev/null || true`,
-    `echo "All stopped."`,
+    `echo "Done. llama-server is running in background."`,
+    `echo "Log: ${logFile}"`,
   ].join('\n');
 }
 

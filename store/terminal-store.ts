@@ -8,16 +8,9 @@ import {
   AppSettings,
   OutputLine,
   ConnectionMode,
-  BridgeStatus,
-  TermuxSettings,
 } from './types';
 import { executeCommand } from '@/lib/pseudo-shell';
 import { useSettingsStore } from './settings-store';
-
-/** @deprecated — kept for use-termux-bridge.ts compat, will be removed */
-export const _pendingTmuxKills: string[] = [];
-/** @deprecated — kept for use-termux-bridge.ts compat, will be removed */
-export const _pendingTmuxClears: string[] = [];
 
 // ─── Multi-session pool ────────────────────────────────────────────────
 
@@ -57,10 +50,8 @@ type TerminalState = {
   settings: AppSettings;
   isSettingsLoaded: boolean;
 
-  // Termux bridge state
+  // Connection mode (always 'native' — JNI forkpty, no Termux bridge)
   connectionMode: ConnectionMode;
-  bridgeStatus: BridgeStatus;
-  termuxSettings: TermuxSettings;
 
   /** Snippet insert-only: command to pre-fill in the input field */
   pendingCommand: string | null;
@@ -83,11 +74,6 @@ type TerminalState = {
 
   // Actions — commands
   runCommand: (command: string) => void;
-  /**
-   * Called by useTermuxBridge when a real command starts streaming.
-   * Creates the block in 'running' state and returns its id.
-   */
-  startTermuxBlock: (command: string) => string;
   /** Append a stdout/stderr line to a running block */
   appendOutputToBlock: (blockId: string, line: OutputLine) => void;
   /** Append multiple lines at once (batched — reduces re-renders) */
@@ -116,8 +102,6 @@ type TerminalState = {
 
   // Actions — connection
   setConnectionMode: (mode: ConnectionMode) => void;
-  setBridgeStatus: (status: BridgeStatus) => void;
-  updateTermuxSettings: (s: Partial<TermuxSettings>) => void;
 
   // Actions — pending command (Creator / Snippet insert)
   /** Pre-fill the Terminal input field without running */
@@ -158,11 +142,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   isSettingsLoaded: false,
 
   // Native terminal (Plan B: JNI forkpty + linker64)
-  // Changed from 'termux' to 'native' — Termux bridge is no longer the default.
-  // Users can switch back to 'termux' mode in Settings if needed.
   connectionMode: 'native',
-  bridgeStatus: 'idle',
-  termuxSettings: useSettingsStore.getState().termuxSettings,
   pendingCommand: null,
   lastInputMode: 'shell',
   activeCliSession: null,
@@ -323,41 +303,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }, 150);
   },
 
-  // ── Termux streaming block management ──────────────────────────────────────
-
-  startTermuxBlock: (command: string) => {
-    const { sessions, activeSessionId } = get();
-    const session = sessions.find((s) => s.id === activeSessionId);
-    if (!session) return '';
-
-    const blockId = `block-${Date.now()}-tx`;
-
-    const newBlock: CommandBlock = {
-      id: blockId,
-      sessionId: activeSessionId,
-      command,
-      output: [],
-      timestamp: Date.now(),
-      exitCode: null,
-      isRunning: true,
-      connectionMode: get().connectionMode,
-    };
-
-    const newHistory = command.trim()
-      ? [command, ...session.commandHistory.filter((c) => c !== command)].slice(0, 100)
-      : session.commandHistory;
-
-    set((state) => ({
-      sessions: state.sessions.map((s) =>
-        s.id === activeSessionId
-          ? { ...s, blocks: [...s.blocks, newBlock], commandHistory: newHistory, historyIndex: -1 }
-          : s
-      ),
-    }));
-
-    return blockId;
-  },
-
   appendOutputToBlock: (blockId: string, line: OutputLine) => {
     const { sessions, activeSessionId } = get();
     const sIdx = sessions.findIndex((s) => s.id === activeSessionId);
@@ -510,8 +455,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   loadSettings: async () => {
     await useSettingsStore.getState().loadSettings();
     // Sync loaded values to terminal-store for backward compat
-    const { settings, termuxSettings, isSettingsLoaded } = useSettingsStore.getState();
-    set({ settings, termuxSettings, isSettingsLoaded });
+    const { settings, isSettingsLoaded } = useSettingsStore.getState();
+    set({ settings, isSettingsLoaded });
     // Restore terminal sessions
     await get().loadSessionState();
   },
@@ -520,14 +465,6 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setConnectionMode: (mode: ConnectionMode) => {
     set({ connectionMode: mode });
-  },
-
-  setBridgeStatus: (status: BridgeStatus) => {
-    set({ bridgeStatus: status });
-  },
-
-  updateTermuxSettings: (s: Partial<TermuxSettings>) => {
-    useSettingsStore.getState().updateTermuxSettings(s);
   },
 
   // ── Pending command (Creator / Snippet insert) ─────────────────────────────────────────
@@ -688,7 +625,6 @@ export const useActiveSession = () =>
 useSettingsStore.subscribe((state) => {
   useTerminalStore.setState({
     settings: state.settings,
-    termuxSettings: state.termuxSettings,
     isSettingsLoaded: state.isSettingsLoaded,
   });
 });

@@ -1,10 +1,10 @@
 /**
  * store/settings-store.ts — App settings extracted from terminal-store.
- * Single source of truth for AppSettings + TermuxSettings.
+ * Single source of truth for AppSettings.
  */
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppSettings, TermuxSettings } from './types';
+import { AppSettings } from './types';
 import { saveApiKey, loadApiKeys, isApiKeyField, stripApiKeys } from '@/lib/secure-store';
 import { useSoundStore } from '@/lib/sounds';
 import { useAgentStore } from '@/store/agent-store';
@@ -48,35 +48,25 @@ export const DEFAULT_SETTINGS: AppSettings = {
   gpuRendering: false,
 };
 
-export const DEFAULT_TERMUX_SETTINGS: TermuxSettings = {
-  wsUrl: 'ws://127.0.0.1:8765',
-  autoReconnect: true,
-  timeoutSeconds: 30,
-};
-
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 interface SettingsState {
   settings: AppSettings;
-  termuxSettings: TermuxSettings;
   isSettingsLoaded: boolean;
 
   loadSettings: () => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => void;
   resetSettings: () => void;
-  updateTermuxSettings: (partial: Partial<TermuxSettings>) => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
-  termuxSettings: DEFAULT_TERMUX_SETTINGS,
   isSettingsLoaded: false,
 
   loadSettings: async () => {
     try {
-      const [settingsRaw, termuxRaw, secureKeys] = await Promise.all([
+      const [settingsRaw, secureKeys] = await Promise.all([
         AsyncStorage.getItem('shelly_settings'),
-        AsyncStorage.getItem('shelly_termux_settings'),
         loadApiKeys(),
       ]);
       const settings = {
@@ -84,16 +74,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         ...(settingsRaw ? JSON.parse(settingsRaw) : {}),
         ...secureKeys,
       };
-      const termuxSettings = termuxRaw
-        ? { ...DEFAULT_TERMUX_SETTINGS, ...JSON.parse(termuxRaw) }
-        : DEFAULT_TERMUX_SETTINGS;
       // Sync sound store on load
       useSoundStore.getState().setEnabled(settings.soundEffects ?? true);
       useSoundStore.getState().setVolume(settings.soundVolume ?? 0.6);
-      set({ settings, termuxSettings, isSettingsLoaded: true });
+      set({ settings, isSettingsLoaded: true });
     } catch (err) {
       console.error('[Settings] loadSettings failed, using defaults:', err);
-      set({ settings: DEFAULT_SETTINGS, termuxSettings: DEFAULT_TERMUX_SETTINGS, isSettingsLoaded: true });
+      set({ settings: DEFAULT_SETTINGS, isSettingsLoaded: true });
     }
   },
 
@@ -131,18 +118,5 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   resetSettings: () => {
     set({ settings: DEFAULT_SETTINGS });
     AsyncStorage.setItem('shelly_settings', JSON.stringify(DEFAULT_SETTINGS)).catch(() => {});
-  },
-
-  updateTermuxSettings: (s: Partial<TermuxSettings>) => {
-    set((state) => {
-      const updated = { ...state.termuxSettings, ...s };
-      if (updated.wsUrl && !/^wss?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(updated.wsUrl)) {
-        console.warn('[Security] Non-local WebSocket URL detected:', updated.wsUrl);
-      }
-      AsyncStorage.setItem('shelly_termux_settings', JSON.stringify(updated)).catch((e) => {
-        console.warn('[TermuxSettings] persist failed:', e);
-      });
-      return { termuxSettings: updated };
-    });
   },
 }));

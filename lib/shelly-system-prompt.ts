@@ -25,8 +25,8 @@ function getShellyIdentity(): string {
     : 'You are Shelly\'s AI assistant. Reply concisely in English.';
 
   const appDesc = locale === 'ja'
-    ? 'Shellyは Android のAI統合ターミナルアプリです（バックエンドはTermux）。'
-    : 'Shelly is an AI-integrated terminal app for Android (powered by Termux).';
+    ? 'Shellyは Android のAI統合ターミナルアプリです。'
+    : 'Shelly is an AI-integrated terminal app for Android.';
 
   const cmdHeader = locale === 'ja'
     ? '# 利用可能なコマンド（正確な名前を使うこと）'

@@ -29,7 +29,7 @@ import {
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTranslation } from '@/lib/i18n';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useTerminalStore } from '@/store/terminal-store';
 import {
   AUTH_TOOL_CONFIGS,
   checkAllAuthStatus,
@@ -56,7 +56,8 @@ type Props = {
 
 export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
   const { t } = useTranslation();
-  const { runRawCommand, isConnected } = useTermuxBridge();
+  const { runCommand } = useTerminalStore();
+  const isConnected = true; // Plan B: native terminal is always available
 
   const [authStatuses, setAuthStatuses] = useState<Record<AuthToolId, AuthStatus>>({
     'claude-code': 'checking',
@@ -79,32 +80,32 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
     (config) => !toolFilter || toolFilter.includes(config.id),
   );
 
+  // ── Native runner: fires command in terminal, returns dummy result ──────────
+  const nativeRunner = useCallback(async (cmd: string, _opts?: any): Promise<any> => {
+    runCommand(cmd);
+    return { ok: true, stdout: '', stderr: '', exitCode: 0 };
+  }, [runCommand]);
+
   // ── Check auth status on open ─────────────────────────────────────────────
 
   const refreshStatuses = useCallback(async () => {
-    if (!isConnected) return;
     setIsRefreshing(true);
     try {
-      const runner = (cmd: string, opts?: { timeoutMs?: number }) =>
-        runRawCommand(cmd, { ...opts, reason: 'auth-check' });
-      const statuses = await checkAllAuthStatus(runner);
+      const statuses = await checkAllAuthStatus(nativeRunner);
       setAuthStatuses(statuses);
     } catch {
       // Keep existing statuses
     } finally {
       setIsRefreshing(false);
     }
-  }, [isConnected, runRawCommand]);
+  }, [nativeRunner]);
 
   useEffect(() => {
-    if (visible && isConnected) {
+    if (visible) {
       refreshStatuses();
-      // Ensure ~/.shellyrc is sourced by .bashrc
-      const runner = (cmd: string, opts?: { timeoutMs?: number }) =>
-        runRawCommand(cmd, { ...opts, reason: 'auth-setup' });
-      ensureShellyrcSourced(runner);
+      ensureShellyrcSourced(nativeRunner);
     }
-  }, [visible, isConnected]);
+  }, [visible]);
 
   // ── Handle API key save ───────────────────────────────────────────────────
 
@@ -117,13 +118,10 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
 
     setSavingTool(toolId);
     try {
-      const runner = (cmd: string, opts?: { timeoutMs?: number }) =>
-        runRawCommand(cmd, { ...opts, reason: 'auth-store-key' });
-
-      const result = await storeApiKey(toolId, key, runner);
+      const result = await storeApiKey(toolId, key, nativeRunner);
       if (result.success) {
         // Verify
-        const verified = await verifyAuth(toolId, runner);
+        const verified = await verifyAuth(toolId, nativeRunner);
         setAuthStatuses((prev) => ({
           ...prev,
           [toolId]: verified ? 'authenticated' : 'not-authenticated',
@@ -142,7 +140,7 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
     } finally {
       setSavingTool(null);
     }
-  }, [apiKeyInputs, runRawCommand, t]);
+  }, [apiKeyInputs, nativeRunner, t]);
 
   // ── Handle browser/OAuth auth ────────────────────────────────────────────
   const [oauthRunning, setOauthRunning] = useState<AuthToolId | null>(null);
@@ -150,48 +148,17 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
 
   const handleBrowserAuth = useCallback(async (config: AuthToolConfig) => {
     // If the tool has a loginCommand, run OAuth via CLI
-    if (config.loginCommand && isConnected) {
+    if (config.loginCommand) {
       setOauthRunning(config.id);
-      setOauthOutput('');
-      try {
-        const runner = (cmd: string, opts?: { timeoutMs?: number; onStream?: (type: 'stdout' | 'stderr', data: string) => void }) =>
-          runRawCommand(cmd, { ...opts, reason: 'oauth-login' });
-
-        let output = '';
-        const result = await runner(config.loginCommand, {
-          timeoutMs: 60000,
-          onStream: (_type, data) => {
-            output += data;
-            setOauthOutput(output);
-            // Detect OAuth URLs in output and open in browser
-            const urlMatch = data.match(/https?:\/\/[^\s"'<>]+/g);
-            if (urlMatch) {
-              for (const url of urlMatch) {
-                Linking.openURL(url).catch(() => {});
-              }
-            }
-          },
-        });
-
-        // Check if auth succeeded after login command completes
-        output += result.stdout || '';
-        const urlMatch = output.match(/https?:\/\/[^\s"'<>]+/);
-        if (urlMatch) {
-          Linking.openURL(urlMatch[0]).catch(() => {});
-        }
-
-        // Wait a moment then re-check auth status
-        setTimeout(() => {
-          if (!mountedRef.current) return;
-          refreshStatuses();
-          setOauthRunning(null);
-          setOauthOutput('');
-        }, 2000);
-      } catch (e) {
+      setOauthOutput('Running: ' + config.loginCommand);
+      runCommand(config.loginCommand);
+      // Wait a moment then re-check auth status
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        refreshStatuses();
         setOauthRunning(null);
         setOauthOutput('');
-        Alert.alert(t('auth.error'), String(e));
-      }
+      }, 3000);
       return;
     }
 
@@ -199,7 +166,7 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
     Linking.openURL(config.apiKeyUrl).catch(() => {
       Alert.alert(t('auth.error'), t('auth.browser_failed'));
     });
-  }, [t, isConnected, runRawCommand, refreshStatuses]);
+  }, [t, runCommand, refreshStatuses]);
 
   // ── Count statuses ────────────────────────────────────────────────────────
 

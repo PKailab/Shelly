@@ -20,7 +20,6 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuickTerminalStore } from '@/hooks/use-quick-terminal';
 import { useTerminalStore } from '@/store/terminal-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { useTranslation } from '@/lib/i18n';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
@@ -37,8 +36,7 @@ export function QuickTerminal() {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<{ cmd: string; output: string }[]>([]);
 
-  const { connectionMode, runCommand } = useTerminalStore();
-  const { sendCommand, isConnected } = useTermuxBridge();
+  const { runCommand } = useTerminalStore();
   const { t } = useTranslation();
 
   // Reanimated shared values
@@ -89,14 +87,9 @@ export function QuickTerminal() {
     setInput('');
     playSound('send');
 
-    if (connectionMode === 'termux' && isConnected) {
-      sendCommand(cmd);
-      setHistory((h) => [...h.slice(-9), { cmd, output: t('quick.running_termux') }]);
-    } else {
-      runCommand(cmd);
-      setHistory((h) => [...h.slice(-9), { cmd, output: t('quick.completed') }]);
-    }
-  }, [input, connectionMode, isConnected, sendCommand, runCommand]);
+    runCommand(cmd);
+    setHistory((h) => [...h.slice(-9), { cmd, output: t('quick.completed') }]);
+  }, [input, runCommand]);
 
   const handleClose = useCallback(() => {
     playSound('quick_close');
@@ -126,7 +119,7 @@ export function QuickTerminal() {
             <MaterialIcons name="keyboard-arrow-down" size={18} color={colors.muted} />
             <Text style={[styles.headerTitle, { color: colors.infoText }]}>Quick Terminal</Text>
             <View style={styles.headerRight}>
-              <View style={[styles.statusDot, { backgroundColor: isConnected ? colors.accent : colors.error }]} />
+              <View style={[styles.statusDot, { backgroundColor: colors.accent }]} />
               <Pressable onPress={handleClose} hitSlop={8}>
                 <MaterialIcons name="close" size={16} color={colors.muted} />
               </Pressable>

@@ -23,8 +23,7 @@ import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
 import { useChatStore, type ChatSession } from '@/store/chat-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
-import { useTerminalStore } from '@/store/terminal-store';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation } from '@/lib/i18n';
@@ -69,9 +68,8 @@ export default function ProjectsScreen() {
   }, [isLoaded]);
 
   // ── Project scanning ──
-  const { bridgeStatus } = useTerminalStore();
-  const { runCommand } = useTermuxBridge();
-  const isConnected = bridgeStatus === 'connected';
+  const { runCommand } = useNativeExec();
+  const isConnected = true;
   const [projectDirs, setProjectDirs] = useState<ProjectEntry[]>([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const [expandedTimeline, setExpandedTimeline] = useState<string | null>(null);

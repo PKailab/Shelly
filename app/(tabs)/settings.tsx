@@ -17,9 +17,8 @@ import {
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTerminalStore } from '@/store/terminal-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
-import { BRIDGE_SERVER_JS, BRIDGE_SERVER_VERSION } from '@/lib/bridge-bundle';
-import { CursorShape, BridgeStatus } from '@/store/types';
+import { useNativeExec } from '@/hooks/use-native-exec';
+import { CursorShape } from '@/store/types';
 import { LlamaCppSection } from '@/components/settings/LlamaCppSection';
 import { LlamaCppModel, MODEL_CATALOG, buildStartAllScript, getRecommendedModel } from '@/lib/llamacpp-setup';
 import { useTranslation, t } from '@/lib/i18n';
@@ -27,7 +26,6 @@ import { useI18n, AVAILABLE_LOCALES } from '@/lib/i18n';
 import { useTheme, useThemeStore, getAllThemes } from '@/lib/theme-engine';
 import { TERMINAL_THEMES, TERMINAL_THEME_NAMES, getTerminalTheme, type TerminalTheme } from '@/lib/terminal-theme';
 import { useDotfilesStore } from '@/lib/dotfiles-sync';
-import { SetupWizard } from '@/components/SetupWizard';
 import { PackageManager as PackageManagerModal } from '@/components/PackageManager';
 import { saveCustomContext, loadCustomContext, DEFAULT_CUSTOM_CONTEXT } from '@/lib/shelly-system-prompt';
 import { AuthWizard } from '@/components/AuthWizard';
@@ -116,39 +114,6 @@ function SettingRow({
   );
 }
 
-function BridgeStatusBadge({ status }: { status: BridgeStatus }) {
-  const config: Record<BridgeStatus, { labelKey: string; color: string; bg: string }> = {
-    idle:         { labelKey: 'settings.not_connected',       color: '#4B5563', bg: '#4B556320' },
-    connecting:   { labelKey: 'settings.status_connecting',   color: '#FBBF24', bg: '#FBBF2420' },
-    connected:    { labelKey: 'settings.status_connected',    color: '#4ADE80', bg: '#4ADE8020' },
-    disconnected: { labelKey: 'settings.status_disconnected', color: '#6B7280', bg: '#6B728020' },
-    error:        { labelKey: 'settings.error_label',         color: '#F87171', bg: '#F8717120' },
-  };
-  const c = config[status];
-  return (
-    <View style={[statusBadgeStyles.badge, { backgroundColor: c.bg }]}>
-      {status === 'connecting' && (
-        <ActivityIndicator size="small" color={c.color} style={{ transform: [{ scale: 0.6 }], marginRight: 2 }} />
-      )}
-      <Text style={[statusBadgeStyles.text, { color: c.color }]}>{t(c.labelKey)}</Text>
-    </View>
-  );
-}
-
-const statusBadgeStyles = StyleSheet.create({
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 5,
-  },
-  text: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    fontWeight: '600',
-  },
-});
 
 // ─── Error Boundary ──────────────────────────────────────────────────────────
 
@@ -188,8 +153,6 @@ function SettingsScreenInner() {
   const {
     settings, updateSettings,
     sessions, clearSession,
-    termuxSettings, updateTermuxSettings,
-    bridgeStatus, connectionMode, setConnectionMode,
   } = useTerminalStore();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -207,15 +170,9 @@ function SettingsScreenInner() {
   React.useEffect(() => { dotfiles.loadConfig(); }, []);
   const [patInput, setPatInput] = useState('');
   const [showPkgManager, setShowPkgManager] = useState(false);
-  const { testConnection, writeFile, runCommand, runRawCommand } = useTermuxBridge();
+  const { writeFile, runCommand, runRawCommand } = useNativeExec();
 
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null);
-  const [wsUrlInput, setWsUrlInput] = useState(termuxSettings.wsUrl);
-  const [isUpdatingBridge, setIsUpdatingBridge] = useState(false);
-  const [bridgeUpdateResult, setBridgeUpdateResult] = useState<'success' | 'fail' | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [showAuthWizard, setShowAuthWizard] = useState(false);
   const [showAllThemes, setShowAllThemes] = useState(false);
   const [showAutoCheckWizard, setShowAutoCheckWizard] = useState(false);
@@ -272,30 +229,10 @@ function SettingsScreenInner() {
     setIsDiagRunning(true);
     setDiagResults({ bridge: 'checking', latency: null, claudeCli: 'checking', geminiCli: 'checking', codexCli: 'checking', ollama: 'checking', storage: 'checking' });
 
-    // 1. Bridge connection + latency
-    const t0 = Date.now();
-    const bridgeOk = await testConnection().catch(() => false);
-    const latencyMs = Date.now() - t0;
-    setDiagResults(prev => ({ ...prev, bridge: bridgeOk ? 'ok' : 'fail', latency: bridgeOk ? latencyMs : null }));
+    // 1. Native exec is always connected
+    setDiagResults(prev => ({ ...prev, bridge: 'ok', latency: 0 }));
 
-    // If bridge not connected, mark CLI checks as fail
-    if (!bridgeOk) {
-      setDiagResults(prev => ({ ...prev, claudeCli: 'fail', geminiCli: 'fail', codexCli: 'fail', storage: 'fail' }));
-      // Still check ollama directly
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 3000);
-        const res = await fetch(`${settings.localLlmUrl}/api/tags`, { signal: ctrl.signal }).catch(() => null);
-        clearTimeout(timer);
-        setDiagResults(prev => ({ ...prev, ollama: res?.ok ? 'ok' : 'fail' }));
-      } catch {
-        setDiagResults(prev => ({ ...prev, ollama: 'fail' }));
-      }
-      setIsDiagRunning(false);
-      return;
-    }
-
-    // 2. Check CLIs via bridge
+    // 2. Check CLIs via native exec
     const checkCli = async (cmd: string): Promise<boolean> => {
       try {
         const result = await runRawCommand(`which ${cmd}`, { timeoutMs: 5000 });
@@ -335,7 +272,7 @@ function SettingsScreenInner() {
     }
 
     setIsDiagRunning(false);
-  }, [testConnection, runRawCommand, settings.localLlmUrl]);
+  }, [runRawCommand, settings.localLlmUrl]);
 
   const copyDiagnostics = useCallback(() => {
     const d = diagResults;
@@ -349,12 +286,12 @@ function SettingsScreenInner() {
       `Codex CLI: ${statusLabel(d.codexCli)}`,
       `Ollama/llama-server: ${statusLabel(d.ollama)}`,
       `Storage: ${statusLabel(d.storage)}`,
-      `Connection Mode: ${connectionMode}`,
-      `Bridge URL: ${termuxSettings.wsUrl}`,
+      `Connection Mode: native`,
+      `Bridge URL: (native exec)`,
       `LLM URL: ${settings.localLlmUrl}`,
     ].join('\n');
     Share.share({ message: report, title: 'Shelly Diagnostics' });
-  }, [diagResults, connectionMode, termuxSettings.wsUrl, settings.localLlmUrl]);
+  }, [diagResults, settings.localLlmUrl]);
 
   const handleSelectModel = (model: LlamaCppModel) => {
     const modelName = model.filename.replace('.gguf', '');
@@ -386,21 +323,6 @@ function SettingsScreenInner() {
   const handleLineHeightChange = (delta: number) => {
     const newLH = Math.min(2.0, Math.max(1.0, Math.round((settings.lineHeight + delta) * 10) / 10));
     updateSettings({ lineHeight: newLH });
-  };
-
-  const handleTimeoutChange = (delta: number) => {
-    const newVal = Math.min(120, Math.max(5, termuxSettings.timeoutSeconds + delta));
-    updateTermuxSettings({ timeoutSeconds: newVal });
-  };
-
-  const handleWsUrlSave = () => {
-    const trimmed = wsUrlInput.trim();
-    if (!trimmed.startsWith('ws://') && !trimmed.startsWith('wss://')) {
-      Alert.alert(t('settings.url_error'), t('settings.url_ws_hint'));
-      return;
-    }
-    updateTermuxSettings({ wsUrl: trimmed });
-    Alert.alert(t('settings.saved'), t('settings.ws_url_updated', { url: trimmed }));
   };
 
   const handleOpenTermux = () => {
@@ -520,25 +442,6 @@ function SettingsScreenInner() {
     }
   }, [settings.localLlmUrl]);
 
-  const handleTestConnection = useCallback(async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    try {
-      const ok = await testConnection();
-      setTestResult(ok ? 'success' : 'fail');
-      if (ok) {
-        Alert.alert(t('settings.bridge_success_title'), t('settings.bridge_success_msg'));
-      } else {
-        Alert.alert(
-          t('settings.bridge_fail_title'),
-          t('settings.bridge_fail_msg', { url: termuxSettings.wsUrl })
-        );
-      }
-    } finally {
-      setIsTesting(false);
-    }
-  }, [testConnection, termuxSettings.wsUrl]);
-
   const handleGenerateStartScript = useCallback(async () => {
     // アクティブなモデルを取得（未選択の場合は推奨モデル）
     const modelId = activeModelId;
@@ -547,22 +450,10 @@ function SettingsScreenInner() {
     const script = buildStartAllScript(model);
     const scriptPath = '~/shelly-bridge/start-shelly.sh';
 
-    if (bridgeStatus !== 'connected') {
-      // 未接続時はスクリプトをbase64エンコードして共有（ペーストしてEnterだけでファイルを作成）
-      const b64 = Buffer.from(script).toString('base64');
-      const installCmd = `echo '${b64}' | base64 -d > ~/shelly-bridge/start-shelly.sh && chmod +x ~/shelly-bridge/start-shelly.sh && echo 'OK: ~/shelly-bridge/start-shelly.sh'`;
-      await Share.share({
-        message: `# Paste this line into Termux and press Enter:\n${installCmd}\n\n# After saving, just run:\n# ~/shelly-bridge/start-shelly.sh`,
-        title: 'Shelly Start Command',
-      });
-      return;
-    }
-
     setIsGeneratingScript(true);
     try {
       const result = await writeFile(scriptPath, script);
       if (result.ok) {
-        // chmod +xも実行
         await runRawCommand('chmod +x ~/shelly-bridge/start-shelly.sh', { timeoutMs: 5000 });
         Alert.alert(
           t('settings.script_saved_title'),
@@ -576,40 +467,7 @@ function SettingsScreenInner() {
     } finally {
       setIsGeneratingScript(false);
     }
-  }, [bridgeStatus, writeFile, runRawCommand, activeModelId]);
-
-  const handleUpdateBridge = useCallback(async () => {
-    if (bridgeStatus !== 'connected') {
-      Alert.alert(
-        t('settings.termux_not_connected'),
-        t('settings.termux_not_connected_msg')
-      );
-      return;
-    }
-    setIsUpdatingBridge(true);
-    setBridgeUpdateResult(null);
-    try {
-      const result = await writeFile(
-        '~/shelly-bridge/server.js',  // server.js側でチルダ展開済み
-        BRIDGE_SERVER_JS
-      );
-      if (result.ok) {
-        setBridgeUpdateResult('success');
-        Alert.alert(
-          t('settings.bridge_updated_title'),
-          t('settings.bridge_updated_msg', { version: BRIDGE_SERVER_VERSION })
-        );
-      } else {
-        setBridgeUpdateResult('fail');
-        Alert.alert(t('settings.update_failed'), t('settings.update_failed_msg', { error: result.error ?? '' }));
-      }
-    } catch (_e) {
-      setBridgeUpdateResult('fail');
-      Alert.alert(t('settings.update_failed'), t('settings.unexpected_error'));
-    } finally {
-      setIsUpdatingBridge(false);
-    }
-  }, [bridgeStatus, writeFile]);
+  }, [writeFile, runRawCommand, activeModelId]);
 
 
   const handleExportLog = useCallback(async () => {
@@ -888,144 +746,20 @@ function SettingsScreenInner() {
         </Pressable>
 
         {showAdvanced && (<>
-        {/* ── Termux Bridge ─────────────────────────────────────────────────── */}
+        {/* ── Terminal (Native) ─────────────────────────────────────────────── */}
         <SectionHeader
           title={t('settings.termux_title')}
-          subtitle={t('settings.termux_subtitle')}
+          subtitle="Native terminal — always connected via JNI"
         />
 
         {/* Status row */}
         <View style={styles.termuxStatusRow}>
           <Text style={styles.termuxStatusLabel}>Connection status</Text>
-          <BridgeStatusBadge status={bridgeStatus} />
-        </View>
-
-        {/* Current mode */}
-        <View style={styles.termuxStatusRow}>
-          <Text style={styles.termuxStatusLabel}>Current mode</Text>
-          <View style={styles.modeChips}>
-            {(['native', 'termux', 'disconnected'] as const).map((m) => (
-              <Pressable
-                key={m}
-                onPress={() => setConnectionMode(m)}
-                style={[
-                  styles.modeChip,
-                  connectionMode === m && styles.modeChipActive,
-                ]}
-              >
-                <Text style={[
-                  styles.modeChipText,
-                  connectionMode === m && styles.modeChipTextActive,
-                ]}>
-                  {m === 'native' ? 'Native' : m === 'termux' ? 'Termux' : 'Off'}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: '#16532544' }}>
+            <Text style={{ color: '#4ADE80', fontSize: 12, fontWeight: '600' }}>Native (always on)</Text>
           </View>
         </View>
 
-        {/* WebSocket URL */}
-        <View style={styles.wsUrlRow}>
-          <Text style={styles.wsUrlLabel}>WebSocket URL</Text>
-          <View style={styles.wsUrlInputRow}>
-            <TextInput
-              style={styles.wsUrlInput}
-              value={wsUrlInput}
-              onChangeText={setWsUrlInput}
-              placeholder="ws://127.0.0.1:8765"
-              placeholderTextColor="#3D4451"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={handleWsUrlSave}
-            />
-            <Pressable onPress={handleWsUrlSave} style={styles.wsUrlSaveBtn}>
-              <Text style={styles.wsUrlSaveBtnText}>Save</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.wsUrlHint}>
-            Bridge server URL running in Termux.{'\n'}
-            Use ws://127.0.0.1:8765 for same device.{'\n'}
-            Start command: node ~/shelly-bridge/server.js
-          </Text>
-        </View>
-
-        {/* Auto-reconnect */}
-        <SettingRow label={t('settings.auto_reconnect_label')} description={t('settings.auto_reconnect_desc')}>
-          <Switch
-            value={termuxSettings.autoReconnect}
-            onValueChange={(v) => updateTermuxSettings({ autoReconnect: v })}
-            trackColor={{ false: '#2D2D2D', true: '#93C5FD50' }}
-            thumbColor={termuxSettings.autoReconnect ? '#93C5FD' : '#6B7280'}
-          />
-        </SettingRow>
-
-        {/* Timeout */}
-        <SettingRow label={t('settings.timeout_label')} description={t('settings.timeout_desc', { seconds: termuxSettings.timeoutSeconds })}>
-          <View style={styles.stepper}>
-            <Pressable onPress={() => handleTimeoutChange(-5)} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>−</Text>
-            </Pressable>
-            <Text style={styles.stepValue}>{termuxSettings.timeoutSeconds}s</Text>
-            <Pressable onPress={() => handleTimeoutChange(5)} style={styles.stepBtn}>
-              <Text style={styles.stepBtnText}>+</Text>
-            </Pressable>
-          </View>
-        </SettingRow>
-
-        {/* Test connection button */}
-        <Pressable
-          onPress={handleTestConnection}
-          disabled={isTesting}
-          style={[styles.actionButton, styles.testButton, isTesting && styles.actionButtonDisabled]}
-        >
-          {isTesting ? (
-            <ActivityIndicator size="small" color="#93C5FD" />
-          ) : (
-            <MaterialIcons
-              name={testResult === 'success' ? 'check-circle' : testResult === 'fail' ? 'error' : 'wifi-tethering'}
-              size={18}
-              color={testResult === 'success' ? '#4ADE80' : testResult === 'fail' ? '#F87171' : '#93C5FD'}
-            />
-          )}
-          <Text style={[
-            styles.actionButtonText,
-            testResult === 'success' && { color: '#4ADE80' },
-            testResult === 'fail' && { color: '#F87171' },
-            !testResult && { color: '#93C5FD' },
-          ]}>
-            {isTesting ? 'Testing connection...' :
-             testResult === 'success' ? 'Connected' :
-             testResult === 'fail' ? 'Connection failed' :
-             'Test connection'}
-          </Text>
-          {!isTesting && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
-        </Pressable>
-
-        {/* Update bridge button */}
-        <Pressable
-          onPress={handleUpdateBridge}
-          disabled={isUpdatingBridge}
-          style={[styles.actionButton, styles.updateBridgeButton, isUpdatingBridge && styles.actionButtonDisabled]}
-        >
-          {isUpdatingBridge ? (
-            <ActivityIndicator size="small" color="#FCD34D" />
-          ) : (
-            <MaterialIcons
-              name={bridgeUpdateResult === 'success' ? 'check-circle' : bridgeUpdateResult === 'fail' ? 'error' : 'system-update-alt'}
-              size={18}
-              color={bridgeUpdateResult === 'success' ? '#4ADE80' : bridgeUpdateResult === 'fail' ? '#F87171' : '#FCD34D'}
-            />
-          )}
-          <Text style={[styles.actionButtonText, { color: bridgeUpdateResult === 'success' ? '#4ADE80' : bridgeUpdateResult === 'fail' ? '#F87171' : '#FCD34D' }]}>
-            {isUpdatingBridge ? 'Updating bridge...' :
-             bridgeUpdateResult === 'success' ? 'Updated (please restart)' :
-             bridgeUpdateResult === 'fail' ? 'Update failed' :
-             `Update bridge to latest (v${BRIDGE_SERVER_VERSION})`}
-          </Text>
-          {!isUpdatingBridge && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
-        </Pressable>
 
         {/* Generate start-all script button */}
         <Pressable
@@ -1039,15 +773,12 @@ function SettingsScreenInner() {
             <MaterialIcons name="play-circle-filled" size={18} color="#4ADE80" />
           )}
           <Text style={[styles.actionButtonText, { color: '#4ADE80' }]}>
-            {isGeneratingScript ? 'Generating script...' :
-             bridgeStatus === 'connected' ? 'Save start script (start-shelly.sh)' :
-             'Share start script'}
+            {isGeneratingScript ? 'Generating script...' : 'Save llama-server start script'}
           </Text>
           {!isGeneratingScript && <MaterialIcons name="chevron-right" size={18} color="#6B7280" />}
         </Pressable>
         <Text style={[styles.wsUrlHint, { marginHorizontal: 16, marginTop: -4, marginBottom: 8 }]}>
-          Start llama-server + shelly-bridge with one command. No multi-window needed.{'\n'}
-          Auto-saves when connected, shares content when disconnected.
+          Saves llama-server startup script to ~/shelly-bridge/start-shelly.sh
         </Text>
 
         {/* Open Termux button */}
@@ -1170,7 +901,7 @@ function SettingsScreenInner() {
 
         {/* ── llama.cpp モデル管理 ──────────────────────────────────────────── */}
         <LlamaCppSection
-          isConnected={bridgeStatus === 'connected'}
+          isConnected={true}
           activeModelId={activeModelId}
           installedModelIds={installedModelIds}
           onSelectModel={handleSelectModel}
@@ -1771,18 +1502,6 @@ function SettingsScreenInner() {
           <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
         </Pressable>
 
-        {/* ── Setup Reset ──────────────────────────────────── */}
-        <Pressable
-          onPress={() => setShowSetupWizard(true)}
-          style={[styles.actionButton, { borderColor: '#60A5FA33' }]}
-        >
-          <MaterialIcons name="build" size={18} color="#60A5FA" />
-          <Text style={[styles.actionButtonText, { color: '#60A5FA' }]}>
-            {bridgeStatus === 'connected' ? 'Setup Wizard (reconfigure)' : 'Open Setup Wizard'}
-          </Text>
-          <MaterialIcons name="chevron-right" size={18} color="#6B7280" />
-        </Pressable>
-
         {/* ── Diagnostics ──────────────────────────────────────────────────── */}
         <SectionHeader title={t('settings.diagnostics_title')} subtitle={t('settings.diagnostics_subtitle')} />
 
@@ -1856,19 +1575,13 @@ function SettingsScreenInner() {
         <PackageManagerModal
           visible={showPkgManager}
           onClose={() => setShowPkgManager(false)}
-          isConnected={bridgeStatus === 'connected'}
+          isConnected={true}
           onRunCommand={(cmd: string) => {
             runCommand(cmd);
             setShowPkgManager(false);
           }}
         />
       )}
-      {/* Setup Wizard (re-setup from settings) */}
-      <SetupWizard
-        visible={showSetupWizard}
-        onComplete={() => setShowSetupWizard(false)}
-        isResetup
-      />
       {/* Auth Wizard */}
       <AuthWizard
         visible={showAuthWizard}

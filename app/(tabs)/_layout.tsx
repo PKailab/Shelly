@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { Tabs, useRouter } from "expo-router";
 import { Platform, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,18 +11,12 @@ import { matchKeybinding, type KeyAction } from "@/lib/keybindings";
 import { MultiPaneContainer } from "@/components/multi-pane/MultiPaneContainer";
 import { CommandPalette } from "@/components/CommandPalette";
 import { QuickTerminal } from "@/components/QuickTerminal";
-import { SetupWizard, isSetupWizardComplete } from "@/components/SetupWizard";
-import { BridgeRecoveryBanner } from "@/components/BridgeRecoveryBanner";
 import { useTerminalStore } from "@/store/terminal-store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useI18n } from "@/lib/i18n";
 import { useTheme, useThemeStore } from "@/lib/theme-engine";
 import { useA11yStore } from "@/lib/accessibility";
 import { usePluginStore } from "@/lib/plugin-api";
 import { useToolDiscovery } from "@/hooks/use-tool-discovery";
-
-// Module-level flag: survives component remounts (prevents wizard running twice)
-let _setupChecked = false;
 
 export default function TabLayout() {
   // CLI + LLM自動検出ポーリング
@@ -35,7 +29,6 @@ export default function TabLayout() {
   const theme = useTheme();
   const c = theme.colors;
   const insets = useSafeAreaInsets();
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
 
   // Initialize global stores on mount
   useEffect(() => {
@@ -43,19 +36,6 @@ export default function TabLayout() {
     useThemeStore.getState().loadTheme();
     useA11yStore.getState().loadConfig();
     usePluginStore.getState().loadPlugins();
-    if (!_setupChecked) {
-      _setupChecked = true;
-      // Native mode (Plan B) doesn't need Termux setup — skip wizard entirely
-      const mode = useTerminalStore.getState().connectionMode;
-      if (mode === 'native') {
-        // Mark as complete so it never triggers again
-        AsyncStorage.setItem('@shelly/setup_wizard_complete', 'true').catch(() => {});
-      } else {
-        isSetupWizardComplete().then((done) => {
-          if (!done) setShowSetupWizard(true);
-        });
-      }
-    }
   }, []);
 
   // ── Global keybinding handler (physical keyboard) ────────────────────────
@@ -123,7 +103,6 @@ export default function TabLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.background }}>
-      {!showSetupWizard && <BridgeRecoveryBanner />}
       <Tabs
         key={`tabs-${winWidth}-${winHeight}`}
         screenOptions={{
@@ -193,11 +172,6 @@ export default function TabLayout() {
       {/* Quick Terminal (drop-down overlay) — hidden on wide screens where Terminal pane is always visible */}
       {!layout.isWide && <QuickTerminal />}
 
-      {/* Setup Wizard (first launch — includes welcome screen) */}
-      <SetupWizard
-        visible={showSetupWizard}
-        onComplete={() => setShowSetupWizard(false)}
-      />
     </View>
   );
 }

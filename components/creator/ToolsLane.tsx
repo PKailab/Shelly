@@ -68,8 +68,6 @@ interface ToolsLaneProps {
   lastProject: CreatorProject | null;
   /** 全プロジェクト一覧（ターゲット選択用） */
   projects: CreatorProject[];
-  /** Termux接続状態 */
-  termuxConnected: boolean;
   /** コマンド実行（Termux bridge経由） */
   onRunCommand: (
     command: string,
@@ -84,7 +82,7 @@ interface ToolsLaneProps {
   onCancel: () => void;
   /** Terminalタブに送る */
   onSendToTerminal: (command: string) => void;
-  /** Termux Bridge接続テスト */
+  /** 接続テスト */
   onTestConnection?: () => Promise<boolean>;
   /** Local LLM設定 */
   localLlmConfig?: LocalLlmConfig;
@@ -95,7 +93,6 @@ interface ToolsLaneProps {
 export function ToolsLane({
   lastProject,
   projects,
-  termuxConnected,
   onRunCommand,
   onCancel,
   onSendToTerminal,
@@ -181,12 +178,6 @@ export function ToolsLane({
           addLog('system', `Sent to Terminal: ${result.delegatedCommand}`);
           setStatus('done');
         } else {
-          // Claude/GeminiはTermux経由で実行
-          if (!termuxConnected) {
-            addLog('stderr', `${getHandlerLabel(result.handledBy)} requires Termux Bridge connection.`);
-            setStatus('error');
-            return;
-          }
           setStatus('running');
           addLog('system', `Running: ${result.delegatedCommand}`);
           const execResult = await onRunCommand(result.delegatedCommand);
@@ -200,19 +191,11 @@ export function ToolsLane({
       setStatus('error');
       addLog('stderr', `Orchestration error: ${e}`);
     }
-  }, [userInput, localLlmConfig, conversationHistory, termuxConnected, onRunCommand, onSendToTerminal, clearLogs, addLog]);
+  }, [userInput, localLlmConfig, conversationHistory, onRunCommand, onSendToTerminal, clearLogs, addLog]);
 
   // ── Dependency Check ────────────────────────────────────────────────────────
 
   const handleCheck = useCallback(async () => {
-    if (!termuxConnected) {
-      Alert.alert(
-        'Termux not connected',
-        'Connect to Termux bridge first.\nSet WebSocket URL in Settings.',
-      );
-      return;
-    }
-
     const config = CLI_TOOLS[selectedTool];
     if (selectedTool === 'custom') {
       setStatus('ready');
@@ -242,16 +225,12 @@ export function ToolsLane({
       setStatus('check_failed');
       addLog('stderr', `Error during check: ${e}`);
     }
-  }, [termuxConnected, selectedTool, onRunCommand, clearLogs, addLog]);
+  }, [selectedTool, onRunCommand, clearLogs, addLog]);
 
   // ── Run ─────────────────────────────────────────────────────────────────────
 
   const handleRun = useCallback(async () => {
     if (!userInput.trim() && selectedTool !== 'custom') return;
-    if (!termuxConnected) {
-      Alert.alert('Termux not connected', 'Connect to Termux bridge first.');
-      return;
-    }
 
     const targetPath = targetProject
       ? `~/Projects/${targetProject.path}`
@@ -353,7 +332,7 @@ export function ToolsLane({
       }
     }
   }, [
-    userInput, customCommand, selectedTool, targetProject, termuxConnected,
+    userInput, customCommand, selectedTool, targetProject,
     onRunCommand, onSendToTerminal, clearLogs, addLog,
   ]);
 
@@ -655,49 +634,14 @@ export function ToolsLane({
       )}
 
       {/* Connection Status Banner */}
-      <View style={[styles.connectionBanner, termuxConnected ? styles.connectionBannerOk : styles.connectionBannerOff]}>
+      <View style={[styles.connectionBanner, styles.connectionBannerOk]}>
         <View style={styles.connectionBannerLeft}>
-          <View style={[styles.connectionDot, termuxConnected ? styles.connectionDotOk : styles.connectionDotOff]} />
-          <Text style={[styles.connectionBannerText, termuxConnected ? styles.connectionBannerTextOk : styles.connectionBannerTextOff]}>
-            {termuxConnected ? 'Termux Bridge connected' : 'Termux Bridge disconnected'}
+          <View style={[styles.connectionDot, styles.connectionDotOk]} />
+          <Text style={[styles.connectionBannerText, styles.connectionBannerTextOk]}>
+            Terminal connected (native)
           </Text>
         </View>
-        {!termuxConnected && onTestConnection && (
-          <Pressable
-            style={styles.bridgeCheckBtn}
-            onPress={handleBridgeCheck}
-            disabled={bridgeCheckStatus === 'checking'}
-          >
-            <Text style={styles.bridgeCheckBtnText}>
-              {bridgeCheckStatus === 'checking' ? 'Checking...' :
-               bridgeCheckStatus === 'ok' ? '✓ OK' :
-               bridgeCheckStatus === 'fail' ? '✕ Not running' :
-               'Check connection'}
-            </Text>
-          </Pressable>
-        )}
       </View>
-
-      {/* Bridge Setup Guide (shown when disconnected) */}
-      {!termuxConnected && (
-        <View style={styles.setupGuide}>
-          <Text style={styles.setupGuideTitle}>📱 Run the following in Termux</Text>
-          <Text style={styles.setupGuideStep}>1. Open Termux</Text>
-          <View style={styles.setupGuideCmd}>
-            <Text style={styles.setupGuideCmdText}>cd ~/shelly-bridge && node server.js</Text>
-          </View>
-          <Text style={styles.setupGuideNote}>
-            First-time setup required:
-          </Text>
-          <View style={styles.setupGuideCmd}>
-            <Text style={styles.setupGuideCmdText}>{'pkg install nodejs && mkdir -p ~/shelly-bridge && cp -r /sdcard/shelly-bridge/* ~/shelly-bridge/ && cd ~/shelly-bridge && npm install'}</Text>
-          </View>
-          <Text style={styles.setupGuideNote}>
-            After starting, go to Settings → Termux Bridge URL,
-            set ws://127.0.0.1:8765 and tap &apos;Check connection&apos;.
-          </Text>
-        </View>
-      )}
     </View>
   );
 }

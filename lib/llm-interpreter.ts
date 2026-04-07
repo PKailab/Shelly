@@ -325,7 +325,7 @@ export async function interpretTermuxOutput(
   const isJa = getCurrentLocale() === 'ja';
 
   const verboseError = isJa
-    ? `あなたはTermuxターミナルのエラー解説AIです。
+    ? `あなたはターミナルのエラー解説AIです。
 コマンドのエラー出力を見て、以下を日本語で答えてください：
 1. エラーの背景と原因（2〜3文で詳しく）
 2. 修正方法（具体的なコマンドがあれば必ず提示）
@@ -339,7 +339,7 @@ Analyze the error output and answer:
 Reply in 5-8 sentences. Put fix commands at the end as "Fix: command".`;
 
   const minimalError = isJa
-    ? `あなたはTermuxターミナルのエラー解説AIです。
+    ? `あなたはターミナルのエラー解説AIです。
 コマンドのエラー出力を見て、以下を日本語で簡潔に答えてください：
 1. エラーの原因（1〜2文）
 2. 修正方法（具体的なコマンドがあれば必ず提示）
@@ -351,7 +351,7 @@ Analyze the error output and answer concisely:
 Reply in 3-5 sentences. Put fix commands at the end as "Fix: command".`;
 
   const verboseSuccess = isJa
-    ? `あなたはTermuxターミナルの通訳AIです。
+    ? `あなたはターミナルの通訳AIです。
 コマンドの実行結果を見て、何が起きたかを日本語で3〜5文で丁寧に説明してください。
 初心者にも分かるよう、結果の意味や次にできることも触れてください。`
     : `You are a terminal output interpreter AI.
@@ -359,7 +359,7 @@ Explain what happened in 3-5 sentences.
 Use beginner-friendly language and mention what the user can do next.`;
 
   const minimalSuccess = isJa
-    ? `あなたはTermuxターミナルの通訳AIです。
+    ? `あなたはターミナルの通訳AIです。
 コマンドの実行結果を見て、何が起きたかを日本語で1〜3文で簡潔に説明してください。
 専門用語は避け、ユーザーが理解しやすい言葉で。`
     : `You are a terminal output interpreter AI.
@@ -419,7 +419,7 @@ export async function explainCommandIntent(
     return '';
   }
 
-  const systemPrompt = `あなたはTermuxコマンド解説AIです。
+  const systemPrompt = `あなたはターミナルコマンド解説AIです。
 ユーザーが実行しようとしているコマンドが何をするか、1文で日本語で説明してください。
 危険性がある場合は、短い警告も含めてください。
 回答は1〜2文以内。`;

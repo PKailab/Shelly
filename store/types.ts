@@ -8,24 +8,9 @@ export type ConnectionStatus = 'local' | 'ssh' | 'disconnected';
 /**
  * Active execution mode for the terminal.
  * - 'native'      : JNI forkpty + linker64 (Plan B, no Termux needed)
- * - 'termux'      : WebSocket → Termux bridge (legacy)
- * - 'disconnected': bridge configured but not connected
+ * - 'disconnected': session not yet started
  */
-export type ConnectionMode = 'native' | 'termux' | 'disconnected';
-
-/** WebSocket connection health */
-export type BridgeStatus =
-  | 'idle'          // never connected
-  | 'connecting'    // WS handshake in progress
-  | 'connected'     // WS open, ready
-  | 'disconnected'  // WS closed cleanly
-  | 'error';        // WS error / timeout
-
-export type TermuxSettings = {
-  wsUrl: string;             // e.g. "ws://127.0.0.1:8765"
-  autoReconnect: boolean;
-  timeoutSeconds: number;    // command execution timeout
-};
+export type ConnectionMode = 'native' | 'disconnected';
 
 // ─── Output / Blocks ─────────────────────────────────────────────────────────
 
@@ -55,8 +40,8 @@ export type CommandBlock = {
   /** Fine-grained status (superset of isRunning) */
   blockStatus?: BlockStatus;
   isSavedSnippet?: boolean;
-  /** Which mode was active when this block was created */
-  connectionMode?: ConnectionMode;
+  /** Which mode was active when this block was created (always 'native') */
+  connectionMode?: 'native';
   // ─── LLM通訳フィールド ─────────────────────────────────────────────────────
   /** Local LLMによる自然言語通訳テキスト（完了後に表示） */
   llmInterpretation?: string;

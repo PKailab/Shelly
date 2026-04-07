@@ -10,7 +10,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTerminalStore } from '@/store/terminal-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import { getActiveLlmLabel } from '@/hooks/use-tool-discovery';
 import { UsageIndicator } from '@/components/UsageIndicator';
 
@@ -38,11 +37,10 @@ type StatusIndicatorProps = {
 };
 
 export function StatusIndicator({ bridgeOnly }: StatusIndicatorProps = {}) {
-  const { bridgeStatus, settings, activeCliSession } = useTerminalStore();
-  const { isConnected } = useTermuxBridge();
-
-  const bridgeColor = isConnected ? '#4ADE80' : bridgeStatus === 'connecting' ? '#FBBF24' : '#6B7280';
-  const bridgeLabel = isConnected ? 'Bridge' : bridgeStatus === 'connecting' ? 'Connecting' : 'Offline';
+  const { settings, activeCliSession } = useTerminalStore();
+  // Plan B: native terminal is always ready
+  const bridgeColor = '#4ADE80';
+  const bridgeLabel = 'Native';
 
   if (bridgeOnly) {
     return (

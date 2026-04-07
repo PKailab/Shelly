@@ -4,7 +4,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { usePreviewStore } from '@/store/preview-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import { CodeRenderer } from '@/components/preview/renderers/CodeRenderer';
 import { detectLanguage, shellEscape, MAX_PREVIEW_SIZE } from '@/lib/preview-file-detector';
 
@@ -13,7 +13,11 @@ export const CodeTab = memo(function CodeTab() {
   const recentFiles = usePreviewStore((s) => s.recentFiles);
   const activeFile = usePreviewStore((s) => s.activeCodeFile);
   const setActiveFile = usePreviewStore((s) => s.setActiveCodeFile);
-  const { runRawCommand } = useTermuxBridge();
+  const { runRawCommand: nativeRun } = useNativeExec();
+  const runRawCommand = useCallback(async (cmd: string): Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number }> => {
+    const result = await nativeRun(cmd);
+    return { ok: result.exitCode === 0, stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+  }, [nativeRun]);
 
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);

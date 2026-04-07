@@ -4,7 +4,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { usePreviewStore } from '@/store/preview-store';
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
+import { useNativeExec } from '@/hooks/use-native-exec';
 import {
   shellEscape, detectFileType, detectLanguage, formatFileSize,
   MAX_PREVIEW_SIZE, type FileEntry, type PreviewFileType,
@@ -23,7 +23,11 @@ export const FilesTab = memo(function FilesTab() {
   const { colors } = useTheme();
   const currentDir = usePreviewStore((s) => s.currentDir);
   const setCurrentDir = usePreviewStore((s) => s.setCurrentDir);
-  const { runRawCommand } = useTermuxBridge();
+  const { runRawCommand: nativeRun } = useNativeExec();
+  const runRawCommand = useCallback(async (cmd: string): Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number }> => {
+    const result = await nativeRun(cmd);
+    return { ok: result.exitCode === 0, stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode };
+  }, [nativeRun]);
 
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
