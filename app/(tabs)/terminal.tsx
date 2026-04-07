@@ -1,6 +1,6 @@
 /**
- * Terminal Screen — Native terminal view via direct PTY (pty-helper)
- * Unix Domain Socket connection + session monitor.
+ * Terminal Screen — Native terminal view via direct JNI forkpty (Plan B)
+ * No TCP, no pty-helper, no bridge dependency.
  */
 import React, { useRef, useState, useCallback, useEffect, useMemo, useContext } from 'react';
 import {
@@ -26,27 +26,20 @@ import { NativeTerminalView } from '@/modules/terminal-view/src';
 import TerminalViewModule from '@/modules/terminal-view/src/TerminalViewModule';
 import TerminalEmulator from '@/modules/terminal-emulator/src/TerminalEmulatorModule';
 import { useTerminalOutput } from '@/hooks/use-terminal-output';
-import { startSessionMonitor, stopSessionMonitor } from '@/lib/terminal-session-monitor';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTranslation, t } from '@/lib/i18n';
 import { useExecutionLogStore } from '@/store/execution-log-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
-import { useActiveSession, useTerminalStore, getPtyPort } from '@/store/terminal-store';
+import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { MultiPaneContext } from '@/components/multi-pane/PaneSlot';
 import { TerminalHeader } from '@/components/terminal/TerminalHeader';
 import { UsagePanel } from '@/components/UsagePanel';
 import { useUsageStore } from '@/store/usage-store';
 import type { ReadFileFn, ListFilesFn } from '@/lib/usage-parser';
-// tmux-manager kept for user-facing tmux commands (optional use)
-import { useTermuxBridge } from '@/hooks/use-termux-bridge';
 import * as FileSystem from 'expo-file-system/legacy';
 import { CommandKeyBar } from '@/components/terminal/CommandKeyBar';
-// TerminalActionBar removed — attach/voice integrated into CommandKeyBar
-import { startSmartWakelock, stopSmartWakelock } from '@/lib/smart-wakelock';
-import TermuxBridge from '@/modules/termux-bridge';
-import { loadSessionsFromProject, startAutoSave, stopAutoSave } from '@/lib/session-persistence';
 import { VoiceChat } from '@/components/VoiceChat';
 import { PreviewBanner } from '@/components/terminal/PreviewBanner';
 import { PreviewTabs } from '@/components/preview/PreviewTabs';
@@ -55,7 +48,6 @@ import { ProcessGuardModal } from '@/components/terminal/ProcessGuardModal';
 import { FirstMateOverlay, shouldShowFirstMate } from '@/components/terminal/FirstMateOverlay';
 import { isProcessKill } from '@/lib/process-guard';
 import { getTerminalTheme, type TerminalTheme } from '@/lib/terminal-theme';
-import { buildCliResumeCommand } from '@/lib/cli-recovery';
 import type { TabSession, SessionStatus } from '@/store/types';
 import { useChatStore } from '@/store/chat-store';
 import { generateId } from '@/lib/id';
@@ -84,24 +76,26 @@ export default function TerminalScreen() {
   const layout = useDeviceLayout();
   const activeSession = useActiveSession();
   const { removeSession, sessions, settings } = useTerminalStore();
-  const bridgeStatus = useTerminalStore((s) => s.bridgeStatus);
-  const { runRawCommand, readFile: bridgeReadFile, listFiles: bridgeListFiles, isConnected: bridgeConnected } = useTermuxBridge();
   const { refresh: refreshUsage } = useUsageStore();
 
-  // Bridge adapters for usage parser
+  // Usage adapters — read/list via TerminalEmulator (no bridge needed)
   const readFileAdapter: ReadFileFn = React.useCallback(async (path: string) => {
-    const result = await bridgeReadFile(path, 'utf8');
-    return result.ok ? result.content : null;
-  }, [bridgeReadFile]);
+    try {
+      const content = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 });
+      return content;
+    } catch {
+      return null;
+    }
+  }, []);
   const listFilesAdapter: ListFilesFn = React.useCallback(async (dir: string) => {
-    const result = await bridgeListFiles(dir, { includeHidden: true });
-    if (!result.ok) return [];
-    return result.entries.map((e: any) => ({ name: e.name, mtime: e.mtime }));
-  }, [bridgeListFiles]);
+    try {
+      const entries = await FileSystem.readDirectoryAsync(dir);
+      return entries.map((name: string) => ({ name, mtime: 0 }));
+    } catch {
+      return [];
+    }
+  }, []);
 
-  React.useEffect(() => {
-    if (bridgeConnected) refreshUsage(readFileAdapter, listFilesAdapter);
-  }, [bridgeConnected]);
   const isMultiPane = useMultiPaneStore((s) => s.isMultiPane);
   // Detect if this instance is rendered inside MultiPaneContainer (via PaneSlot context)
   // vs. rendered by the Tabs navigator (hidden underneath the overlay)
@@ -179,191 +173,47 @@ export default function TerminalScreen() {
     });
   }, []);
 
-  // Create or reconnect a native session to pty-helper
+  // Create a native session via JNI forkpty (no TCP, no pty-helper)
   const createNativeSession = useCallback(async (session: TabSession) => {
-    // Per-session guard: prevent concurrent creation for the same session
     if (creatingSessions.current.has(session.id)) {
       console.log('[Terminal] createNativeSession: already in progress for', session.nativeSessionId);
       return;
     }
     creatingSessions.current.add(session.id);
 
-    const port = getPtyPort(session.tmuxSession);
     try {
-      // 0. Only destroy if session exists but has no emulator buffer
-      try {
-        const hasEmu = await TerminalEmulator.hasEmulator(session.nativeSessionId);
-        if (!hasEmu) {
-          await TerminalEmulator.destroySession(session.nativeSessionId);
-        }
-      } catch {
-        // Session doesn't exist in Kotlin registry — safe to proceed
+      // Check if emulator already exists
+      const hasEmu = await TerminalEmulator.hasEmulator(session.nativeSessionId).catch(() => false);
+      if (hasEmu) {
+        useTerminalStore.setState((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
+          ),
+        }));
+        return;
       }
 
-      // 1. Check if pty-helper is already running on this port
-      let ptyAlive = false;
-      try {
-        const check = await runRawCommand(
-          `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo ALIVE || echo DEAD`,
-          { timeoutMs: 1000, reason: 'pty-check' }
-        );
-        ptyAlive = check?.stdout?.includes('ALIVE') ?? false;
-      } catch {}
+      // Destroy any stale session
+      try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch (_) {}
 
-      if (!ptyAlive) {
-        // pty-helper not running — start a new one
-        console.log('[Terminal] pty-helper not running, starting on port', port);
+      // Create session via JNI forkpty
+      await TerminalEmulator.createSession({
+        sessionId: session.nativeSessionId,
+        rows: 24,
+        cols: 80,
+      });
 
-        // Kill any stale process on this port
-        await runRawCommand(
-          `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
-          { timeoutMs: 3000, reason: 'pty-cleanup' }
-        ).catch(() => {});
+      // Start foreground service to prevent task-kill
+      await TerminalEmulator.startSessionService();
 
-        // Launch pty-helper
-        await runRawCommand(
-          `nohup ~/shelly-bridge/pty-helper ${port} 80 24 > /dev/null 2>&1 &`,
-          { timeoutMs: 5000, reason: 'pty-start' }
-        );
-
-        // Wait for pty-helper to be ready (poll TCP port, max 5s)
-        // Termux restart後は起動が遅いため十分な猶予を持たせる
-        let ready = false;
-        for (let i = 0; i < 20; i++) {
-          await new Promise(resolve => setTimeout(resolve, 250));
-          try {
-            const result = await runRawCommand(
-              `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
-              { timeoutMs: 2000, reason: 'pty-wait' }
-            );
-            if (result?.stdout?.includes('READY')) {
-              ready = true;
-              break;
-            }
-          } catch {}
-        }
-        if (!ready) {
-          throw new Error(`pty-helper not ready on port ${port} after 5s`);
-        }
-      } else {
-        // pty-helper is already running — just reconnect (no wait needed)
-        console.log('[Terminal] pty-helper already running on port', port, '— reconnecting');
-      }
-
-      // 2. Create Kotlin session connected to pty-helper TCP port (with retry)
-      console.log('[Terminal] connecting Kotlin session to port', port, 'sessionId=', session.nativeSessionId);
-      let connected = false;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          await TerminalEmulator.createSession({
-            sessionId: session.nativeSessionId,
-            port,
-            rows: 24,
-            cols: 80,
-          });
-          connected = true;
-          console.log(`[Terminal] createSession attempt ${attempt + 1} succeeded`);
-          break;
-        } catch (e) {
-          console.warn(`[Terminal] createSession attempt ${attempt + 1} failed:`, e);
-          try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
-          await new Promise(resolve => setTimeout(resolve, 250));
-        }
-      }
-
-      // Last resort: kill pty-helper and start fresh
-      if (!connected) {
-        console.warn('[Terminal] All retries failed, restarting pty-helper on port', port);
-        await runRawCommand(
-          `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
-          { timeoutMs: 3000, reason: 'pty-force-restart' }
-        ).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 150));
-        await runRawCommand(
-          `nohup ~/shelly-bridge/pty-helper ${port} 80 24 > /dev/null 2>&1 &`,
-          { timeoutMs: 5000, reason: 'pty-restart' }
-        );
-        for (let i = 0; i < 6; i++) {
-          await new Promise(resolve => setTimeout(resolve, 250));
-          try {
-            const r = await runRawCommand(
-              `(echo >/dev/tcp/127.0.0.1/${port}) 2>/dev/null && echo READY || echo WAIT`,
-              { timeoutMs: 2000, reason: 'pty-restart-wait' }
-            );
-            if (r?.stdout?.includes('READY')) break;
-          } catch {}
-        }
-        // Final attempt
-        try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
-        await TerminalEmulator.createSession({
-          sessionId: session.nativeSessionId,
-          port,
-          rows: 24,
-          cols: 80,
-        });
-      }
-
-      // 3. Send Ctrl+L to trigger shell prompt redraw after connection/reconnection
-      // Delay to ensure TCP connection + shell is ready to receive input
-      await new Promise(r => setTimeout(r, 500));
-      try {
-        await TerminalEmulator.writeToSession(session.nativeSessionId, '\x0c');
-      } catch {}
-      // Send a second Ctrl+L after 1.5s as fallback (shell may need time to initialize)
-      setTimeout(async () => {
-        try {
-          await TerminalEmulator.writeToSession(session.nativeSessionId, '\x0c');
-        } catch {}
-      }, 1500);
-
-
-      // 4. Start foreground service to prevent task-kill
-      try { await TerminalEmulator.startSessionService(); } catch {}
-
-      // 5. Update session status to alive
+      // Update session status
       useTerminalStore.setState((state) => ({
         sessions: state.sessions.map((s) =>
           s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
         ),
       }));
-
-      // 6. CLI auto-resume: if this was a fresh pty-helper (not reconnect),
-      // and the session had an active CLI, resume it automatically.
-      console.log('[CLI-Resume] check: ptyAlive=', ptyAlive, 'activeCli=', session.activeCli, 'cwd=', session.currentDir);
-      if (!ptyAlive && session.activeCli) {
-        const resumeCmd = buildCliResumeCommand(session.currentDir, session.activeCli);
-        console.log('[CLI-Resume] resumeCmd=', resumeCmd);
-        if (resumeCmd) {
-          // Wait for shell prompt to be ready (poll transcript for prompt chars)
-          let promptDetected = false;
-          for (let i = 0; i < 12; i++) { // 12 * 250ms = 3s max
-            await new Promise(resolve => setTimeout(resolve, 250));
-            try {
-              const transcript = await TerminalEmulator.getTranscriptText(session.nativeSessionId, 5);
-              console.log('[CLI-Resume] poll', i, 'transcript=', JSON.stringify(transcript?.slice(-80)));
-              if (transcript && (transcript.includes('$ ') || transcript.includes('❯ ') || transcript.includes('% '))) {
-                promptDetected = true;
-                break;
-              }
-            } catch (e) {
-              console.log('[CLI-Resume] poll', i, 'error:', e);
-            }
-          }
-          try {
-            await TerminalEmulator.writeToSession(
-              session.nativeSessionId,
-              resumeCmd + '\n'
-            );
-            console.log('[CLI-Resume] sent:', session.activeCli, promptDetected ? '(prompt detected)' : '(fallback timeout)');
-          } catch (e) {
-            console.warn('[CLI-Resume] writeToSession failed:', e);
-          }
-        }
-      } else {
-        console.log('[CLI-Resume] skipped:', ptyAlive ? 'pty was alive (reconnect)' : 'no activeCli');
-      }
     } catch (err) {
-      console.error('[Terminal] Failed to create native session:', err);
+      console.error('[Terminal] createNativeSession failed:', err);
       useTerminalStore.setState((state) => ({
         sessions: state.sessions.map((s) =>
           s.id === session.id ? { ...s, sessionStatus: 'exited' as const, isAlive: false } : s
@@ -372,78 +222,66 @@ export default function TerminalScreen() {
     } finally {
       creatingSessions.current.delete(session.id);
     }
-  }, [runRawCommand]);
+  }, []);
 
-  // Recover a session: reconnect to existing pty-helper, or restart if dead
+  // Recover a session: destroy and re-create
   const recoverSession = useCallback(async (session: TabSession) => {
-    // Skip if already being created/recovered
     if (creatingSessions.current.has(session.id)) {
       console.log('[Terminal] recoverSession: already in progress for', session.nativeSessionId);
       return;
     }
     setIsRecovering(true);
 
-    // Mark as recovering
     useTerminalStore.setState((state) => ({
       sessions: state.sessions.map((s) =>
         s.id === session.id ? { ...s, sessionStatus: 'recovering' as const } : s
       ),
     }));
 
-    // Destroy old Kotlin session (not the pty-helper process!)
     try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
-
-    // Reconnect (createNativeSession checks if pty-helper is alive first)
     await createNativeSession(session);
 
     setIsRecovering(false);
-  }, [createNativeSession, runRawCommand]);
+  }, [createNativeSession]);
 
-  // Reset a session: kill pty-helper, destroy Kotlin session, start fresh
+  // Reset a session: destroy, clear state, start fresh
   const resetSession = useCallback(async (session: TabSession) => {
-    const port = getPtyPort(session.tmuxSession);
-
-    // 0. Clear creation mutex so createNativeSession doesn't skip
     creatingSessions.current.delete(session.id);
-
-    // 1. Destroy Kotlin session (clears TerminalEmulator buffer)
     try { await TerminalEmulator.destroySession(session.nativeSessionId); } catch {}
 
-    // 2. Kill pty-helper process on this port
-    await runRawCommand(
-        `pkill -f "pty-helper.*${port}" 2>/dev/null; true`,
-        { timeoutMs: 3000, reason: 'pty-reset-kill' }
-    ).catch(() => {});
-
-    // 3. Clear store state (also sets sessionStatus to 'starting')
     useTerminalStore.getState().clearSession(session.id);
 
-    // 4. Small delay to ensure port is released
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // 5. Create fresh session (new pty-helper + new Kotlin session + new shell)
     await createNativeSession(session);
-  }, [createNativeSession, runRawCommand]);
+  }, [createNativeSession]);
 
-  // Ensure native sessions exist. Called on bridge connect AND on foreground resume.
-  // pty-helper processes persist in Termux, but the TCP connection may drop
-  // when Android backgrounds the app. This silently reconnects or re-creates sessions.
+  // Ensure native sessions exist. Called on mount and foreground resume.
   const ensureNativeSessions = useCallback(async () => {
-    if (bridgeStatus !== 'connected') return;
     if (isHiddenBehindMultiPane) return;
-    // Global mutex: prevent concurrent runs
     if (sessionMutexRef.current) return;
     sessionMutexRef.current = true;
 
-    for (const session of sessions) {
-      if (session.sessionStatus === 'starting' || session.sessionStatus === 'alive') {
-        // In MultiPane context, the tab-side instance already owns the Kotlin session.
-        // Just ensure the session status is set to alive so TerminalView renders.
-        if (isRenderedInMultiPane) {
+    try {
+      for (const session of sessions) {
+        if (session.sessionStatus === 'starting' || session.sessionStatus === 'alive') {
+          // In MultiPane context, the tab-side instance already owns the Kotlin session.
+          if (isRenderedInMultiPane) {
+            try {
+              const alive = await TerminalEmulator.isSessionAlive(session.nativeSessionId);
+              if (alive) {
+                useTerminalStore.setState((state) => ({
+                  sessions: state.sessions.map((s) =>
+                    s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
+                  ),
+                }));
+                continue;
+              }
+            } catch {}
+            continue;
+          }
+
           try {
             const alive = await TerminalEmulator.isSessionAlive(session.nativeSessionId);
             if (alive) {
-              // Session exists in Kotlin registry — just make sure status is alive
               useTerminalStore.setState((state) => ({
                 sessions: state.sessions.map((s) =>
                   s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
@@ -452,52 +290,23 @@ export default function TerminalScreen() {
               continue;
             }
           } catch {}
-          // If not alive in MultiPane, don't try to re-create (tab-side will handle it)
-          continue;
+
+          console.log('[Terminal] ensureNativeSessions: session not alive, re-creating:', session.nativeSessionId);
+          await createNativeSession(session);
+        } else if (session.sessionStatus === 'exited') {
+          if (isRenderedInMultiPane) continue;
+          console.log('[Terminal] ensureNativeSessions: session exited, recovering:', session.nativeSessionId);
+          await recoverSession(session);
         }
-
-        try {
-          const alive = await TerminalEmulator.isSessionAlive(session.nativeSessionId);
-          if (alive) {
-            // Session is alive (socket OK or reconnecting with preserved buffer) — do nothing
-            useTerminalStore.setState((state) => ({
-              sessions: state.sessions.map((s) =>
-                s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
-              ),
-            }));
-            continue;
-          }
-        } catch {}
-
-        // Session not in Kotlin registry at all — need full re-creation
-        console.log('[Terminal] ensureNativeSessions: session not alive, re-creating:', session.nativeSessionId);
-        await createNativeSession(session);
-      } else if (session.sessionStatus === 'exited') {
-        if (isRenderedInMultiPane) continue; // Let tab-side handle recovery
-        console.log('[Terminal] ensureNativeSessions: session exited, recovering:', session.nativeSessionId);
-        await recoverSession(session);
       }
+    } finally {
+      sessionMutexRef.current = false;
     }
-    sessionMutexRef.current = false;
-  }, [bridgeStatus, sessions, createNativeSession, recoverSession, isHiddenBehindMultiPane, isRenderedInMultiPane]);
+  }, [sessions, createNativeSession, recoverSession, isHiddenBehindMultiPane, isRenderedInMultiPane]);
 
-  // Run on bridge connect/reconnect AND on initial mount (covers Split View
-  // where a new TerminalScreen instance mounts while sessions are already alive)
+  // Run on initial mount
   useEffect(() => {
     ensureNativeSessions();
-  }, [bridgeStatus]);
-
-  // Also run on mount — Split View creates a fresh TerminalScreen instance
-  // but bridgeStatus doesn't change, so the above effect won't fire.
-  // Use a small delay to let the layout settle before reconnecting.
-  useEffect(() => {
-    if (bridgeStatus === 'connected') {
-      // Immediate check
-      ensureNativeSessions();
-      // Delayed retry — pty-helper may need time to be ready in Split View
-      const timer = setTimeout(() => ensureNativeSessions(), 2000);
-      return () => clearTimeout(timer);
-    }
   }, []);
 
   // Run on foreground resume — handles app switch, home button, split view toggle
@@ -522,42 +331,10 @@ export default function TerminalScreen() {
     })();
   }, []);
 
-  // Start smart wakelock + foreground service + session monitor on mount
+  // Refresh usage on mount
   useEffect(() => {
-    startSmartWakelock(runRawCommand);
-    TermuxBridge.startForeground().catch(() => {});
-    const tmuxNames = sessions.map((s) => s.tmuxSession);
-    startSessionMonitor(tmuxNames, runRawCommand, (deadTmuxName) => {
-      const deadSession = sessions.find((s) => s.tmuxSession === deadTmuxName);
-      if (deadSession) {
-        recoverSession(deadSession);
-      }
-    });
-    return () => {
-      stopSmartWakelock();
-      TermuxBridge.stopForeground().catch(() => {});
-      stopSessionMonitor();
-    };
+    refreshUsage(readFileAdapter, listFilesAdapter);
   }, []);
-
-  // Keep session monitor in sync with session changes
-  useEffect(() => {
-    const tmuxNames = sessions.map((s) => s.tmuxSession);
-    startSessionMonitor(tmuxNames, runRawCommand, (deadTmuxName) => {
-      const deadSession = sessions.find((s) => s.tmuxSession === deadTmuxName);
-      if (deadSession) recoverSession(deadSession);
-    });
-    return () => stopSessionMonitor();
-  }, [sessions.length]);
-
-  // Auto-save sessions to project directory (if chat has a projectPath)
-  useEffect(() => {
-    const cwd = activeSession?.currentDir;
-    if (cwd && cwd !== '/home/user' && cwd !== '') {
-      startAutoSave(cwd, runRawCommand);
-      return () => stopAutoSave();
-    }
-  }, [activeSession?.currentDir, runRawCommand]);
 
   // Battery optimization exemption — prompt once on unexpected disconnect
   const checkBatteryExemption = useCallback(async () => {
@@ -632,16 +409,7 @@ export default function TerminalScreen() {
   }, [settings.terminalTheme]);
 
   // Adaptive terminal font size for small screens (Z Fold6 cover ~ 373dp)
-  // Terminal font size in dp (converted to px in native ShellyTerminalView).
-  // Balanced for readability vs column count:
-  //   Compact (cover ~370dp): 11dp → ~29px → ~33 cols
-  //   Standard (phone ~400dp): 12dp → ~34px → ~31 cols
-  //   Wide/split (928px pane):  11dp → ~32px → ~80 cols ← sweet spot
-  //   Wide/full (1856px):       11dp → ~32px → ~160 cols
   const termFontSize = layout.isCompact ? 11 : layout.width < 500 ? 12 : layout.isWide ? 11 : 12;
-
-  // Resize is now handled directly by pty-helper via socket protocol.
-  // No JS-side fallback needed.
 
   // Send text to terminal via native PTY
   const sendToTerminal = useCallback((text: string) => {
@@ -659,20 +427,19 @@ export default function TerminalScreen() {
     });
   }, [activeSession?.nativeSessionId]);
 
-  // Copy file from device to terminal cwd via bridge
+  // Copy file from device to terminal cwd
   const copyFileToCwd = useCallback(async (sourceUri: string, fileName: string) => {
     try {
       const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const cwd = activeSession?.currentDir || '/data/data/com.termux/files/home';
       const tempPath = `${FileSystem.cacheDirectory}${safeName}`;
       await FileSystem.copyAsync({ from: sourceUri, to: tempPath });
-      await runRawCommand(
-        `cp '${tempPath}' './${safeName}' 2>/dev/null && echo "Copied ${safeName} to $(pwd)"`,
-        { timeoutMs: 10000, reason: 'file-attach' },
-      );
+      // Use terminal to copy file to cwd
+      sendToTerminal(`cp '${tempPath}' './${safeName}'\n`);
     } catch (e) {
       console.warn('[Terminal] file copy failed:', e);
     }
-  }, [runRawCommand]);
+  }, [activeSession?.currentDir, sendToTerminal]);
 
 
   const handleReload = useCallback(() => {
@@ -755,8 +522,6 @@ export default function TerminalScreen() {
               }
             }}
             onResize={(e) => {
-              // Resize is handled directly by Kotlin → pty-helper via socket protocol.
-              // This callback is kept for JS-side logging/tracking only.
               const { cols, rows } = e.nativeEvent;
               if (cols > 0 && rows > 0) {
                 console.log(`[Terminal] resize: ${cols}x${rows}`);
