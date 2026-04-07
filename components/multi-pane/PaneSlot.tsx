@@ -160,7 +160,7 @@ function SplitMenu({
         ) : (
           <>
             <Text style={splitStyles.title}>Open In New Pane</Text>
-            {(['index', 'terminal', 'projects', 'browser', 'creator', 'obsidian', 'snippets', 'search', 'settings'] as PaneTab[]).map((t) => (
+            {(['terminal', 'ai', 'browser', 'markdown'] as PaneTab[]).map((t) => (
               <Pressable
                 key={t}
                 style={[splitStyles.option, t === suggestedTab && splitStyles.optionHighlight]}

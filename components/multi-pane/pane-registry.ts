@@ -1,27 +1,53 @@
+import React from 'react';
+import { View, Text } from 'react-native';
 import type { ComponentType } from 'react';
 import type { PaneTab } from '@/hooks/use-multi-pane';
 
 type PaneEntry = {
   title: string;
-  icon: string; // MaterialIcons name
+  icon: string;
   getComponent: () => ComponentType;
 };
 
+function StubPane({ label }: { label: string }) {
+  return React.createElement(View, {
+    style: { flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' },
+  }, React.createElement(Text, {
+    style: { color: '#666', fontFamily: 'monospace', fontSize: 12 },
+  }, `${label} — Coming Soon`));
+}
+
 export const PANE_REGISTRY: Record<PaneTab, PaneEntry> = {
-  projects: {
-    title: 'Projects',
-    icon: 'folder',
-    getComponent: () => require('@/app/(tabs)/projects').default,
+  terminal: {
+    title: 'Terminal',
+    icon: 'terminal',
+    getComponent: () => require('@/app/(tabs)/terminal').default,
   },
+  ai: {
+    title: 'AI',
+    icon: 'auto-awesome',
+    getComponent: () => () => React.createElement(StubPane, { label: 'AI Pane' }),
+  },
+  browser: {
+    title: 'Browser',
+    icon: 'language',
+    getComponent: () => () => React.createElement(StubPane, { label: 'Browser Pane' }),
+  },
+  markdown: {
+    title: 'Markdown',
+    icon: 'description',
+    getComponent: () => () => React.createElement(StubPane, { label: 'Markdown Pane' }),
+  },
+  // Legacy — kept for backwards compat during migration
   index: {
     title: 'Chat',
     icon: 'chat',
     getComponent: () => require('@/app/(tabs)/index').default,
   },
-  terminal: {
-    title: 'Terminal',
-    icon: 'terminal',
-    getComponent: () => require('@/app/(tabs)/terminal').default,
+  projects: {
+    title: 'Projects',
+    icon: 'folder',
+    getComponent: () => require('@/app/(tabs)/projects').default,
   },
   settings: {
     title: 'Settings',
