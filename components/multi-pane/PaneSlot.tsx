@@ -294,6 +294,13 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  fill: {
+    flex: 1,
+  },
+  hidden: {
+    // Keep mounted (audio alive) but invisible and zero-size
+    display: 'none',
+  },
 });
 
 const splitStyles = StyleSheet.create({
