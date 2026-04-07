@@ -1,8 +1,7 @@
 <h1 align="center">Shelly</h1>
 
 <p align="center">
-  A chat-first terminal IDE for Android.<br>
-  Chat and Terminal, side by side. Connected by AI.
+  A single-screen terminal IDE for Android — terminal, AI, browser, and markdown in a flexible pane layout.
 </p>
 
 <p align="center">
@@ -24,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/hero.jpg" alt="Shelly — AI analyzes terminal errors in real time" width="720">
+  <img src="docs/images/hero.jpg" alt="Shelly — terminal, AI, and browser in a single screen" width="720">
 </p>
 
 ---
@@ -54,9 +53,11 @@ git clone https://github.com/RYOITABASHI/Shelly.git && cd Shelly
 pnpm install && pnpm android
 ```
 
-> **Requirements:** Android device + [Termux (F-Droid)](https://f-droid.org/en/packages/com.termux/). For building from source: Node.js 22+, pnpm, Android NDK r27+. Expo Go is not supported — Shelly uses native Kotlin/C modules.
+> **Requirements:** Android device. For building from source: Node.js 22+, pnpm, Android NDK r27+. Expo Go is not supported — Shelly uses native Kotlin/C modules.
+>
+> Termux is no longer required for terminal functionality (Shelly uses a JNI native PTY), but some CLI packages may still require Termux if you want to install additional tools.
 
-On first launch, the Setup Wizard handles everything: Termux installation, storage permissions, package setup, and Android process-kill protection. You'll see the chat screen in under 5 minutes. Type "hello" and the AI responds.
+On first launch, the Setup Wizard handles permissions and AI configuration. The terminal is ready in under 5 minutes.
 
 ---
 
@@ -66,24 +67,25 @@ You're running Claude Code in the terminal. It throws an error. You copy it. You
 
 **Seven steps. Every single time.**
 
-This is the daily workflow of every developer using CLI-based AI tools. The terminal and the chat live in different worlds, and *you* are the copy-paste bridge between them.
+This is the daily workflow of every developer using CLI-based AI tools. The terminal and the AI live in different worlds, and *you* are the copy-paste bridge between them.
 
-**Shelly puts Chat and Terminal side by side — and connects them with AI.**
+**Shelly puts Terminal and AI panes side by side — and the AI reads your terminal output automatically.**
 
-Say **"fix the error on the right"**. Shelly reads the terminal output, explains the error, and generates an executable command. Tap **[▶ Run]** and the fix lands directly in the Terminal pane.
+Say **"fix the error on the right"**. Shelly reads the terminal output, explains the error, and generates an executable command. Tap **[Run]** and the fix lands directly in the Terminal pane.
 
 No copy. No paste. No tab switching. Zero friction.
 
 **Three levels of value:**
-- **Level 1:** Chat alone — build things by talking. The entry point for beginners.
-- **Level 2:** Terminal alone — a full native TTY for power users.
-- **Level 3:** Both panes, side by side — a development experience that doesn't exist anywhere else.
+
+- **Single pane:** a native terminal that is faster, smarter, and more usable than Termux alone — with inline content blocks, autocomplete, syntax highlighting, and clickable errors.
+- **Split panes:** terminal + AI side by side — the AI reads what the terminal shows and executes fixes with one tap. No copy-paste bridge needed.
+- **Full layout:** sidebar + up to 4 pane types + agent bar — a mobile IDE. Browse docs in the browser pane, preview markdown on the right, run agents in the background, and keep your terminal front and center.
 
 ---
 
 ## How is Shelly different?
 
-Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Replit runs in the cloud. Claude Cowork is desktop-only. Shelly is the only tool that puts a native terminal and multi-agent AI chat side by side on your phone — and connects them so the AI can read what the terminal shows and execute fixes with one tap.
+Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Replit runs in the cloud. Claude Code on desktop is desktop-only. Shelly is the only tool that puts a native terminal and multi-agent AI side by side on your phone — with a browser pane, markdown viewer, sidebar, and agent bar all in one screen — and connects them so the AI reads your terminal output and executes fixes with one tap.
 
 ---
 
@@ -92,68 +94,106 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 ### Highlights
 
 - **Cross-pane intelligence** — Say "fix the error on the right." AI reads your terminal, suggests a fix, one tap to execute. No copy-paste. No tab switching.
-- **Native terminal emulator** — Kotlin + C (`forkpty`), not a WebView. Sessions survive app switching. The only React Native app with an embedded native terminal.
-- **Natural language everything** — Talk, type, or speak. Shelly figures out whether to run a command, ask an AI, or both. 12 AI agents, auto-routed or `@mention`-selected.
+- **Native terminal emulator** — JNI forkpty (C + Kotlin), same-process, zero IPC. Sessions survive app switching. The only React Native app with an embedded native terminal.
+- **4 pane types in one screen** — Terminal, AI, Browser (WebView + bookmarks + background audio), Markdown viewer. Arrange up to 4 panes freely.
+- **Natural language everything** — Talk, type, or speak. 12 AI agents, auto-routed or `@mention`-selected.
+
+<details>
+<summary><strong>Layout System (5 features)</strong></summary>
+
+- **Single-screen layout** — AgentBar (top) + Sidebar (left, collapsible) + PaneContainer (center, up to 4 panes) + ContextBar (bottom)
+- **4 pane types** — Terminal (native PTY), AI (streaming + context injection), Browser (WebView + bookmarks + background audio), Markdown (viewer + renderer)
+- **Flexible splits** — 1-pane, 2-pane horizontal/vertical, 3-pane, and 4-pane grid. Resize by dragging dividers
+- **Z Fold6 optimized** — Unfolded: 3-pane default layout. Folded: single-pane with swipe switching
+- **ContextBar** — Always-visible footer showing current working directory, git branch, and connection status
+
+</details>
 
 <details>
 <summary><strong>Cross-Pane Intelligence (8 features)</strong></summary>
 
 - **"Fix the error on the right"** — AI reads terminal output and responds with executable fixes
-- **ActionBlock** — Code blocks in AI responses have [▶ Run] buttons that execute directly in Terminal
-- **Real-time terminal awareness** — Chat AI always knows what's happening in Terminal (wide mode: automatic, single pane: on reference)
+- **ActionBlock** — Code blocks in AI responses have [Run] buttons that execute directly in the Terminal pane
+- **Real-time terminal awareness** — AI pane always knows what is happening in the terminal (wide: automatic, narrow: on reference)
 - **CLI Co-Pilot** — Real-time translation of terminal output, approval prompt explanations, second opinions, session summaries
-- **Approval Proxy** — Terminal `[Y/n]` prompts become native chat buttons (Approve / Deny / Ask @team). No more typing blind 'Y'.
+- **Approval Proxy** — Terminal `[Y/n]` prompts become native chat buttons (Approve / Deny / Ask AI). No more typing blind 'Y'
 - **Error Summary** — Errors are detected, translated, and surfaced as persistent chat bubbles with [Suggest Fix] buttons
 - **Auto-savepoint** — Game-like save/load system. Every change is auto-committed. Revert to any point with one tap
-- **Pre-commit security scan** — API keys, private keys, and secrets are detected before they're committed
+- **Pre-commit security scan** — API keys, private keys, and secrets are detected before they are committed
 
 </details>
 
 <details>
-<summary><strong>Chat-First Development (6 features)</strong></summary>
+<summary><strong>Terminal Enhancements (10 features)</strong></summary>
 
-- **Natural language execution** — Talk naturally, get real execution. Commands run behind the scenes in Termux
-- **Multi-agent AI routing** — Automatically selects the best AI based on the task
-- **@mention routing** — `@claude`, `@gemini`, `@codex`, `@cerebras`, `@local`, `@perplexity`, `@team`, `@plan`, `@arena`, `@actions` for direct control
-- **VoiceChain** — Voice input connects to the full input router. Speak → execute → TTS response
-- **GitHub integration** — AI suggests when to push. PAT setup in chat. One-tap sync. `@actions` sets up CI/CD without touching YAML
-- **Natural language packages** — "install python" → `pkg install -y python`. Package errors auto-diagnosed and fixed
-
-</details>
-
-<details>
-<summary><strong>Creative Tools (4 features)</strong></summary>
-
-- **Plan Mode** — AI-generated plans as interactive step cards. Execute or skip each step with a tap
-- **Click-to-Edit** — In the preview panel, tap any element to select it. Preset buttons or custom instructions modify the UI instantly
-- **Arena Mode** — Same prompt, two AIs, blind comparison. Vote for the better response, then see which AI wrote it
-- **Template Gallery** — 7 project templates with guided wizard flows. From "what do you want to build?" to running code in under a minute
-
-</details>
-
-<details>
-<summary><strong>Safety & Learning (3 features)</strong></summary>
-
-- **5-level command safety** — Every command is risk-assessed before execution. Dangerous operations require confirmation
-- **Learning mode** — AI explains what each command does and what the output means, in your language
-- **Onboarding wizard** — 5-minute setup from zero. Termux install, AI configuration, everything guided
-
-</details>
-
-<details>
-<summary><strong>Power Features (11 features)</strong></summary>
-
-- **Native Terminal Emulator** — Kotlin-based rendering on Android Canvas. No WebView. Connected via direct PTY helper (C, `forkpty()`) over TCP localhost
-- **Reconnectable sessions** — PTY helper supports client reconnection. Sessions survive app transitions
-- **Termux bridge** — Native Kotlin module for direct Termux integration
-- **Local LLM support** — Run Gemma/Qwen on-device via llama.cpp with guided setup wizard
-- **Japanese input in terminal** — Something Termux alone can't do
-- **Multi-pane layout** — Split view on foldable/wide screens
+- **Fig-style autocomplete** — 30+ top-level commands with subcommand and flag completion, rendered as an inline popup
+- **Syntax highlighting** — Command output colorized by content type
+- **Clickable paths and errors** — Tap a file path or stack trace line to jump to it
+- **Inline content blocks** — JSON, markdown, images, and tables rendered inline inside the terminal output (Command Blocks)
+- **CLI notifications** — Long-running commands surface a system notification when they complete
+- **Workflow manager** — Named workflows with step-by-step execution and progress tracking
 - **SmartKeyBar** — 5 context-adaptive key sets (Default / Vim / Git / REPL / Navigate). Swipe to switch
-- **Command completion** — 30+ top-level commands with subcommand and flag completion
-- **PackageDoctor** — Auto-diagnoses Termux package errors and suggests fixes in chat
-- **ProcessGuard** — Detects Android process kills, shows device-specific fix wizard
+- **Background Agents** — `@agent` commands scheduled via AlarmManager, run in tmux, report results async. Supports Perplexity / Claude / Gemini / Local
+- **Immortal sessions** — tmux keeps your shell alive when the app is backgrounded. Resume any session by name
+- **Japanese input in terminal** — Compose CJK characters directly in the terminal pane
+
+</details>
+
+<details>
+<summary><strong>AI Pane (7 features)</strong></summary>
+
+- **Multi-agent routing** — Automatically selects the best AI based on the task. Override with `@mention`
+- **@mention routing** — `@claude`, `@gemini`, `@codex`, `@cerebras`, `@local`, `@perplexity`, `@team`, `@plan`, `@arena`, `@actions` for direct control
+- **Terminal context injection** — AI always has access to the current terminal transcript. No manual copy-paste
+- **Inline diff with accept/reject** — AI-suggested file edits are shown as diffs. Accept or reject per hunk
+- **Voice input** — Speak your prompt. VoiceChain connects to the full input router and returns TTS response
+- **Arena Mode** — Same prompt, two AIs, blind comparison. Vote for the better response, then see which model wrote it
+- **Local LLM support** — Run Gemma/Qwen on-device via llama.cpp with guided setup wizard. Full privacy, no API key needed
+
+</details>
+
+<details>
+<summary><strong>Browser Pane (4 features)</strong></summary>
+
+- **Full WebView browser** — Navigate any URL inside a pane. Keep docs open while you work in the terminal
+- **Bookmarks** — Save and organize URLs. Accessible from the sidebar
+- **Background audio** — Audio from browser pane continues playing when you switch to another pane
+- **Link capture** — Share any URL to Shelly from Android and it opens in the browser pane
+
+</details>
+
+<details>
+<summary><strong>Sidebar (5 sections)</strong></summary>
+
+- **Repos** — Git repository list with branch status
+- **Files** — File tree for the current workspace
+- **Tasks** — Background agent task list with status and output
+- **Ports** — Active localhost ports with one-tap browser pane navigation
+- **Profiles** — SSH profile manager and workspace switcher
+
+</details>
+
+<details>
+<summary><strong>Cosmetics and Discovery (7 features)</strong></summary>
+
+- **CRT overlay** — GPU-rendered scanlines and screen-curve shader for a retro terminal feel
+- **Sound profiles** — Modern / Retro / Silent keyclick profiles
+- **7 fonts** — Fira Code, JetBrains Mono, Cascadia Code, Hack, Inconsolata, Source Code Pro, monospace system
+- **Haptic toggle** — Per-interaction haptic feedback control
+- **Feature catalog** — In-app browser of all 40+ features with search and filter
+- **Context hints** — Smart hints based on what is currently on screen
+- **Smart command palette** — Fuzzy search across commands, agents, panes, and settings
+
+</details>
+
+<details>
+<summary><strong>Infrastructure (5 features)</strong></summary>
+
+- **SSH profiles** — Named SSH connections with key or password auth, accessible from sidebar
+- **Workspace isolation** — Per-project cwd, environment, and AI context
+- **Settings TUI** — Full settings accessible from a terminal-style text UI as well as the graphical panel
 - **8 terminal themes** — Shelly / Dracula / Nord / Monokai / Tokyo Night / Gruvbox / Catppuccin / Solarized
+- **PackageDoctor** — Auto-diagnoses package errors and suggests fixes in the AI pane
 
 </details>
 
@@ -165,56 +205,50 @@ Mobile development never took off — not because phones lack computing power, b
 
 Chat apps (ChatGPT, Claude, Gemini) can *talk* about code, but they can't *run* it. Terminal emulators (Termux) can *run* anything, but they're hostile to anyone who isn't already a developer.
 
-Shelly fills the gap. You type "make me a portfolio site" in a chat bubble, and a real shell runs the commands, generates files, and shows you the results.
+Shelly fills the gap. You type "make me a portfolio site" in the AI pane, and a real shell runs the commands, generates files, and shows you the results — right next to the terminal that produced them.
 
 ### Why Native?
 
 Early versions used ttyd and a WebView. WebSocket connections dropped. Android's Phantom Process Killer terminated background processes. Every time you switched apps, the terminal was dead.
 
-So I directed the AI to throw it all away and go native. Shelly now embeds a native terminal emulator — Kotlin code derived from Termux's own `terminal-emulator` library — directly inside an Expo/React Native app, connected via a custom C helper that creates pseudo-terminals with `forkpty()`.
+So I directed the AI to throw it all away and go native. Shelly now embeds a native terminal emulator — Kotlin code derived from Termux's own `terminal-emulator` library — connected via a JNI C layer that calls `forkpty()` in the same process. No TCP. No IPC boundary. No socket drops.
 
-As far as we know, this is the **only React Native app in the world** with an embedded native terminal emulator.
+As far as we know, this is the **only React Native app in the world** with an embedded native terminal emulator running in-process via JNI.
 
 ### Who is this for?
 
 - **Vibe Coders** — Lovable/Bolt/Replit Agent, but on your phone with a real terminal underneath
-- **Mobile-first developers** — Claude Code or Gemini CLI in Termux, with a proper UI around it
+- **Mobile-first developers** — Claude Code or Gemini CLI, with a proper multi-pane IDE around them
 - **Non-engineers with ideas** — Shelly translates everything. Dangerous operations are blocked until you understand them
 
 ---
 
 ## Architecture
 
-### Chat → Execution Pipeline
+### Screen Layout
 
 ```
-User input (natural language / voice)
-       │
-       ▼
-┌─────────────────────┐
-│   Input Router       │  ← Intent classification (4 layers + 4.5 routing)
-│   "What does the     │
-│    user want?"       │
-└──────────┬──────────┘
-           │
-    ┌──────┴──────┐
-    ▼             ▼
-┌────────┐  ┌──────────┐
-│ Light  │  │ AI Agent │  ← Claude / Gemini / Codex / Cerebras / Groq / Local LLM
-│ Tasks  │  │ Selection│
-│(direct)│  └────┬─────┘
-└────────┘       │
-                 ▼
-          ┌─────────────┐
-          │ Direct PTY   │  ← C helper (forkpty) → real shell
-          │ (native)     │
-          └──────┬──────┘
-                 │
-                 ▼
-          ┌─────────────┐
-          │  Chat UI     │  ← Results as chat bubbles + ActionBlocks
-          │  (response)  │
-          └─────────────┘
+┌──────────────────────────────────────────────────────┐
+│  AgentBar (top)                                       │
+│  agent switcher · search · settings                   │
+├──────────┬───────────────────────────────────────────┤
+│          │                                            │
+│ Sidebar  │   PaneContainer                            │
+│          │                                            │
+│ Repos    │   ┌─────────────────┬────────────────────┐ │
+│ Files    │   │  Terminal Pane  │   AI Pane          │ │
+│ Tasks    │   │                 │                    │ │
+│ Ports    │   │  native PTY     │  streaming LLM     │ │
+│ Profiles │   │  (JNI forkpty)  │  context-aware     │ │
+│          │   ├─────────────────┼────────────────────┤ │
+│          │   │  Browser Pane   │  Markdown Pane     │ │
+│          │   │                 │                    │ │
+│          │   │  WebView        │  renderer/viewer   │ │
+│          │   └─────────────────┴────────────────────┘ │
+├──────────┴───────────────────────────────────────────┤
+│  ContextBar (bottom)                                  │
+│  cwd · git branch · connection status                 │
+└──────────────────────────────────────────────────────┘
 ```
 
 ### Cross-Pane Intelligence
@@ -223,25 +257,48 @@ User input (natural language / voice)
 ┌─────────────────────────────────────────────────┐
 │              Shelly (Wide Mode)                  │
 │                                                  │
-│  ┌──────────────┐    ┌────────────────────────┐  │
-│  │   Chat Pane   │    │    Terminal Pane        │  │
-│  │              │    │                        │  │
-│  │  User: "fix  │    │  $ npm run build       │  │
-│  │  the error   │    │  Error: Cannot find     │  │
-│  │  on the      │    │  module './utils'       │  │
-│  │  right"      │    │                        │  │
-│  │              │    │                        │  │
-│  │  AI: The     │◄───│  (output captured via    │  │
-│  │  error is... │    │   native terminal view)  │  │
-│  │              │    │                        │  │
-│  │  ┌────────┐  │    │                        │  │
-│  │  │▶ Run   │──┼───►│  $ mv util.ts utils.ts │  │
-│  │  └────────┘  │    │                        │  │
-│  └──────────────┘    └────────────────────────┘  │
+│  ┌──────────────────┐    ┌─────────────────────┐ │
+│  │   AI Pane         │    │   Terminal Pane      │ │
+│  │                  │    │                     │ │
+│  │  User: "fix the  │    │  $ npm run build    │ │
+│  │  error on the    │    │  Error: Cannot find  │ │
+│  │  right"          │    │  module './utils'   │ │
+│  │                  │    │                     │ │
+│  │  AI: The error   │◄───│  (transcript injected│ │
+│  │  is a missing    │    │   at dispatch time)  │ │
+│  │  import path...  │    │                     │ │
+│  │                  │    │                     │ │
+│  │  ┌───────────┐   │    │                     │ │
+│  │  │  Run      │───┼───►│  $ mv util.ts       │ │
+│  │  └───────────┘   │    │    utils.ts         │ │
+│  └──────────────────┘    └─────────────────────┘ │
 └─────────────────────────────────────────────────┘
 ```
 
-Chat reads Terminal. Terminal executes Chat. The user just talks.
+AI reads Terminal. Terminal executes AI. The user just talks.
+
+### Native PTY — JNI forkpty
+
+```
+React Native JS
+      │
+      │  JSI bridge
+      ▼
+Kotlin NativeModule (TermuxBridgeModule)
+      │
+      │  JNI call
+      ▼
+shelly-exec.c  ──── forkpty() ────► shell process
+      │                              (bash / zsh / sh)
+      │  read/write fd
+      ▼
+ShellyTerminalView.kt  (Kotlin Canvas renderer)
+      │
+      ▼
+Android SurfaceView  (GPU composited)
+```
+
+No TCP. No sockets. No separate process. The shell runs as a child of the app process via `forkpty`, and the PTY fd is read directly from Kotlin via JNI.
 
 ---
 
@@ -254,7 +311,7 @@ Chat reads Terminal. Terminal executes Chat. The user just talks.
 | UI | NativeWind (TailwindCSS 3) |
 | State | Zustand |
 | Navigation | expo-router v6 |
-| Terminal | Native emulator (Kotlin, Termux-derived) + Direct PTY (C, forkpty) |
+| Terminal | Native emulator (Kotlin, Termux-derived) + JNI forkpty (C, same-process) |
 | i18n | expo-localization + Zustand (900+ keys, EN/JA) |
 
 ---
@@ -269,6 +326,7 @@ The cross-pane system comes from: *"Why do I have to copy an error from one wind
 The native terminal comes from: *"Why does the terminal die every time I switch apps?"*
 The approval proxy comes from: *"Claude is asking me to approve something in English. I don't know what it means."*
 The VoiceChain comes from: *"I can't type on a phone keyboard fast enough to keep up with my ideas."*
+The layout system comes from: *"Why can't I have a browser, a terminal, and an AI all on the same screen at the same time?"*
 
 Every limitation became an innovation that engineers need just as much.
 
@@ -290,10 +348,12 @@ This started as a personal tool. Community contributions are shaping it into a t
 - [Flesh out CONTRIBUTING.md](https://github.com/RYOITABASHI/Shelly/issues/6) — development setup guide
 
 **Key files to explore:**
+
 - `lib/input-router.ts` — The brain. Classifies natural language into shell commands, AI requests, or @mentions
 - `lib/command-safety.ts` — Risk assessment engine. Blocks dangerous commands with 5 severity levels
 - `lib/auto-savepoint.ts` — Watches for file changes and auto-commits. The "game save" system
 - `modules/terminal-view/android/.../ShellyTerminalView.kt` — The native terminal renderer (Kotlin + Android Canvas)
+- `modules/termux-bridge/android/src/main/jni/shelly-exec.c` — The JNI forkpty layer
 
 If you find something that could be better — a cleaner pattern, a performance optimization, a bug fix — **please open an issue or PR**. That's exactly why this is open source.
 
@@ -309,7 +369,7 @@ Modern mobile SoCs have NPUs pushing 40+ TOPS. Local LLMs that required a deskto
 
 When that happens, you'll have zero-cost AI-assisted development, complete privacy, and development anywhere — airplanes, remote sites, commutes.
 
-Shelly was built for that future. Local LLM integration is already implemented. The native terminal is already there. The multi-agent routing already supports local models alongside cloud APIs.
+Shelly was built for that future. Local LLM integration is already implemented. The native terminal is already there. The multi-agent routing already supports local models alongside cloud APIs. The layout system already handles the screen real estate of foldables and tablets.
 
 The question isn't whether mobile development will happen. It's who builds the tools for it first.
 
@@ -319,7 +379,7 @@ The question isn't whether mobile development will happen. It's who builds the t
 
 **RYO ITABASHI** — Creative Director at [Rebuild Factoryz](https://rebuildfactoryz.com/). Branding and design are my profession. Code is not.
 
-I built Shelly because I wanted to use Claude Code on my phone, but Termux was too intimidating. So I made a chat interface that hides the terminal complexity while keeping its full power. Then I realized the real problem wasn't the terminal itself — it was the gap between the terminal and the AI. So I connected them. Then the WebView kept dying, so I directed the AI to replace the entire rendering layer with a native terminal emulator.
+I built Shelly because I wanted to use Claude Code on my phone, but Termux was too intimidating. So I made a chat interface that hides the terminal complexity while keeping its full power. Then I realized the real problem wasn't the terminal itself — it was the gap between the terminal and the AI. So I connected them. Then the WebView kept dying, so I directed the AI to replace the entire rendering layer with a native terminal emulator. Then I realized I needed a browser pane, a markdown viewer, a sidebar, and a proper layout system to make it a real IDE.
 
 100,000 lines later, I still can't write code. But I can describe what I need, and the AI builds it.
 
@@ -331,12 +391,13 @@ Both were developed entirely on a Samsung Galaxy Z Fold6, in Termux, without eve
 
 ## Known Limitations
 
-- **PTY communication is unauthenticated** — The native terminal connects to a PTY helper over TCP localhost. This is same-device only and not exposed to the network, but there is no auth layer between the two processes.
-- **OOB TCP health check** — The session health monitor uses an out-of-band TCP connection. Same localhost-only constraint applies.
 - **No offline mode** — Cloud AI features require an internet connection. Local LLM support works offline, but the default experience assumes connectivity.
+- **Termux still needed for extra packages** — Shelly no longer depends on Termux for the terminal itself (JNI native PTY), but if you want to install additional CLI tools (Python, Node, git, etc.), Termux is still the easiest way to get them.
 - **Manus-era bundle ID** — The Android package name (`space.manus.shelly.terminal.t20260224103125`) dates from early development. Changing it would break existing installs — a migration is planned for a future major release.
 - **Deep link scheme** — The custom URL scheme (`manus20260224103125://`) is a legacy artifact. Same migration timeline as the bundle ID.
 - **@team routes to multiple APIs** — When using `@team`, Shelly queries multiple AI providers simultaneously. This consumes API credits on each provider. A cost warning is displayed before execution.
+
+---
 
 ## Security
 
@@ -348,6 +409,8 @@ Shelly runs commands on your device. The safety system is a best-effort layer, n
 - **API keys are stored in SecureStore** — Keys are never written to logs or debug output. SecureStore uses Android Keystore encryption on supported devices.
 
 To report a security issue, please open a [GitHub issue](https://github.com/RYOITABASHI/Shelly/issues) with the `security` label, or contact the maintainer directly.
+
+---
 
 ## Privacy
 
