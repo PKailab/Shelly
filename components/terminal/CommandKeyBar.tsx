@@ -15,6 +15,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { useTerminalStore } from '@/store/terminal-store';
 import { KEY_BAR_HEIGHT, BORDER_WIDTH } from '@/lib/layout-constants';
+import { usePaneVoice } from '@/hooks/use-pane-voice';
 
 type Props = {
   sendKey: (keyCode: string) => void;
@@ -24,8 +25,8 @@ type Props = {
   suggestedSet?: KeySetId;
   /** Attach file callback (replaces TerminalActionBar) */
   onAttach?: () => void;
-  /** Voice input callback (replaces TerminalActionBar) */
-  onVoice?: () => void;
+  /** Voice input callback — called with the transcript text when recording completes */
+  onVoice?: (text: string) => void;
 };
 
 type KeyConfig = {
@@ -114,6 +115,24 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
   const [activeSet, setActiveSet] = useState<KeySetId>('default');
   const [altActive, setAltActive] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  // Voice recording via usePaneVoice — only active when onVoice prop is provided
+  const handleTranscript = useCallback((text: string) => {
+    onVoice?.(text);
+  }, [onVoice]);
+  const { startRecording, stopRecording, isRecording, isTranscribing } = usePaneVoice(handleTranscript);
+
+  const handleVoicePress = useCallback(async () => {
+    if (!onVoice) return;
+    if (settings.hapticFeedback) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    if (isRecording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+    }
+  }, [onVoice, isRecording, startRecording, stopRecording, settings.hapticFeedback]);
 
   const currentSet = KEY_SETS[activeSet];
 
@@ -209,8 +228,15 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
           </Pressable>
         )}
         {onVoice && (
-          <Pressable onPress={onVoice} hitSlop={6} style={styles.miniBtn}>
-            <MaterialIcons name="mic" size={13} color={c.muted} />
+          <Pressable onPress={handleVoicePress} hitSlop={6} style={styles.miniBtn}>
+            <MaterialIcons
+              name="mic"
+              size={13}
+              color={isRecording || isTranscribing ? c.accent : c.muted}
+            />
+            {(isRecording || isTranscribing) && (
+              <View style={[styles.recordingDot, { backgroundColor: c.accent }]} />
+            )}
           </Pressable>
         )}
 
@@ -281,6 +307,14 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  recordingDot: {
+    position: 'absolute',
+    bottom: 6,
+    right: 5,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
   dotsCol: {
     paddingRight: 6,
