@@ -6,3 +6,6 @@ target_link_libraries(termux log)
 
 add_library(shelly-pty SHARED src/main/jni/shelly-pty.c)
 target_link_libraries(shelly-pty log)
+
+add_library(shelly-exec SHARED src/main/jni/shelly-exec.c)
+target_link_libraries(shelly-exec log)

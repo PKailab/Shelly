@@ -410,5 +410,31 @@ class TerminalEmulatorModule : Module() {
             Log.i("TerminalEmulator", "Cancelled agent $agentId")
             null
         }
+
+        // ── Non-interactive command execution (replaces Termux bridge) ───────
+
+        AsyncFunction("execCommand") { command: String, timeoutMs: Int? ->
+            val context = appContext.reactContext
+                ?: throw IllegalStateException("No React context")
+            val timeout = timeoutMs ?: 120_000
+            val libDir = LibExtractor.getLibDir(context)
+            val homeDir = HomeInitializer.getHomeDir(context)
+            val bashPath = LibExtractor.getBashPath(context)
+
+            val result = ShellyJNI.execSubprocess(
+                "/system/bin/linker64",
+                bashPath,
+                libDir.absolutePath,
+                homeDir.absolutePath,
+                command,
+                timeout
+            )
+
+            mapOf(
+                "exitCode" to result[0].toInt(),
+                "stdout" to result[1],
+                "stderr" to result[2]
+            )
+        }
     }
 }

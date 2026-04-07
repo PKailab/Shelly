@@ -3,7 +3,10 @@ package expo.modules.terminalemulator
 object ShellyJNI {
     init {
         System.loadLibrary("shelly-pty")
+        System.loadLibrary("shelly-exec")
     }
+
+    // ── PTY (interactive terminal) ──────────────────────────────────────────
 
     @JvmStatic
     external fun createSubprocess(
@@ -24,4 +27,17 @@ object ShellyJNI {
 
     @JvmStatic
     external fun close(fd: Int)
+
+    // ── Exec (non-interactive command execution) ────────────────────────────
+
+    /** Fork+exec a command, capture stdout/stderr, return [exitCode, stdout, stderr] */
+    @JvmStatic
+    external fun execSubprocess(
+        linkerPath: String,
+        bashPath: String,
+        ldLibPath: String,
+        homePath: String,
+        command: String,
+        timeoutMs: Int
+    ): Array<String>
 }
