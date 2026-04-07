@@ -63,7 +63,7 @@ pnpm install && pnpm android
 
 > **Requirements:** Android device. For building from source: Node.js 22+, pnpm, Android NDK r27+. Expo Go is not supported — Shelly uses native Kotlin/C modules.
 >
-> Termux is no longer required for terminal functionality (Shelly uses a JNI native PTY), but some CLI packages may still require Termux if you want to install additional tools.
+> Termux is not required. Shelly ships with bash, Node.js 22, Python 3.12, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
 
 On first launch, the Setup Wizard handles permissions and AI configuration. The terminal is ready in under 5 minutes.
 
@@ -99,7 +99,7 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 
 ## Features
 
-> **91 features.** Here are the ones that matter most.
+> **167 features.** Here are the ones that matter most.
 
 ### Highlights
 
@@ -397,7 +397,7 @@ I built Shelly because I wanted to use Claude Code on my phone, but Termux was t
 
 The keyboard in the screenshots is **Nacre** — a split-layout Android IME I built (also through AI) to solve the input problem on mobile. Shelly handles the interface. Nacre handles the input. Together, they make phone-only development actually possible.
 
-Both were developed entirely on a Samsung Galaxy Z Fold6, in Termux, without ever touching a desktop computer.
+Both were developed entirely on a Samsung Galaxy Z Fold6, without ever touching a desktop computer.
 
 ---
 
