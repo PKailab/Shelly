@@ -53,10 +53,29 @@ export function getCompressedCatalog(): string {
   return FEATURE_CATALOG.map(f => `- ${f.name}: ${f.description}`).join('\n');
 }
 
-/** Find features relevant to a given context */
-export function suggestFeatures(context: string): Feature[] {
-  const lower = context.toLowerCase();
-  return FEATURE_CATALOG.filter(f =>
-    f.triggerContext && lower.includes(f.triggerContext.toLowerCase().split(' ')[0])
+/** Find features relevant to a given context string */
+export function suggestFeatures(context: string): Feature[];
+/** Find features relevant to an array of recent command names */
+export function suggestFeatures(recentCommandNames: string[]): Feature[];
+export function suggestFeatures(contextOrCommands: string | string[]): Feature[] {
+  if (Array.isArray(contextOrCommands)) {
+    // Context from recent terminal command names
+    const joined = contextOrCommands.join(' ').toLowerCase();
+    const matched = FEATURE_CATALOG.filter(
+      (f) => f.triggerContext && joined.includes(f.triggerContext.toLowerCase().split(' ')[0]),
+    );
+    if (matched.length >= 2) return matched.slice(0, 3);
+    // Fall back to popular always-useful features
+    const fallbackIds = ['ai-pane', 'command-blocks', 'savepoints'];
+    const fallbacks = FEATURE_CATALOG.filter((f) => fallbackIds.includes(f.id));
+    // Merge: matched first, then fill from fallbacks without duplicates
+    const seen = new Set(matched.map((f) => f.id));
+    const extra = fallbacks.filter((f) => !seen.has(f.id));
+    return [...matched, ...extra].slice(0, 3);
+  }
+  // Legacy string-based path
+  const lower = contextOrCommands.toLowerCase();
+  return FEATURE_CATALOG.filter(
+    (f) => f.triggerContext && lower.includes(f.triggerContext.toLowerCase().split(' ')[0]),
   ).slice(0, 3);
 }

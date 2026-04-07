@@ -17,6 +17,32 @@ import { useTerminalStore } from '@/store/terminal-store';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { buildTmuxListCommand } from '@/lib/session-restore';
 import { useTranslation } from '@/lib/i18n';
+import { suggestFeatures } from '@/lib/feature-catalog';
+
+// ---------------------------------------------------------------------------
+// Recent actions — module-level so they persist across palette open/close
+// ---------------------------------------------------------------------------
+const MAX_RECENT = 5;
+
+interface RecentEntry {
+  label: string;
+  action: () => void;
+  ts: number;
+}
+
+const _recentActions: RecentEntry[] = [];
+
+/**
+ * Register an action as recently used. Call this from any component that
+ * executes a palette-style action (e.g. settings screens, terminal shortcuts).
+ */
+export function addRecentAction(label: string, action: () => void): void {
+  // Remove existing entry with same label to avoid duplicates
+  const idx = _recentActions.findIndex((r) => r.label === label);
+  if (idx !== -1) _recentActions.splice(idx, 1);
+  _recentActions.unshift({ label, action, ts: Date.now() });
+  if (_recentActions.length > MAX_RECENT) _recentActions.length = MAX_RECENT;
+}
 
 const ACCENT = '#00D4AA';
 
@@ -107,8 +133,8 @@ export function CommandPalette() {
     return list;
   }, [snippets, isMultiPane, layout.isWide]);
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return actions;
+  const searchResults = useMemo(() => {
+    if (!query.trim()) return null; // null = show sectioned view
     const q = query.toLowerCase();
     return actions.filter(
       (a) =>
@@ -118,7 +144,46 @@ export function CommandPalette() {
     );
   }, [query, actions]);
 
+  // Recent section — snapshot at render time (stable reference via useMemo)
+  const recentSection = useMemo((): PaletteAction[] => {
+    return _recentActions.map((r, i) => ({
+      id: `recent-${i}-${r.label}`,
+      label: r.label,
+      icon: 'history' as const,
+      category: 'recent',
+      onExecute: r.action,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]); // re-snapshot each time palette opens (query resets to '')
+
+  // Suggested section — context from active session command history
+  const suggestedSection = useMemo((): PaletteAction[] => {
+    const activeSession = useTerminalStore
+      .getState()
+      .sessions.find((s) => s.id === useTerminalStore.getState().activeSessionId);
+    const recentCmds = activeSession?.commandHistory?.slice(0, 10) ?? [];
+    const features = suggestFeatures(recentCmds);
+    return features.map((f) => ({
+      id: `suggest-${f.id}`,
+      label: f.name,
+      hint: f.description,
+      icon: 'auto-awesome' as const,
+      category: 'suggest',
+      onExecute: () => {
+        if (f.id === 'ai-pane') { router.push('/(tabs)/' as any); close(); }
+        else if (f.id === 'savepoints') { router.push('/(tabs)/projects' as any); close(); }
+        else if (f.id === 'command-blocks') { router.push('/(tabs)/terminal' as any); close(); }
+        else { close(); }
+      },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   const handleSelect = useCallback((action: PaletteAction) => {
+    // Record to recents (skip entries that are already tagged as recent/suggest)
+    if (action.category !== 'recent' && action.category !== 'suggest') {
+      addRecentAction(action.label, action.onExecute);
+    }
     setQuery('');
     action.onExecute();
   }, []);
@@ -134,9 +199,34 @@ export function CommandPalette() {
       case 'action': return 'ACTION';
       case 'snippet': return 'SNIPPET';
       case 'pane': return 'PANE';
+      case 'recent': return 'RECENT';
+      case 'suggest': return 'SUGGEST';
       default: return cat.toUpperCase();
     }
   };
+
+  /** Render a dim section divider */
+  const SectionHeader = ({ title }: { title: string }) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionHeaderText}>{title}</Text>
+    </View>
+  );
+
+  /** Render a single palette row */
+  const ActionRow = ({ item }: { item: PaletteAction }) => (
+    <Pressable style={styles.item} onPress={() => handleSelect(item)}>
+      <MaterialIcons name={item.icon as any} size={18} color="#9BA1A6" />
+      <View style={styles.itemText}>
+        <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
+        {item.hint && (
+          <Text style={styles.itemHint} numberOfLines={1}>{item.hint}</Text>
+        )}
+      </View>
+      <View style={styles.categoryBadge}>
+        <Text style={styles.categoryText}>{categoryLabel(item.category)}</Text>
+      </View>
+    </Pressable>
+  );
 
   return (
     <Modal
@@ -167,32 +257,56 @@ export function CommandPalette() {
           </View>
 
           {/* Results */}
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            keyboardShouldPersistTaps="handled"
-            style={styles.list}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.item}
-                onPress={() => handleSelect(item)}
-              >
-                <MaterialIcons name={item.icon as any} size={18} color="#9BA1A6" />
-                <View style={styles.itemText}>
-                  <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
-                  {item.hint && (
-                    <Text style={styles.itemHint} numberOfLines={1}>{item.hint}</Text>
+          {searchResults !== null ? (
+            /* ── Search mode: flat filtered list ── */
+            <FlatList
+              data={searchResults}
+              keyExtractor={(item) => item.id}
+              keyboardShouldPersistTaps="handled"
+              style={styles.list}
+              renderItem={({ item }) => <ActionRow item={item} />}
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>{t('palette.no_results')}</Text>
+              }
+            />
+          ) : (
+            /* ── Browse mode: Recent + Suggested + All Features ── */
+            <FlatList
+              keyboardShouldPersistTaps="handled"
+              style={styles.list}
+              data={[]}
+              renderItem={null}
+              ListHeaderComponent={
+                <>
+                  {/* Recent */}
+                  {recentSection.length > 0 && (
+                    <>
+                      <SectionHeader title="RECENT" />
+                      {recentSection.map((item) => (
+                        <ActionRow key={item.id} item={item} />
+                      ))}
+                    </>
                   )}
-                </View>
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>{categoryLabel(item.category)}</Text>
-                </View>
-              </Pressable>
-            )}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>{t('palette.no_results')}</Text>
-            }
-          />
+
+                  {/* Suggested */}
+                  {suggestedSection.length > 0 && (
+                    <>
+                      <SectionHeader title="SUGGESTED FOR YOU" />
+                      {suggestedSection.map((item) => (
+                        <ActionRow key={item.id} item={item} />
+                      ))}
+                    </>
+                  )}
+
+                  {/* All Features */}
+                  <SectionHeader title="ALL FEATURES" />
+                  {actions.map((item) => (
+                    <ActionRow key={item.id} item={item} />
+                  ))}
+                </>
+              }
+            />
+          )}
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Ctrl+Shift+P</Text>
@@ -284,6 +398,18 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     textAlign: 'center',
     paddingVertical: 24,
+  },
+  sectionHeader: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: '#0E0E0E',
+  },
+  sectionHeaderText: {
+    color: '#374151',
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
   footer: {
     borderTopWidth: 1,
