@@ -65,6 +65,9 @@ object HomeInitializer {
             sb.appendLine("pip3() { pip \"\$@\"; }")
             sb.appendLine("curl() { _run $libDir/curl \"\$@\"; }")
             sb.appendLine("ssh() { _run $libDir/ssh \"\$@\"; }")
+            sb.appendLine("rg() { _run $libDir/rg \"\$@\"; }")
+            sb.appendLine("jq() { _run $libDir/jq \"\$@\"; }")
+            sb.appendLine("sqlite3() { _run $libDir/sqlite3 \"\$@\"; }")
             sb.appendLine()
 
             // Coreutils applets as functions

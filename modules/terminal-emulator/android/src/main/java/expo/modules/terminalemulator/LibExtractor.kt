@@ -51,7 +51,15 @@ object LibExtractor {
         "lib/arm64-v8a/libcom_err.so" to "libcom_err.so.3",
         "lib/arm64-v8a/libkrb5support.so" to "libkrb5support.so.0",
         "lib/arm64-v8a/libandroid-glob.so" to "libandroid-glob.so",
-        "lib/arm64-v8a/libresolv_wrapper.so" to "libresolv_wrapper.so"
+        "lib/arm64-v8a/libresolv_wrapper.so" to "libresolv_wrapper.so",
+        // ripgrep
+        "lib/arm64-v8a/librg.so" to "rg",
+        // jq + deps
+        "lib/arm64-v8a/libjq_bin.so" to "jq",
+        "lib/arm64-v8a/libjq.so" to "libjq.so",
+        "lib/arm64-v8a/libonig.so" to "libonig.so",
+        // sqlite3
+        "lib/arm64-v8a/libsqlite3_bin.so" to "sqlite3"
     )
 
     fun getLibDir(context: Context): File =
