@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 4
+    private const val BASHRC_VERSION = 5
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -79,7 +79,7 @@ object HomeInitializer {
 
             // OSC 133 for command block detection
             sb.appendLine("# OSC 133 for command block detection")
-            sb.appendLine("PS1='\\[\\e]133;A\\a\\]\\u@shelly:\\w\\\$ \\[\\e]133;B\\a\\]'")
+            sb.appendLine("PS1='\\[\\e]133;A\\a\\]shelly:\\w\\\$ \\[\\e]133;B\\a\\]'")
             sb.appendLine("PROMPT_COMMAND='echo -ne \"\\033]133;D;\\\$?\\007\"'")
 
             bashrc.writeText(sb.toString())

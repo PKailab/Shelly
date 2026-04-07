@@ -157,8 +157,10 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   settings: useSettingsStore.getState().settings,
   isSettingsLoaded: false,
 
-  // Termux bridge
-  connectionMode: 'termux',
+  // Native terminal (Plan B: JNI forkpty + linker64)
+  // Changed from 'termux' to 'native' — Termux bridge is no longer the default.
+  // Users can switch back to 'termux' mode in Settings if needed.
+  connectionMode: 'native',
   bridgeStatus: 'idle',
   termuxSettings: useSettingsStore.getState().termuxSettings,
   pendingCommand: null,
