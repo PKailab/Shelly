@@ -405,8 +405,6 @@ Both were developed entirely on a Samsung Galaxy Z Fold6, in Termux, without eve
 
 - **No offline mode** — Cloud AI features require an internet connection. Local LLM support works offline, but the default experience assumes connectivity.
 - **Termux still needed for extra packages** — Shelly no longer depends on Termux for the terminal itself (JNI native PTY), but if you want to install additional CLI tools (Python, Node, git, etc.), Termux is still the easiest way to get them.
-- **Manus-era bundle ID** — The Android package name (`space.manus.shelly.terminal.t20260224103125`) dates from early development. Changing it would break existing installs — a migration is planned for a future major release.
-- **Deep link scheme** — The custom URL scheme (`manus20260224103125://`) is a legacy artifact. Same migration timeline as the bundle ID.
 - **@team routes to multiple APIs** — When using `@team`, Shelly queries multiple AI providers simultaneously. This consumes API credits on each provider. A cost warning is displayed before execution.
 
 ---

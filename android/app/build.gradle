@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'space.manus.shelly.terminal.t20260224103125'
+    namespace 'dev.shelly.terminal'
     defaultConfig {
-        applicationId 'space.manus.shelly.terminal.t20260224103125'
+        applicationId 'dev.shelly.terminal'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

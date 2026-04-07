@@ -1,21 +1,6 @@
 import type { ExpoConfig } from "expo/config";
 
-// Legacy bundle ID — do not change (breaks existing installs and EAS association)
-const rawBundleId = "space.manus.shelly.terminal.t20260224103125";
-const bundleId =
-  rawBundleId
-    .replace(/[-_]/g, ".") // Replace hyphens/underscores with dots
-    .replace(/[^a-zA-Z0-9.]/g, "") // Remove invalid chars
-    .replace(/\.+/g, ".") // Collapse consecutive dots
-    .replace(/^\.+|\.+$/g, "") // Trim leading/trailing dots
-    .toLowerCase()
-    .split(".")
-    .map((segment) => {
-      // Android requires each segment to start with a letter
-      // Prefix with 'x' if segment starts with a digit
-      return /^[a-zA-Z]/.test(segment) ? segment : "x" + segment;
-    })
-    .join(".") || "space.manus.app";
+const bundleId = "dev.shelly.terminal";
 const schemeFromBundleId = "shelly";
 
 const env = {
