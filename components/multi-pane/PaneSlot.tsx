@@ -5,7 +5,8 @@ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PANE_REGISTRY } from './pane-registry';
 import { PaneSelector } from './PaneSelector';
 import type { PaneTab } from '@/hooks/use-multi-pane';
-import { usePaneStore, getAgentColor } from '@/store/pane-store';
+import { usePaneStore, getAgentColor, AGENT_COLORS } from '@/store/pane-store';
+import { useSettingsStore } from '@/store/settings-store';
 import { onCommandComplete } from '@/lib/cli-notification';
 
 const ACCENT = '#00D4AA';
@@ -30,6 +31,7 @@ type Props = {
 const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV, canSplit }: Props) => {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [splitMenuVisible, setSplitMenuVisible] = useState(false);
+  const [agentMenuVisible, setAgentMenuVisible] = useState(false);
   const [paneWidth, setPaneWidth] = useState(0);
   const [notification, setNotification] = useState<{ status: 'done' | 'error' } | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -37,8 +39,11 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
   const wasBrowserRef = useRef(tab === 'browser');
   const entry = PANE_REGISTRY[tab];
   const agentColor = usePaneStore((s) => getAgentColor(s.paneAgents, leafId));
+  const boundAgent = usePaneStore((s) => s.paneAgents[leafId] ?? null);
+  const { bindAgent } = usePaneStore();
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const { setFocusedPane } = usePaneStore();
+  const teamMembers = useSettingsStore((s) => s.settings.teamMembers);
   const Component = useMemo(() => entry.getComponent(), [tab]);
   // BrowserComponent is memoised once — never remounts, even when hidden
   const BrowserComponent = useMemo(() => PANE_REGISTRY['browser'].getComponent(), []);
@@ -84,6 +89,19 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           </Text>
           <MaterialIcons name="arrow-drop-down" size={14} color="#9BA1A6" />
         </Pressable>
+        {tab === 'ai' && (
+          <Pressable
+            style={styles.agentBadgeBtn}
+            onPress={() => setAgentMenuVisible(true)}
+            hitSlop={6}
+          >
+            <View style={[styles.agentDot, { backgroundColor: agentColor }]} />
+            <Text style={styles.agentBadgeText}>
+              {boundAgent ?? 'unbound'}
+            </Text>
+            <MaterialIcons name="arrow-drop-down" size={12} color="#9BA1A6" />
+          </Pressable>
+        )}
         {notification && (
           <View style={[
             styles.notificationBadge,
@@ -147,6 +165,20 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
         onSplitV={onSplitV}
         currentTab={tab}
       />
+
+      {/* Agent selector menu */}
+      {tab === 'ai' && (
+        <AgentMenu
+          visible={agentMenuVisible}
+          onClose={() => setAgentMenuVisible(false)}
+          teamMembers={teamMembers}
+          boundAgent={boundAgent}
+          onSelect={(key) => {
+            bindAgent(leafId, key);
+            setAgentMenuVisible(false);
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -231,6 +263,55 @@ function SplitMenu({
   );
 }
 
+// ─── Agent Menu ──────────────────────────────────────────────────────────────
+
+function AgentMenu({
+  visible,
+  onClose,
+  teamMembers,
+  boundAgent,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  teamMembers: Record<string, boolean>;
+  boundAgent: string | null;
+  onSelect: (key: string) => void;
+}) {
+  if (!visible) return null;
+
+  const agents = Object.entries(teamMembers)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key);
+
+  return (
+    <Pressable style={splitStyles.backdrop} onPress={onClose}>
+      <Pressable style={agentMenuStyles.menu} onPress={(e) => e.stopPropagation()}>
+        <Text style={splitStyles.title}>Switch Agent</Text>
+        {agents.map((key) => {
+          const color = AGENT_COLORS[key] ?? AGENT_COLORS.unbound;
+          const isActive = key === boundAgent;
+          return (
+            <Pressable
+              key={key}
+              style={[agentMenuStyles.row, isActive && agentMenuStyles.rowActive]}
+              onPress={() => onSelect(key)}
+            >
+              <View style={[agentMenuStyles.dot, { backgroundColor: color }]} />
+              <Text style={[agentMenuStyles.label, isActive && { color: ACCENT }]}>
+                {key.charAt(0).toUpperCase() + key.slice(1)}
+              </Text>
+              {isActive && (
+                <MaterialIcons name="check" size={13} color={ACCENT} style={{ marginLeft: 'auto' }} />
+              )}
+            </Pressable>
+          );
+        })}
+      </Pressable>
+    </Pressable>
+  );
+}
+
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -291,6 +372,26 @@ const styles = StyleSheet.create({
     padding: 3,
     borderRadius: 4,
   },
+  agentBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  agentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  agentBadgeText: {
+    color: '#9BA1A6',
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+  },
   content: {
     flex: 1,
   },
@@ -342,6 +443,38 @@ const splitStyles = StyleSheet.create({
   optionText: {
     color: '#ECEDEE',
     fontSize: 13,
+    fontFamily: 'monospace',
+  },
+});
+
+const agentMenuStyles = StyleSheet.create({
+  menu: {
+    width: 180,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 10,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  rowActive: {
+    backgroundColor: 'rgba(0,212,170,0.08)',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  label: {
+    color: '#ECEDEE',
+    fontSize: 12,
     fontFamily: 'monospace',
   },
 });
