@@ -251,89 +251,43 @@ PROMPT_COMMAND='echo -ne "\033]133;D;$?\007"'
 **Phase 1**: bash + 依存ライブラリのみ。PTY接続の動作確認。
 **Phase 2**: 基本ツール同梱。Claude Codeが使えるレベル。
 
-## デュアルモード設計
+## 削除するコード
 
-### モード切替
+Termuxフォールバックは不要。Shellyの完成形でTermuxの生ターミナルを操作したいユーザー像が存在しない。コード負債をなくしてPlan Bに集中する。
 
-| モード | 対象 | ターミナル実行 | セッション永続化 | セットアップ |
-|-------|------|-------------|--------------|------------|
-| **Built-in (デフォルト)** | 全ユーザー | linker64 + JNI forkpty | アプリkillで消失 | 不要 |
-| **Termux (上級者向け)** | パワーユーザー | 既存TCPブリッジ | tmux経由で永続 | 手動 |
+| ファイル/機能 | 理由 |
+|-------------|------|
+| `hooks/use-termux-bridge.ts` | WebSocketブリッジ不要 |
+| `shelly-bridge/` ディレクトリ全体 | bridge.js, pty-helper, start-shelly.sh不要 |
+| `modules/termux-bridge/` | TermuxBridge Native Module不要 |
+| `lib/tmux-manager.ts` | tmux依存不要 |
+| TCP heartbeat/reconnect全般 | PTY fd直接なので不要 |
+| SetupWizard Steps 2-4 (Termux関連) | Termux不要 |
+| `BridgeRecoveryBanner` | 不要 |
+| socat関連コード | 不要 |
+| Settings画面のTermux接続セクション | 不要 |
 
-- デフォルトはBuilt-inモード。Termuxインストール不要
-- Settings画面に「Termux接続」オプションを残す
-- SetupWizardからTermux必須ステップは消す
-- Termuxモードの接続・復帰は上級者前提のため手厚いガイド不要
-
-### コード方針
-
-**残すコード（Termuxフォールバック用）:**
-- `lib/use-termux-bridge.ts` — WebSocket Bridge通信
-- `shelly-bridge/` — bridge.js, start-shelly.sh
-- `modules/termux-bridge/` — TermuxBridge Native Module
-- `ShellyTerminalSession.kt`のTCP接続パス
-- tmux-manager.ts
-
-**変更するコード:**
-- `ShellyTerminalSession.kt` — Built-in (PTY fd) とTermux (TCP) のデュアルパス
-- `TerminalEmulatorModule.kt` — `createSession`にmode引数追加
-- `terminal.tsx` — モードに応じた起動フロー分岐
-- SetupWizard — Termux関連ステップをオプション化
-
-**新規コード:**
-- `termux.c` (JNI拡張) — forkpty + linker64 execve
-- `LibExtractor.kt` — APKからバイナリ抽出
-- `JNI.kt` — JNIブリッジクラス
-- `HomeInitializer.kt` — filesDir/home/ 初期化
-
-### createSessionのデュアルパス
-
-```kotlin
-AsyncFunction("createSession") { config: Map<String, Any> ->
-    val mode = config["mode"] as? String ?: "builtin"
-
-    when (mode) {
-        "builtin" -> {
-            // Plan B: JNI forkpty + linker64
-            val libDir = LibExtractor.extractAll(context)
-            val result = IntArray(2)
-            JNI.createSubprocess(
-                "/system/bin/linker64",
-                LibExtractor.getBashPath(context),
-                libDir.absolutePath,
-                homeDir, rows, cols, result
-            )
-            ShellyTerminalSession.fromPtyFd(sessionId, result[0], result[1], emulator)
-        }
-        "termux" -> {
-            // 既存: TCPブリッジ経由
-            val port = config["port"] as Int
-            ShellyTerminalSession.fromTcpPort(sessionId, port, emulator)
-        }
-    }
-}
-```
+**注意**: 削除はPhase 1完了後。まずBuilt-inモードが動くことを確認してから段階的に削除。
 
 ## セッション永続化
 
-### Built-inモード
 - bashクラッシュ/終了 → `waitFor(childPid)` → `onSessionExit` → 再起動ボタン
 - アプリバックグラウンド → WakeLock (PARTIAL_WAKE_LOCK)で維持
 - アプリkill → セッション消失（再起動で新規セッション）
-- これは許容範囲: Built-inモードは軽量な使い方を想定
+- 将来: Shelly独自のセッション永続化（tmux不要の仕組み）
 
-### Termuxモード
-- tmux経由でセッション永続化（既存動作）
-- アプリkill後もtmuxセッション生存
-- 復帰時にtmux attachで接続復帰
-- 上級者は自力で復旧できる前提
+## パッケージ管理（HN/Reddit/Termux界隈向け）
+
+ガチユーザーが不足なく使えるために、将来的にパッケージ追加の手段を提供:
+- TermuxのAPTリポジトリからバイナリ取得する`shelly pkg install`コマンド
+- または同梱バイナリのOTA更新
+- `.bashrc`カスタマイズ、PATH操作、環境変数は自由に設定可能
 
 ## セキュリティ考慮
 
 - linker64トリックはAndroidの正規メカニズムではない。将来のAndroidバージョンで塞がれる可能性がある
-- **緩和策**: Termuxフォールバック維持。linker64ブロック検知時にSettings画面で「Termuxモード推奨」を表示
+- **緩和策**: 起動時にlinker64動作確認。失敗時はユーザーに通知し、targetSdk引き下げ版APKを提供する選択肢
 - 同梱バイナリはTermuxのAPTリポジトリのビルド済みバイナリを使用（ライセンス: GPL v3 for bash, 各ツールのライセンスに準拠）
-- 起動時にlinker64トリックの動作確認を行い、失敗時は自動でTermuxモードを提案
 
 ## Success Criteria
 
