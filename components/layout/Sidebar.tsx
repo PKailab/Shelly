@@ -14,6 +14,7 @@ import { useSidebarStore } from '@/store/sidebar-store';
 import { useAgentStore } from '@/store/agent-store';
 import { SidebarSection } from './SidebarSection';
 import { FileTree } from './FileTree';
+import { ProfilesSection } from './ProfilesSection';
 
 const WIDTH_EXPANDED = 240;
 const WIDTH_ICONS = 48;
@@ -172,7 +173,7 @@ export function Sidebar() {
           onToggle={() => toggleSection('profiles')}
           iconsOnly={iconsOnly}
         >
-          <Text style={[styles.emptyText, { color: c.muted }]}>No saved profiles</Text>
+          <ProfilesSection />
         </SidebarSection>
       </ScrollView>
 
