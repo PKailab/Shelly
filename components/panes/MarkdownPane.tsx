@@ -18,6 +18,7 @@ import {
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '@/lib/theme-engine';
 import { execCommand } from '@/hooks/use-native-exec';
+import PaneInputBar from '@/components/panes/PaneInputBar';
 
 // ── Module-level state for imperative openMarkdownFile ────────────────────────
 
@@ -67,6 +68,11 @@ export default function MarkdownPane() {
 
   const handleEdit = useCallback(() => {
     ToastAndroid.show('Edit with vim in terminal', ToastAndroid.SHORT);
+  }, []);
+
+  const handleSearch = useCallback((_text: string) => {
+    // Future: search within document
+    ToastAndroid.show('Search within document — coming soon', ToastAndroid.SHORT);
   }, []);
 
   // ── Markdown style rules keyed to current theme ──────────────────────────
@@ -246,6 +252,12 @@ export default function MarkdownPane() {
           <Markdown style={markdownStyles}>{content}</Markdown>
         </ScrollView>
       )}
+
+      {/* Bottom search bar */}
+      <PaneInputBar
+        placeholder="Search in document..."
+        onSubmit={handleSearch}
+      />
     </View>
   );
 }

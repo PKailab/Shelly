@@ -13,6 +13,7 @@ import WebView, { WebViewNavigation } from 'react-native-webview';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/lib/theme-engine';
 import { useBrowserStore } from '@/store/browser-store';
+import PaneInputBar from '@/components/panes/PaneInputBar';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -118,6 +119,12 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
 
   const handleRefresh = useCallback(() => {
     webviewRef.current?.reload();
+  }, []);
+
+  const handleBottomBarSubmit = useCallback((text: string) => {
+    const url = normalizeUrl(text);
+    setInputUrl(url);
+    setCurrentUrl(url);
   }, []);
 
   return (
@@ -254,6 +261,12 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
           )}
         />
       )}
+
+      {/* ── Bottom search / navigation bar ──────────────────────────── */}
+      <PaneInputBar
+        placeholder="Search or enter URL..."
+        onSubmit={handleBottomBarSubmit}
+      />
     </KeyboardAvoidingView>
   );
 }

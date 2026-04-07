@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { PaneIdContext } from '@/components/multi-pane/PaneSlot';
 import { useAIPaneStore } from '@/store/ai-pane-store';
+import { usePaneStore } from '@/store/pane-store';
 import { formatContextBadge } from '@/lib/ai-pane-context';
 import { useThemeStore } from '@/lib/theme-engine';
 import type { ChatMessage } from '@/store/chat-store';
