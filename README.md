@@ -42,7 +42,7 @@ I'm not an engineer. I've never written a line of TypeScript. I don't fully unde
 
 But I built this — a 100,000-line terminal IDE — by talking to AI.
 
-Every architectural decision in Shelly is mine. The code is not. It was created through conversation with [Claude Code](https://claude.ai/), running inside [Termux](https://termux.dev/) on a Samsung Galaxy Z Fold6. I direct. The AI builds. No desktop. No laptop. Just a foldable phone and an AI that can execute commands.
+Every architectural decision in Shelly is mine. The code is not. It was created through conversation with [Claude Code](https://claude.ai/) on a Samsung Galaxy Z Fold6. I direct. The AI builds. No desktop. No laptop. Just a foldable phone and an AI that can execute commands.
 
 The keyboard you see in the screenshots? I built that too. It's called [Nacre](https://github.com/RYOITABASHI/Nacre) — an 11,000-line Android IME written in Kotlin, also created entirely through AI conversation. I'm typing on it right now, inside Shelly, improving both apps simultaneously.
 
@@ -345,7 +345,7 @@ This started as a personal tool. Community contributions are shaping it into a t
 - `lib/command-safety.ts` — Risk assessment engine. Blocks dangerous commands with 5 severity levels
 - `lib/auto-savepoint.ts` — Watches for file changes and auto-commits. The "game save" system
 - `modules/terminal-view/android/.../ShellyTerminalView.kt` — The native terminal renderer (Kotlin + Android Canvas)
-- `modules/termux-bridge/android/src/main/jni/shelly-exec.c` — The JNI forkpty layer
+- `modules/terminal-emulator/android/src/main/jni/shelly-pty.c` — The JNI forkpty layer
 
 If you find something that could be better — a cleaner pattern, a performance optimization, a bug fix — **please open an issue or PR**. That's exactly why this is open source.
 
