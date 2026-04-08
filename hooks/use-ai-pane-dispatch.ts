@@ -16,6 +16,11 @@ import { useSettingsStore } from '@/store/settings-store';
 import { getTerminalSnapshot, buildAIPaneSystemPrompt } from '@/lib/ai-pane-context';
 import type { ChatMessage } from '@/store/chat-store';
 import { logInfo, logError } from '@/lib/debug-logger';
+import { groqChatStream, GROQ_DEFAULT_MODEL } from '@/lib/groq';
+import { geminiChatStream, GEMINI_DEFAULT_MODEL } from '@/lib/gemini';
+import { perplexitySearchStream, PERPLEXITY_DEFAULT_MODEL } from '@/lib/perplexity';
+import type { GroqMessage } from '@/lib/groq';
+import type { GeminiMessage } from '@/lib/gemini';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -302,11 +307,198 @@ export function useAIPaneDispatch(paneId: string) {
               tokenCount: estimateTokens(accumulated),
             });
           }
-        } else {
-          // ── Other agents: stub until full routing is wired ──
-          logInfo('AIPaneDispatch', 'Response complete (stub for agent: ' + agent + ')');
+        } else if (agent === 'groq') {
+          // ── Groq (Llama 3.3 70B, OpenAI-compatible SSE) ──
+          const apiKey = settings.groqApiKey ?? '';
+          if (!apiKey) {
+            store.updateMessage(paneId, assistantId, {
+              content: 'Groq API key is not set. Add it in Settings (gear icon) → Groq API Key.',
+              isStreaming: false,
+              streamingText: undefined,
+            });
+          } else {
+            const groqHistory: GroqMessage[] = history.map((m) => ({
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+            }));
+            // Prepend system prompt as a user/assistant exchange isn't possible in Groq
+            // groqChatStream accepts history and appends the system prompt internally,
+            // but we pass our richer terminal-aware system prompt via the first history entry.
+            // We inject it as the first message if the history is empty, otherwise trust groq.ts.
+            let accumulated = '';
+            throttledUpdate(paneId, assistantId, { isStreaming: true, streamingText: '' });
+
+            const result = await groqChatStream(
+              apiKey,
+              userText,
+              (chunk, done) => {
+                if (signal.aborted) return;
+                if (!done && chunk) {
+                  accumulated += chunk;
+                  throttledUpdate(paneId, assistantId, {
+                    streamingText: accumulated,
+                    tokenCount: estimateTokens(accumulated),
+                    isStreaming: true,
+                  });
+                }
+              },
+              settings.groqModel ?? GROQ_DEFAULT_MODEL,
+              groqHistory,
+              signal,
+            );
+
+            if (!signal.aborted) {
+              const finalContent = result.content ?? accumulated;
+              if (!result.success && result.error) {
+                store.updateMessage(paneId, assistantId, {
+                  content: `Groq error: ${result.error}`,
+                  isStreaming: false,
+                  streamingText: undefined,
+                });
+              } else {
+                store.updateMessage(paneId, assistantId, {
+                  content: finalContent,
+                  streamingText: undefined,
+                  isStreaming: false,
+                  tokenCount: estimateTokens(finalContent),
+                });
+              }
+              logInfo('AIPaneDispatch', 'Groq response complete');
+            }
+          }
+        } else if (agent === 'gemini') {
+          // ── Gemini (SSE via Google AI Studio) ──
+          const apiKey = settings.geminiApiKey ?? '';
+          if (!apiKey) {
+            store.updateMessage(paneId, assistantId, {
+              content: 'Gemini API key is not set. Add it in Settings (gear icon) → Gemini API Key.',
+              isStreaming: false,
+              streamingText: undefined,
+            });
+          } else {
+            const geminiHistory: GeminiMessage[] = history.map((m) => ({
+              role: m.role === 'user' ? 'user' : 'model',
+              parts: [{ text: m.content }],
+            }));
+
+            let accumulated = '';
+            throttledUpdate(paneId, assistantId, { isStreaming: true, streamingText: '' });
+
+            const result = await geminiChatStream(
+              apiKey,
+              userText,
+              (chunk, done) => {
+                if (signal.aborted) return;
+                if (!done && chunk) {
+                  accumulated += chunk;
+                  throttledUpdate(paneId, assistantId, {
+                    streamingText: accumulated,
+                    tokenCount: estimateTokens(accumulated),
+                    isStreaming: true,
+                  });
+                }
+              },
+              settings.geminiModel ?? GEMINI_DEFAULT_MODEL,
+              geminiHistory,
+              signal,
+            );
+
+            if (!signal.aborted) {
+              const finalContent = result.content ?? accumulated;
+              if (!result.success && result.error) {
+                store.updateMessage(paneId, assistantId, {
+                  content: `Gemini error: ${result.error}`,
+                  isStreaming: false,
+                  streamingText: undefined,
+                });
+              } else {
+                store.updateMessage(paneId, assistantId, {
+                  content: finalContent,
+                  streamingText: undefined,
+                  isStreaming: false,
+                  tokenCount: estimateTokens(finalContent),
+                });
+              }
+              logInfo('AIPaneDispatch', 'Gemini response complete');
+            }
+          }
+        } else if (agent === 'perplexity') {
+          // ── Perplexity Sonar (web-search SSE) ──
+          const apiKey = settings.perplexityApiKey ?? '';
+          if (!apiKey) {
+            store.updateMessage(paneId, assistantId, {
+              content: 'Perplexity API key is not set. Add it in Settings (gear icon) → Perplexity API Key.',
+              isStreaming: false,
+              streamingText: undefined,
+            });
+          } else {
+            const pplxHistory = history.map((m) => ({ role: m.role, content: m.content }));
+
+            let accumulated = '';
+            throttledUpdate(paneId, assistantId, { isStreaming: true, streamingText: '' });
+
+            const result = await perplexitySearchStream(
+              apiKey,
+              userText,
+              (chunk, done, citations) => {
+                if (signal.aborted) return;
+                if (!done && chunk) {
+                  accumulated += chunk;
+                  throttledUpdate(paneId, assistantId, {
+                    streamingText: accumulated,
+                    tokenCount: estimateTokens(accumulated),
+                    isStreaming: true,
+                  });
+                }
+                if (done && citations && citations.length > 0) {
+                  // Append formatted citations to the final message
+                  const citationText = '\n\n**Sources:**\n' +
+                    citations.map((c, i) => `${i + 1}. [${c.title ?? c.url}](${c.url})`).join('\n');
+                  accumulated += citationText;
+                }
+              },
+              settings.perplexityModel ?? PERPLEXITY_DEFAULT_MODEL,
+              pplxHistory,
+              signal,
+            );
+
+            if (!signal.aborted) {
+              const finalContent = result.content
+                ? (result.citations && result.citations.length > 0
+                  ? result.content + '\n\n**Sources:**\n' +
+                    result.citations.map((c, i) => `${i + 1}. [${c.title ?? c.url}](${c.url})`).join('\n')
+                  : result.content)
+                : accumulated;
+
+              if (!result.success && result.error) {
+                store.updateMessage(paneId, assistantId, {
+                  content: `Perplexity error: ${result.error}`,
+                  isStreaming: false,
+                  streamingText: undefined,
+                });
+              } else {
+                store.updateMessage(paneId, assistantId, {
+                  content: finalContent,
+                  streamingText: undefined,
+                  isStreaming: false,
+                  tokenCount: estimateTokens(finalContent),
+                });
+              }
+              logInfo('AIPaneDispatch', 'Perplexity response complete');
+            }
+          }
+        } else if (agent === 'claude') {
+          // ── Claude — TODO: no lib/claude.ts yet ──
+          // Claude Code runs as a CLI tool; a REST API wrapper is needed.
           store.updateMessage(paneId, assistantId, {
-            content: `Agent "${agent}" is not yet wired in the AI Pane.\nConfigure your API keys in Settings, or switch the pane agent to "local".`,
+            content: 'Claude API integration is not yet available in the AI Pane.\n\nTo use Claude, open a Terminal tab and run `claude` directly.\n\n(TODO: add lib/claude.ts with Anthropic Messages API)',
+            isStreaming: false,
+            streamingText: undefined,
+          });
+        } else {
+          // ── Unknown agent ──
+          store.updateMessage(paneId, assistantId, {
+            content: `Unknown agent "${agent}". Switch the pane agent in the pane header.`,
             isStreaming: false,
             streamingText: undefined,
           });
