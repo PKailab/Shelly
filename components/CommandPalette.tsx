@@ -104,7 +104,7 @@ export function CommandPalette() {
 
     // Package Manager
     list.push(
-      { id: 'action-packages', label: t('pkg.title'), hint: 'Termux pkg GUI', icon: 'inventory-2', category: 'action',
+      { id: 'action-packages', label: t('pkg.title'), hint: 'Bundled tools status', icon: 'inventory-2', category: 'action',
         onExecute: () => {
           useSettingsStore.getState().setShowConfigTUI(true);
           close();

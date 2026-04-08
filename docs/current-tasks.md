@@ -1,6 +1,6 @@
 # Current Tasks — Termux Dependency Removal (2026-04-08)
 
-Status: 9 tasks, 0 completed.
+Status: 9 tasks, **9 completed.** All done.
 
 ## Background
 
