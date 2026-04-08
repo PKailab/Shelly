@@ -103,7 +103,13 @@ export default function TerminalScreen() {
   // vs. rendered by the Tabs navigator (hidden underneath the overlay)
   const multiPaneCtx = useContext(MultiPaneContext);
   const isRenderedInMultiPane = multiPaneCtx !== null;
+  // Only hide tab-side terminal when MultiPane is actively visible on wide screen
+  // AND the MultiPaneContainer actually renders pane slots (layout.isWide)
   const isHiddenBehindMultiPane = !isRenderedInMultiPane && isMultiPane && layout.isWide;
+
+  // Even if hidden behind multi-pane, always ensure sessions exist
+  // so the terminal is ready when the user switches to single-pane mode
+  const skipSessionCreation = false;
 
   // Bridge terminal output events to execution-log-store
   useTerminalOutput();
@@ -272,7 +278,6 @@ export default function TerminalScreen() {
 
   // Ensure native sessions exist. Called on mount and foreground resume.
   const ensureNativeSessions = useCallback(async () => {
-    if (isHiddenBehindMultiPane) return;
     if (sessionMutexRef.current) return;
     sessionMutexRef.current = true;
 
