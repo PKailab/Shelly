@@ -146,20 +146,112 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
   // ── Handle browser/OAuth auth ────────────────────────────────────────────
   const [oauthRunning, setOauthRunning] = useState<AuthToolId | null>(null);
   const [oauthOutput, setOauthOutput] = useState('');
+  const oauthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up any ongoing poll on unmount
+  useEffect(() => {
+    return () => {
+      if (oauthPollRef.current !== null) {
+        clearInterval(oauthPollRef.current);
+        oauthPollRef.current = null;
+      }
+    };
+  }, []);
 
   const handleBrowserAuth = useCallback(async (config: AuthToolConfig) => {
-    // If the tool has a loginCommand, run OAuth via CLI
+    // If the tool has a loginCommand, run OAuth via real PTY
     if (config.loginCommand) {
       setOauthRunning(config.id);
       setOauthOutput('Running: ' + config.loginCommand);
-      runCommand(config.loginCommand);
-      // Wait a moment then re-check auth status
-      setTimeout(() => {
-        if (!mountedRef.current) return;
-        refreshStatuses();
-        setOauthRunning(null);
-        setOauthOutput('');
-      }, 3000);
+
+      // Get the native session ID from the first terminal session
+      const sessionId = useTerminalStore.getState().sessions[0]?.nativeSessionId;
+      if (!sessionId) {
+        // Fallback: route through store's runCommand
+        runCommand(config.loginCommand);
+      } else {
+        try {
+          await TerminalEmulator.writeToSession(sessionId, config.loginCommand + '\n');
+        } catch {
+          runCommand(config.loginCommand);
+        }
+      }
+
+      // Clear any existing poll
+      if (oauthPollRef.current !== null) {
+        clearInterval(oauthPollRef.current);
+        oauthPollRef.current = null;
+      }
+
+      const startTime = Date.now();
+      const TIMEOUT_MS = 60_000;
+      let urlOpened = false;
+
+      oauthPollRef.current = setInterval(async () => {
+        if (!mountedRef.current) {
+          clearInterval(oauthPollRef.current!);
+          oauthPollRef.current = null;
+          return;
+        }
+
+        // Timeout after 60s
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          clearInterval(oauthPollRef.current!);
+          oauthPollRef.current = null;
+          setOauthRunning(null);
+          setOauthOutput('');
+          Alert.alert(t('auth.error'), t('auth.oauth_timeout'));
+          return;
+        }
+
+        // Read recent terminal output
+        let recentText = '';
+        if (sessionId) {
+          try {
+            recentText = await TerminalEmulator.getTranscriptText(sessionId, 40);
+          } catch {
+            // Fallback to store entries
+            const session = useTerminalStore.getState().sessions.find(
+              (s: any) => s.nativeSessionId === sessionId,
+            );
+            recentText = session?.entries?.slice(-10)
+              .flatMap((e: any) => e.output || [])
+              .map((o: any) => o.text)
+              .join('\n') ?? '';
+          }
+        } else {
+          const session = useTerminalStore.getState().sessions[0];
+          recentText = session?.entries?.slice(-10)
+            .flatMap((e: any) => e.output || [])
+            .map((o: any) => o.text)
+            .join('\n') ?? '';
+        }
+
+        // Detect OAuth URL and open in browser (only once)
+        if (!urlOpened) {
+          const urlMatch = recentText.match(/https?:\/\/[^\s\x1b\]]+/);
+          if (urlMatch) {
+            urlOpened = true;
+            Linking.openURL(urlMatch[0]).catch(() => {
+              Alert.alert(t('auth.error'), t('auth.browser_failed'));
+            });
+            setOauthOutput(urlMatch[0]);
+          }
+        }
+
+        // Detect success patterns
+        const successPattern = /authenticated|success|logged in|Logged in/i;
+        if (successPattern.test(recentText)) {
+          clearInterval(oauthPollRef.current!);
+          oauthPollRef.current = null;
+          setOauthRunning(null);
+          setOauthOutput('');
+          setAuthStatuses((prev) => ({ ...prev, [config.id]: 'authenticated' }));
+          setExpandedTool(null);
+          refreshStatuses();
+        }
+      }, 2000);
+
       return;
     }
 
