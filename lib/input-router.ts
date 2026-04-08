@@ -148,7 +148,7 @@ const SHELL_COMMAND_PREFIXES = [
   // ネットワーク
   'curl', 'wget', 'ping', 'ssh', 'scp', 'nc', 'netstat', 'ifconfig', 'ip',
   // パッケージ
-  'apt', 'apt-get', 'pkg', 'pip', 'pip3', 'npm', 'npx', 'yarn', 'pnpm',
+  'apt', 'apt-get', 'pip', 'pip3', 'npm', 'npx', 'yarn', 'pnpm',
   // 開発ツール
   'git', 'node', 'python', 'python3', 'ruby', 'go', 'cargo', 'make', 'cmake',
   'gcc', 'g++', 'clang', 'javac', 'java',
@@ -207,11 +207,10 @@ const LIGHTWEIGHT_PATTERNS: Array<{ pattern: RegExp; command: string; label: str
   { pattern: /^(?:プロセス一覧|実行中|running processes)/i, command: 'ps aux 2>/dev/null || ps', label: 'ps' },
   { pattern: /^(?:環境変数|env vars|printenv)/i, command: 'printenv | head -30', label: 'printenv' },
   { pattern: /^(?:IP.*アドレス|ipアドレス|ip address|my ip)/i, command: 'ip addr show 2>/dev/null || ifconfig 2>/dev/null || echo "ip command not found"', label: 'ip addr' },
-  // Package management
-  { pattern: /^(?:パッケージ|package)(?:を|)(?:更新|アップデート|update)/i, command: 'pkg update -y && pkg upgrade -y', label: 'pkg update' },
-  { pattern: /^(?:(?:install|インストール)\s+)(.+)/i, command: 'pkg install -y $1', label: 'pkg install', hasCaptureGroup: true },
-  { pattern: /^(?:(?:remove|削除|アンインストール)\s+)(.+)/i, command: 'pkg remove -y $1', label: 'pkg remove', hasCaptureGroup: true },
-  { pattern: /^(?:(?:search|検索|探す)\s+(?:package|パッケージ)\s+)(.+)/i, command: 'pkg search $1', label: 'pkg search', hasCaptureGroup: true },
+  // Package management (npm for npm packages, guidance for system packages)
+  { pattern: /^(?:パッケージ|package|npm)(?:を|)(?:更新|アップデート|update)/i, command: 'npm update -g', label: 'npm update' },
+  { pattern: /^(?:(?:install|インストール)\s+)([a-z0-9@\-._\/+\s]+)/i, command: 'npm install $1', label: 'npm install', hasCaptureGroup: true },
+  { pattern: /^(?:(?:remove|削除|アンインストール)\s+)([a-z0-9@\-._\/+\s]+)/i, command: 'npm uninstall $1', label: 'npm uninstall', hasCaptureGroup: true },
 ];
 
 /** Shell-safe character set for package names / search terms */
