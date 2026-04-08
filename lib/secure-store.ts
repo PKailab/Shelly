@@ -10,7 +10,15 @@ import * as SecureStore from 'expo-secure-store';
 const KEY_PREFIX = 'shelly_';
 
 /** API key names that should be stored securely */
-export const API_KEY_NAMES = ['geminiApiKey', 'perplexityApiKey', 'groqApiKey', 'cerebrasApiKey'] as const;
+export const API_KEY_NAMES = [
+  'geminiApiKey',
+  'perplexityApiKey',
+  'groqApiKey',
+  'cerebrasApiKey',
+  'claudeAuthToken',
+  'geminiAuthToken',
+  'codexAuthToken',
+] as const;
 export type ApiKeyName = typeof API_KEY_NAMES[number];
 
 /**
