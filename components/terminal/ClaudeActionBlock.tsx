@@ -30,16 +30,34 @@ const ACTION_ICONS: Record<ActionType, string> = {
 type ReadBlockProps = {
   filePath: string;
   duration?: string;
+  /** Preview lines of the file content — e.g. ["1 IMPORT REACT, { USESTATE }...", "2 IMPORT { VIEW }..."] */
+  previewLines?: string[];
+  /** Total line count shown as "... 340 LINES" */
+  totalLines?: number;
 };
 
-export function ReadActionBlock({ filePath, duration }: ReadBlockProps) {
+export function ReadActionBlock({ filePath, duration, previewLines, totalLines }: ReadBlockProps) {
   return (
-    <View style={styles.actionRow}>
-      <View style={[styles.dot, { backgroundColor: ACTION_COLORS.read }]} />
-      <Text style={[styles.actionLabel, { color: ACTION_COLORS.read }]}>READ</Text>
-      <Text style={styles.actionPath} numberOfLines={1}>{filePath}</Text>
-      {duration && <Text style={styles.actionDuration}>{duration}</Text>}
-      <MaterialIcons name="content-copy" size={12} color="#6B7280" />
+    <View style={styles.readContainer}>
+      <View style={styles.actionRow}>
+        <View style={[styles.dot, { backgroundColor: ACTION_COLORS.read }]} />
+        <Text style={[styles.actionLabel, { color: ACTION_COLORS.read }]}>READ</Text>
+        <Text style={styles.actionPath} numberOfLines={1}>{filePath}</Text>
+        <View style={styles.spacer} />
+        {duration && <Text style={styles.actionDuration}>{duration}</Text>}
+        <MaterialIcons name="content-copy" size={12} color="#6B7280" />
+      </View>
+      {/* Code preview lines */}
+      {previewLines && previewLines.length > 0 && (
+        <View style={styles.codePreview}>
+          {previewLines.map((line, i) => (
+            <Text key={i} style={styles.codePreviewLine} numberOfLines={1}>{line}</Text>
+          ))}
+          {totalLines != null && (
+            <Text style={styles.codePreviewEllipsis}>// ... {totalLines} LINES</Text>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -52,16 +70,23 @@ type EditBlockProps = {
   addedLines?: string[];
   onAccept?: () => void;
   onReject?: () => void;
+  /** Show green checkmark when edit is applied */
+  isComplete?: boolean;
 };
 
-export function EditActionBlock({ filePath, removedLines, addedLines, onAccept, onReject }: EditBlockProps) {
+export function EditActionBlock({ filePath, removedLines, addedLines, onAccept, onReject, isComplete }: EditBlockProps) {
   return (
     <View style={styles.editContainer}>
       <View style={styles.actionRow}>
         <View style={[styles.dot, { backgroundColor: ACTION_COLORS.edit }]} />
         <Text style={[styles.actionLabel, { color: ACTION_COLORS.edit }]}>EDIT</Text>
         <Text style={styles.actionPath} numberOfLines={1}>{filePath}</Text>
-        <MaterialIcons name="edit" size={12} color={ACTION_COLORS.edit} />
+        <View style={styles.spacer} />
+        {isComplete ? (
+          <MaterialIcons name="check" size={14} color={ACCENT} />
+        ) : (
+          <MaterialIcons name="edit" size={12} color={ACTION_COLORS.edit} />
+        )}
       </View>
       {/* Diff lines */}
       {removedLines && removedLines.map((line, i) => (
@@ -193,12 +218,41 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontWeight: '500',
     color: '#E5E7EB',
-    flex: 1,
+    flexShrink: 1,
   },
   actionDuration: {
     fontSize: 9,
     fontFamily: 'monospace',
     color: '#6B7280',
+  },
+  // Read
+  readContainer: {
+    backgroundColor: '#111',
+    borderRadius: 6,
+    marginVertical: 2,
+  },
+  codePreview: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+  },
+  codePreviewLine: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '500',
+    color: '#E5E7EB',
+    lineHeight: 16,
+  },
+  codePreviewEllipsis: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '500',
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  spacer: {
+    flex: 1,
   },
   // Edit
   editContainer: {
@@ -365,9 +419,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#6B7280',
     letterSpacing: 0.3,
-    flex: 1,
-  },
-  spacer: {
     flex: 1,
   },
 });

@@ -109,11 +109,25 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           ) : null}
         </Pressable>
 
-        {/* Center: token/usage indicator */}
-        <View style={styles.headerCenter}>
-          <MaterialIcons name="data-usage" size={10} color="#6B7280" />
-          <Text style={styles.tokenText}>42K / 1H</Text>
-        </View>
+        {/* Center: token/usage indicator (terminal/ai) or nav buttons (browser) */}
+        {tab === 'browser' ? (
+          <View style={styles.browserNav}>
+            <Pressable style={styles.navMiniBtn} hitSlop={4}>
+              <MaterialIcons name="arrow-back" size={12} color="#6B7280" />
+            </Pressable>
+            <Pressable style={styles.navMiniBtn} hitSlop={4}>
+              <MaterialIcons name="arrow-forward" size={12} color="#6B7280" />
+            </Pressable>
+            <Pressable style={styles.navMiniBtn} hitSlop={4}>
+              <MaterialIcons name="refresh" size={12} color="#6B7280" />
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.headerCenter}>
+            <MaterialIcons name="data-usage" size={10} color="#6B7280" />
+            <Text style={styles.tokenText}>42K / 1H</Text>
+          </View>
+        )}
 
         {notification && (
           <View style={[
@@ -128,29 +142,32 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
 
         <View style={styles.headerSpacer} />
 
-        {/* Right action icons: save, user, split, close */}
+        {/* Right action icons matching mock: split-h, split-grid, close */}
         <View style={styles.headerActions}>
-          <Pressable style={styles.actionBtn} hitSlop={6}>
-            <MaterialIcons name="save" size={12} color="#6B7280" />
-          </Pressable>
-          <Pressable style={styles.actionBtn} hitSlop={6}>
-            <MaterialIcons name="person" size={12} color="#6B7280" />
-          </Pressable>
           {canSplit && (
-            <Pressable
-              style={styles.actionBtn}
-              onPress={() => setSplitMenuVisible(true)}
-              hitSlop={6}
-            >
-              <MaterialIcons name="dashboard" size={12} color="#6B7280" />
-            </Pressable>
+            <>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => onSplitH('terminal')}
+                hitSlop={6}
+              >
+                <MaterialIcons name="view-column" size={13} color="#6B7280" />
+              </Pressable>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => setSplitMenuVisible(true)}
+                hitSlop={6}
+              >
+                <MaterialIcons name="grid-view" size={13} color="#6B7280" />
+              </Pressable>
+            </>
           )}
           <Pressable
             style={styles.actionBtn}
             onPress={onRemove}
             hitSlop={6}
           >
-            <MaterialIcons name="close" size={12} color="#6B7280" />
+            <MaterialIcons name="close" size={13} color="#6B7280" />
           </Pressable>
         </View>
       </View>
@@ -382,6 +399,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'monospace',
     fontWeight: '600',
+  },
+  browserNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginLeft: 6,
+  },
+  navMiniBtn: {
+    padding: 2,
+    borderRadius: 3,
   },
   headerSpacer: {
     flex: 1,

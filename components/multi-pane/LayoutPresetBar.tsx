@@ -58,21 +58,60 @@ const PRESETS: LayoutPreset[] = [
   },
 ];
 
+/** Count leaf nodes */
+function countLeaves(node: PaneNode): number {
+  if (node.type === 'leaf') return 1;
+  return countLeaves(node.children[0]) + countLeaves(node.children[1]);
+}
+
+/** Collect all leaf tabs */
+function collectTabs(node: PaneNode): string[] {
+  if (node.type === 'leaf') return [node.tab];
+  return [...collectTabs(node.children[0]), ...collectTabs(node.children[1])];
+}
+
 /** Derive current preset id from the tree shape */
 function detectPreset(root: PaneNode | null): string | null {
   if (!root) return 'single';
   if (root.type === 'leaf') return 'single';
-  // Not worth full matching — return null and let none be highlighted
+
+  const leaves = countLeaves(root);
+  const tabs = collectTabs(root);
+
+  // 2 panes
+  if (leaves === 2 && root.type === 'split') {
+    if (root.direction === 'horizontal') return '2col';
+    if (root.direction === 'vertical') return '2row';
+  }
+
+  // 4 panes — check all terminal
+  if (leaves === 4) {
+    if (tabs.every((t) => t === 'terminal')) return '4term';
+    // 2x2 or 1+2 — check structure
+    if (root.type === 'split' && root.direction === 'vertical') {
+      const top = root.children[0];
+      const bot = root.children[1];
+      if (top.type === 'split' && bot.type === 'split') {
+        // If ratio is ~0.5 both ways → 2x2, otherwise 1+2
+        if (root.ratio > 0.45 && root.ratio < 0.55) return '2x2';
+        return '1+2';
+      }
+    }
+  }
+
   return null;
 }
 
 export function LayoutPresetBar() {
   const { root } = useMultiPaneStore();
-  const currentPreset = detectPreset(root);
+  const [lastSelected, setLastSelected] = React.useState<string | null>(null);
+  const detected = detectPreset(root);
+  const currentPreset = detected ?? lastSelected;
 
   const handleSelect = (preset: LayoutPreset) => {
     const newRoot = preset.build();
     useMultiPaneStore.setState({ root: newRoot, isMultiPane: true });
+    setLastSelected(preset.id);
   };
 
   return (
