@@ -1,23 +1,26 @@
 # Shelly — CLAUDE.md
 
 このファイルはClaude Codeがプロジェクトを理解するためのコンテキストです。
-Shelly上のTermuxからClaude Codeを起動した際にも自動で読み込まれます。
 
 ---
 
 ## プロジェクト概要
 
-**Shelly** はAI搭載のAndroidターミナルIDE。Samsung Galaxy Z Fold6上で、Termux + Claude Codeを使って開発されている。
+**Shelly** はAI搭載のAndroidターミナルIDE。Samsung Galaxy Z Fold6上で開発されている。
 
 - **技術スタック**: Expo 54 / React Native 0.81 / TypeScript (strict)
 - **UI**: NativeWind (TailwindCSS 3)
 - **状態管理**: Zustand
-- **API**: tRPC + TanStack React Query
-- **パッケージマネージャ**: pnpm 9.12
+- **パッケージマネージャ**: pnpm
 - **ナビゲーション**: expo-router v6（ファイルベース）
 - **アニメーション**: React Native Reanimated v4
 - **i18n**: expo-localization + Zustand（日英対応）
-- **PTY**: JNI forkpty（`modules/terminal-emulator/` — Kotlin + C）。TCP/Termux bridge廃止済み
+- **Bundle ID**: `dev.shelly.terminal`
+- **PTY**: JNI forkpty（`modules/terminal-emulator/` — Kotlin + C）。Termux不要
+- **バンドルツール**: bash, Node.js, Python 3, git, curl, ssh, sqlite3, rg, jq（APK同梱、`LibExtractor`で自動展開）
+- **コマンド実行**: `execCommand()` from `hooks/use-native-exec.ts`（JNI fork+exec+pipe）
+- **APIキー**: `lib/secure-store.ts`（expo-secure-store暗号化保存）
+- **設定**: ConfigTUI（歯車ボタン or `shelly config`）— 設定タブは廃止済み
 
 ---
 
@@ -30,7 +33,7 @@ ShellLayout
 ├── AgentBar       (上部) — エージェント状態・通知・グローバルアクション
 ├── Sidebar        (左)   — Tasks / Repos / Files / Device / Ports / Profiles
 ├── PaneContainer  (中央) — ターミナル/AI/ブラウザ/Markdownのペイン群
-└── ContextBar     (下部) — 入力・補完・ショートカット
+└── ContextBar     (下部) — cwd・gitブランチ・接続状態
 ```
 
 **ペインタイプ**: Terminal / AI / Browser / Markdown（always-on、オーバーレイではない）
@@ -47,49 +50,75 @@ Shelly/
 │   └── (tabs)/
 │       └── terminal.tsx        # Terminalペイン用コンテンツ（他タブは削除済み）
 ├── components/
-│   ├── shell/
+│   ├── layout/
 │   │   ├── ShellLayout.tsx         # 全体レイアウト（AgentBar+Sidebar+Pane+ContextBar）
-│   │   ├── AgentBar.tsx            # 上部バー
-│   │   ├── Sidebar.tsx             # 左サイドバー
-│   │   ├── ContextBar.tsx          # 下部入力エリア
-│   │   └── PaneContainer.tsx       # ペイン管理コンテナ
+│   │   ├── AgentBar.tsx            # 上部バー（エージェント切替+検索+設定）
+│   │   ├── Sidebar.tsx             # 左サイドバー（Tasks/Repos/Files/Device/Ports/Profiles）
+│   │   ├── SidebarSection.tsx      # アコーディオンセクション
+│   │   ├── FileTree.tsx            # ファイルブラウザ
+│   │   ├── ContextBar.tsx          # 下部ステータス（cwd・gitブランチ・接続状態）
+│   │   └── ProfilesSection.tsx     # SSHプロファイル管理
+│   ├── multi-pane/
+│   │   ├── MultiPaneContainer.tsx  # ペイングリッド（inline、overlay廃止）
+│   │   ├── PaneSlot.tsx            # 各ペインスロット（エージェント色ボーダー+フォーカス）
+│   │   └── pane-registry.ts        # Terminal/AI/Browser/Markdownの登録
 │   ├── panes/
-│   │   ├── TerminalPane.tsx        # TTYターミナルペイン
-│   │   ├── AiPane.tsx              # AIチャット+ストリーミング+インラインdiff
-│   │   ├── BrowserPane.tsx         # ブックマーク+バックグラウンドメディア
-│   │   └── MarkdownPane.tsx        # Markdownプレビュー
+│   │   ├── AIPane.tsx              # AIチャット+ストリーミング+インラインdiff
+│   │   ├── BrowserPane.tsx         # WebView+ブックマーク+バックグラウンドメディア
+│   │   ├── MarkdownPane.tsx        # Markdownプレビュー+editボタン
+│   │   ├── PaneInputBar.tsx        # 共通入力バー（AI/Browser/Markdownペイン下部）
+│   │   ├── InlineDiff.tsx          # diff Accept/Reject UI
+│   │   └── VoiceWaveform.tsx       # インライン音声波形
 │   ├── terminal/
-│   │   ├── ShortcutBar.tsx         # Ctrl/Esc/Tab等ショートカット
+│   │   ├── TerminalBlock.tsx       # コマンドブロック（インラインコンテンツ対応）
 │   │   ├── AutocompletePopup.tsx   # Fig-style補完UI
-│   │   └── InlineBlock.tsx         # インラインコンテンツブロック
+│   │   ├── RichInputOverlay.tsx    # シンタックスハイライトオーバーレイ
+│   │   ├── MarkdownBlock.tsx       # インラインMarkdownレンダラ
+│   │   ├── JsonTreeBlock.tsx       # 折りたたみJSON表示
+│   │   ├── ImagePreviewBlock.tsx   # インライン画像プレビュー
+│   │   ├── TableBlock.tsx          # テーブル表示
+│   │   └── LinkContextMenu.tsx     # パス/URL長押しメニュー
 │   ├── config/
-│   │   └── ConfigTUI.tsx           # 設定ボトムシート（設定タブ廃止済み）
-│   ├── CommandPalette.tsx
-│   └── Onboarding.tsx
+│   │   └── ConfigTUI.tsx           # 設定ボトムシート（全設定移植済み）
+│   ├── CrtOverlay.tsx              # CRTエフェクト（scanlines+phosphor+flicker）
+│   ├── ContextHint.tsx             # 行動トリガーヒント
+│   ├── CommandPalette.tsx          # コマンドパレット（recent+suggested+search）
+│   ├── AuthWizard.tsx              # CLI認証（ブラウザ認証+APIキー）
+│   ├── WelcomeWizard.tsx           # セットアップウィザード（CLI自動インストール対応）
+│   └── VoiceChat.tsx               # フルスクリーン音声モード
 ├── modules/
-│   └── terminal-emulator/          # JNI forkpty ネイティブモジュール
-│       ├── android/src/            # Kotlin — execCommand(), forkPty()
-│       └── src/shelly-exec.c       # fork+exec+pipe実装
+│   ├── terminal-emulator/          # JNI forkpty ネイティブモジュール
+│   │   ├── android/src/main/java/  # Kotlin — TerminalEmulatorModule, LibExtractor, ShellyJNI
+│   │   └── android/src/main/jni/   # C — shelly-pty.c (forkpty), shelly-exec.c (exec)
+│   └── terminal-view/              # ネイティブターミナルビュー（Kotlin Canvas描画）
 ├── lib/
-│   ├── autocomplete-engine.ts      # Fig-style補完エンジン
-│   ├── syntax-highlighter.ts       # 出力シンタックスハイライト
-│   ├── workflow-manager.ts         # `shelly workflow` コマンド管理
+│   ├── autocomplete-engine.ts      # Fig-style補完エンジン（fuzzyスコアリング）
+│   ├── syntax-highlighter.ts       # シェルコマンドシンタックスハイライト
+│   ├── error-pattern-detector.ts   # file:line:col エラーパターン検出
+│   ├── content-block-detector.ts   # 出力タイプ判定（markdown/json/image/table）
+│   ├── cli-notification.ts         # コマンド完了通知イベント
+│   ├── workflow-manager.ts         # `shelly workflow` CRUD
+│   ├── ai-pane-context.ts          # AIペインへのターミナルコンテキスト注入
+│   ├── feature-catalog.ts          # 167機能カタログ（AI Discovery用）
+│   ├── context-hint-manager.ts     # 行動トリガーヒント管理
+│   ├── font-manager.ts             # フォント選択（CRT連動）
+│   ├── sound-profiles.ts           # Modern/Retro/Silent
+│   ├── haptics.ts                  # ハプティクスフィードバック
+│   ├── workspace-manager.ts        # リポジトリごとのワークスペース切替
 │   ├── local-llm.ts                # ローカルLLMオーケストレーション
-│   ├── groq.ts                     # Groq API (Llama 3.3 70B + Whisper)
+│   ├── groq.ts                     # Groq API (SSEストリーミング)
 │   ├── gemini.ts                   # Gemini API
 │   ├── perplexity.ts               # Perplexity API
-│   ├── pro.ts                      # Pro/Freeフラグ
+│   ├── cli-runner.ts               # CLIツール管理（claude/gemini/codex）
+│   ├── cli-auth.ts                 # CLI認証（SecureStore）
 │   ├── secure-store.ts             # APIキー暗号化（expo-secure-store）
-│   ├── project-context.ts          # プロジェクトコンテキスト自動生成
-│   ├── user-profile.ts             # ユーザープロファイル自動学習
+│   ├── pseudo-shell.ts             # `shelly` コマンドハンドラ
 │   ├── command-safety.ts           # コマンド安全チェック（5段階）
+│   ├── input-router.ts             # 自然言語→コマンドルーティング
 │   ├── theme-engine.ts             # テーマエンジン（30種）
-│   ├── sounds.ts                   # サウンドプロファイル
+│   ├── debug-logger.ts             # [Shelly][Module] 形式のデバッグログ
 │   └── i18n/
-│       ├── index.ts
-│       └── locales/
-│           ├── en.ts
-│           └── ja.ts
+│       └── locales/ (en.ts, ja.ts)
 ├── store/
 │   ├── terminal-store.ts      # セッション・ブロック管理
 │   ├── settings-store.ts      # アプリ設定
@@ -103,12 +132,14 @@ Shelly/
 │   ├── workspace-store.ts     # リポジトリごとのワークスペース分離
 │   └── workflow-store.ts      # 保存済みワークフロー
 ├── hooks/
-│   ├── use-device-layout.ts   # レスポンシブ（compact/standard/wide）
-│   ├── use-native-exec.ts     # execCommand() — JNI経由コマンド実行
-│   ├── use-pane.ts            # ペイン状態
-│   ├── use-theme.ts
-│   ├── use-motion.ts
-│   └── use-speech-input.ts
+│   ├── use-device-layout.ts      # レスポンシブ（compact/standard/wide）
+│   ├── use-native-exec.ts        # execCommand() — JNI経由コマンド実行
+│   ├── use-multi-pane.ts         # ペインツリー管理（split/resize/remove）
+│   ├── use-autocomplete.ts       # 補完フック（sync+async path/git）
+│   ├── use-ai-pane-dispatch.ts   # AIペインストリーミング（Groq/Gemini/Perplexity/Local）
+│   ├── use-pane-voice.ts         # ペイン内音声入力
+│   ├── use-command-palette.ts    # コマンドパレット状態
+│   └── use-speech-input.ts       # 録音+文字起こし
 ├── chelly/                    # Chat UI OSS切り出し（別リポ予定）
 ├── .github/workflows/
 │   └── build-android.yml
@@ -138,18 +169,18 @@ Shelly/
 | 判断 | 理由 | 影響範囲 |
 |------|------|----------|
 | タブ廃止 → ShellLayout一本化 | ターミナルをプライマリUIとするため | app/index.tsx, ShellLayout.tsx |
-| PTYをJNI forkptyに移行 | TCP/Termux bridge依存ゼロ、IPC境界なし | modules/terminal-emulator/, use-native-exec.ts |
-| 設定タブ廃止 → ConfigTUI（ギアボタン） | 設定は使用頻度が低い。UIを単純化 | ConfigTUI.tsx, settings-store.ts |
-| Chat UIをchelly/に分離 | ターミナル特化とチャットUIを疎結合化、OSSで公開予定 | chelly/ |
-| APIキーはSecureStore暗号化保存 | AsyncStorageに平文保存しない | secure-store.ts |
-| APIキーはヘッダーで送信（URLパラメータ禁止） | ログ/キャッシュへの漏洩防止 | gemini.ts, groq.ts |
-| localLlmModel はファイル名ベース | llama-server APIのmodel名と一致させるため | terminal-store.ts |
-| 推奨モデル = Gemma 3 4B Q4_K_M | 3-4B日本語最強、Z Fold6 RAM 12GBで余裕 | local-llm.ts |
-| Pro/Free = ビルドタイムフラグ（SHELLY_PRO env） | ソース全公開、フラグで制御 | pro.ts, app.config.ts |
-| Pro機能: API統合, Local LLM, AI Pane, Workflow | CLIベースの基本機能は無料 | pro.ts |
-| Groq = デフォルトAIプロバイダ | 1,000回/日無料、爆速、日本語○ | groq.ts |
-| チャットルーティング: Groq > Local LLM > Gemini | 速度順フォールバック | ai-pane-store.ts |
-| GitHub連携: PAT認証 + push + CI提案 | Phase 1-5実装済み | lib/github-*.ts |
+| PTYをJNI forkptyに移行 | Termux不要、IPC境界ゼロ | modules/terminal-emulator/ |
+| バイナリAPK同梱（LibExtractor） | bash/node/git/python等をAPK内に.soとして同梱、初回起動時に展開 | LibExtractor.kt |
+| NativeTerminalView = PTY直結 | ユーザー入力はPTY fd直接。terminal-storeは補助（ブロック記録、cwd追跡） | terminal.tsx, terminal-store.ts |
+| execCommand = 別fork+exec | runCommandとは別系統。非インタラクティブコマンド用 | use-native-exec.ts |
+| shellyコマンド → pseudo-shell | `shelly config/workflow/voice`等はアプリ内処理 | pseudo-shell.ts |
+| 設定タブ廃止 → ConfigTUI | 歯車ボタン or `shelly config`。全設定をボトムシートに集約 | ConfigTUI.tsx |
+| APIキーはSecureStore | settings-store.updateSettingsが自動ルーティング | secure-store.ts, settings-store.ts |
+| AI PaneルーティングはGroq > Gemini > Perplexity > Local | use-ai-pane-dispatch.tsで分岐 | use-ai-pane-dispatch.ts |
+| ウェブ認証が正規ルート | APIキーより定額プランのOAuth推奨 | AuthWizard.tsx |
+| CLI自動インストール | WelcomeWizardで`npm install -g`を自動実行 | WelcomeWizard.tsx |
+| Chat UIをchelly/に分離 | OSS公開予定。ランタイム依存なし | chelly/ |
+| デバッグログ全箇所 | `[Shelly][Module]`形式、logcat対応 | debug-logger.ts |
 
 ---
 
