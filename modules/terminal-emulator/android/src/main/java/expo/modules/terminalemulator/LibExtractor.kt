@@ -62,7 +62,17 @@ object LibExtractor {
         "lib/arm64-v8a/libjq.so" to "libjq.so",
         "lib/arm64-v8a/libonig.so" to "libonig.so",
         // sqlite3
-        "lib/arm64-v8a/libsqlite3_bin.so" to "sqlite3"
+        "lib/arm64-v8a/libsqlite3_bin.so" to "sqlite3",
+        // tmux + deps
+        "lib/arm64-v8a/libtmux.so" to "tmux",
+        "lib/arm64-v8a/libevent_core.so" to "libevent_core-2.1.so",
+        // vim + deps
+        "lib/arm64-v8a/libvim.so" to "vim",
+        "lib/arm64-v8a/libsodium.so" to "libsodium.so",
+        // make
+        "lib/arm64-v8a/libmake.so" to "make",
+        // less
+        "lib/arm64-v8a/libless.so" to "less"
     )
 
     fun getLibDir(context: Context): File =

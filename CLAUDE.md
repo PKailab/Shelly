@@ -17,7 +17,7 @@
 - **i18n**: expo-localization + Zustand（日英対応）
 - **Bundle ID**: `dev.shelly.terminal`
 - **PTY**: JNI forkpty（`modules/terminal-emulator/` — Kotlin + C）。Termux不要
-- **バンドルツール**: bash, Node.js, Python 3, git, curl, ssh, sqlite3, rg, jq（APK同梱、`LibExtractor`で自動展開）
+- **バンドルツール**: bash, Node.js, Python 3, git, curl, ssh, sqlite3, rg, jq, tmux, vim, make, less（APK同梱、`LibExtractor`で自動展開）
 - **コマンド実行**: `execCommand()` from `hooks/use-native-exec.ts`（JNI fork+exec+pipe）
 - **APIキー**: `lib/secure-store.ts`（expo-secure-store暗号化保存）
 - **設定**: ConfigTUI（歯車ボタン or `shelly config`）— 設定タブは廃止済み
