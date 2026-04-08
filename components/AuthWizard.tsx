@@ -36,7 +36,6 @@ import {
   checkAllAuthStatus,
   storeApiKey,
   verifyAuth,
-  ensureShellyrcSourced,
   type AuthToolId,
   type AuthStatus,
   type AuthToolConfig,
@@ -104,7 +103,6 @@ export function AuthWizard({ visible, onComplete, toolFilter, title }: Props) {
   useEffect(() => {
     if (visible) {
       refreshStatuses();
-      ensureShellyrcSourced(nativeRunner);
     }
   }, [visible]);
 
