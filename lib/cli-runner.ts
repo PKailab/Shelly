@@ -1,7 +1,7 @@
 /**
- * lib/cli-runner.ts — v2.4
+ * lib/cli-runner.ts — v2.5
  *
- * CLI Runner: Claude Code / Gemini CLI をTermux bridge経由でアプリ内実行する。
+ * CLI Runner: Claude Code / Gemini CLI をJNI直接実行でアプリ内実行する。
  *
  * 設計方針:
  * - 対話型UIを前提にしない（1回実行で完結する形を優先）
@@ -9,6 +9,8 @@
  * - ログに現れたキーらしき文字列は自動マスク
  * - 依存未導入時は自然言語で案内し、セットアップコマンドを提案
  */
+
+import { execCommand } from '@/hooks/use-native-exec';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +72,7 @@ export const CLI_TOOLS: Record<CliTool, CliToolConfig> = {
     checkCommand: 'which claude',
     installGuide:
       'Claude Codeがインストールされていないよ。\n' +
-      'Termuxで以下を実行してインストールしてね：\n' +
+      'ターミナルで以下を実行してインストールしてね：\n' +
       'npm install -g @anthropic-ai/claude-code',
     setupCommands: ['npm install -g @anthropic-ai/claude-code'],
     isInteractive: true,
@@ -83,7 +85,7 @@ export const CLI_TOOLS: Record<CliTool, CliToolConfig> = {
     checkCommand: 'which gemini',
     installGuide:
       'Gemini CLIがインストールされていないよ。\n' +
-      'Termuxで以下を実行してインストールしてね：\n' +
+      'ターミナルで以下を実行してインストールしてね：\n' +
       'npm install -g @google/gemini-cli',
     setupCommands: ['npm install -g @google/gemini-cli'],
     isInteractive: true,
@@ -96,7 +98,7 @@ export const CLI_TOOLS: Record<CliTool, CliToolConfig> = {
     checkCommand: 'which codex',
     installGuide:
       'Codex CLIがインストールされていないよ。\n' +
-      'Termuxで以下を実行してインストールしてね：\n' +
+      'ターミナルで以下を実行してインストールしてね：\n' +
       'npm install -g @openai/codex',
     setupCommands: ['npm install -g @openai/codex'],
     isInteractive: true,
@@ -108,7 +110,7 @@ export const CLI_TOOLS: Record<CliTool, CliToolConfig> = {
     checkCommand: 'which cody',
     installGuide:
       'Cody CLIがインストールされていないよ。\n' +
-      'インストール方法はSourcegraphの公式ドキュメントを確認してね。',
+      'ターミナルでインストール方法はSourcegraphの公式ドキュメントを確認してね。',
     setupCommands: [],
     isInteractive: true,
   },
@@ -188,7 +190,7 @@ export function buildCliCommand(req: CliRunRequest): CliRunPlan {
       isInteractiveFallback = true;
       fallbackSuggestion =
         'この操作はClaude Codeの対話型モードが必要かもしれないよ。\n' +
-        'Termuxで直接 `claude` を実行するか、もっとシンプルな指示で試してみて。';
+        'ターミナルで直接 `claude` を実行するか、もっとシンプルな指示で試してみて。';
     }
   } else if (req.tool === 'gemini') {
     // gemini --prompt "<prompt>" in the target directory
@@ -197,7 +199,7 @@ export function buildCliCommand(req: CliRunRequest): CliRunPlan {
       isInteractiveFallback = true;
       fallbackSuggestion =
         'この操作はGemini CLIの対話型モードが必要かもしれないよ。\n' +
-        'Termuxで直接 `gemini` を実行するか、もっとシンプルな指示で試してみて。';
+        'ターミナルで直接 `gemini` を実行するか、もっとシンプルな指示で試してみて。';
     }
   } else {
     command = req.userInput;
@@ -220,8 +222,22 @@ export function buildCliCommand(req: CliRunRequest): CliRunPlan {
 // ─── Dependency Check ─────────────────────────────────────────────────────────
 
 /**
+ * execCommandを使ってCLIツールが利用可能か直接チェックする。
+ */
+export async function checkCliAvailability(tool: CliTool): Promise<CliCheckResult> {
+  if (tool === 'custom') {
+    return { available: true, needsAuth: false, message: '', setupCommands: [] };
+  }
+  const config = CLI_TOOLS[tool];
+  const toolName = tool === 'codex' ? 'codex' : tool === 'cody' ? 'cody' : tool;
+  const result = await execCommand(`which ${toolName} 2>/dev/null`);
+  const exitCode = result.exitCode ?? (result.stdout.trim().length > 0 ? 0 : 1);
+  return interpretCheckResult(tool, exitCode, result.stdout);
+}
+
+/**
  * CLI依存確認の結果を自然言語メッセージに変換する。
- * 実際のチェックはTermux bridge経由で行い、その結果をここで解釈する。
+ * 実際のチェックはexecCommand経由で行い、その結果をここで解釈する。
  */
 export function interpretCheckResult(
   tool: CliTool,
@@ -251,8 +267,8 @@ export function interpretCheckResult(
 
   if (needsAuth) {
     const authGuide = tool === 'claude'
-      ? 'Claude Codeの認証が必要だよ。\nTermuxで `claude auth login` を実行するか、\n環境変数 ANTHROPIC_API_KEY を設定してね。\n（APIキーはShellyには保存しないよ。Termux側で管理してね。）'
-      : 'Gemini CLIの認証が必要だよ。\nTermuxで `gemini auth login` を実行するか、\n環境変数 GEMINI_API_KEY を設定してね。\n（APIキーはShellyには保存しないよ。Termux側で管理してね。）';
+      ? 'Claude Codeの認証が必要だよ。\nターミナルで `claude auth login` を実行するか、\n環境変数 ANTHROPIC_API_KEY を設定してね。\n（APIキーはShellyには保存しないよ。ターミナル側で管理してね。）'
+      : 'Gemini CLIの認証が必要だよ。\nターミナルで `gemini auth login` を実行するか、\n環境変数 GEMINI_API_KEY を設定してね。\n（APIキーはShellyには保存しないよ。ターミナル側で管理してね。）';
 
     return {
       available: true,
@@ -396,7 +412,7 @@ function buildErrorSummary(tool: CliTool, errorOutput: string, exitCode: number)
     return `権限エラーが発生したよ。フォルダへのアクセス権限を確認してね。`;
   }
   if (errorOutput.toLowerCase().includes('api key') || errorOutput.toLowerCase().includes('authentication')) {
-    return `認証エラーが発生したよ。APIキーの設定を確認してね。\n（APIキーはTermux側の環境変数で管理してね。）`;
+    return `認証エラーが発生したよ。APIキーの設定を確認してね。\n（APIキーはターミナル側の環境変数で管理してね。）`;
   }
 
   return `${toolLabel}の実行中にエラーが発生したよ。\n詳細はログを確認してね。`;
@@ -409,12 +425,12 @@ function buildErrorNextActions(tool: CliTool, errorOutput: string): string[] {
     actions.push(`${CLI_TOOLS[tool]?.label ?? tool}をインストールする`);
   }
   if (errorOutput.toLowerCase().includes('api key') || errorOutput.toLowerCase().includes('authentication')) {
-    actions.push('APIキーをTermuxの環境変数に設定する');
+    actions.push('APIキーをターミナルの環境変数に設定する');
     actions.push('認証コマンドを実行する');
   }
 
   actions.push('別の指示で試してみる');
-  actions.push('Termuxで直接コマンドを実行する');
+  actions.push('ターミナルで直接コマンドを実行する');
 
   return actions.slice(0, 3);
 }
