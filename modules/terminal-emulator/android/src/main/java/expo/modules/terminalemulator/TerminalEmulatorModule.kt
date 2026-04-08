@@ -332,7 +332,7 @@ class TerminalEmulatorModule : Module() {
                 var execSuccess = false
                 try {
                     val pb = ProcessBuilder(bashPath, "-c", "echo EXECVE_OK; uname -a")
-                    pb.environment()["HOME"] = "/data/data/com.termux/files/home"
+                    pb.environment()["HOME"] = HomeInitializer.getHomeDir(context).absolutePath
                     pb.environment()["TERM"] = "xterm-256color"
                     pb.environment()["PATH"] = "/system/bin:/vendor/bin"
                     pb.directory(context.filesDir)
@@ -355,7 +355,7 @@ class TerminalEmulatorModule : Module() {
                         result.append("linker_exists=${java.io.File(linker).exists()}\n")
                         result.append("LD_LIBRARY_PATH=$libDirPath\n")
                         val pb2 = ProcessBuilder(linker, bashPath, "-c", "echo EXECVE_OK; uname -a")
-                        pb2.environment()["HOME"] = "/data/data/com.termux/files/home"
+                        pb2.environment()["HOME"] = HomeInitializer.getHomeDir(context).absolutePath
                         pb2.environment()["TERM"] = "xterm-256color"
                         pb2.environment()["PATH"] = "/system/bin:/vendor/bin"
                         pb2.environment()["LD_LIBRARY_PATH"] = libDirPath

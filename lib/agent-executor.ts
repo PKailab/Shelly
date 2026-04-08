@@ -4,8 +4,9 @@
  */
 import { Agent, ToolChoice } from '@/store/types';
 import { toolChoiceToLabel } from './agent-tool-router';
+import { getHomePath } from '@/lib/home-path';
 
-const HOME = '/data/data/com.termux/files/home';
+const HOME = getHomePath();
 const SHELLY_DIR = `${HOME}/.shelly`;
 const AGENTS_DIR = `${SHELLY_DIR}/agents`;
 const TMP_DIR = `${SHELLY_DIR}/tmp`;
@@ -55,7 +56,7 @@ START_TIME=$(date +%s)
 
 # Source environment
 [ -f "$ENV_FILE" ] && source "$ENV_FILE"
-export PATH="/data/data/com.termux/files/usr/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 export HOME="${HOME}"
 
 # Create directories

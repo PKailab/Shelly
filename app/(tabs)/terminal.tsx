@@ -53,6 +53,7 @@ import { useChatStore } from '@/store/chat-store';
 import { generateId } from '@/lib/id';
 import { BlockList } from '@/components/terminal/BlockList';
 import { execCommand } from '@/hooks/use-native-exec';
+import { getHomePath } from '@/lib/home-path';
 
 // ─── Status type for StatusBadge ─────────────────────────────────────────────
 
@@ -458,7 +459,7 @@ export default function TerminalScreen() {
   const copyFileToCwd = useCallback(async (sourceUri: string, fileName: string) => {
     try {
       const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const cwd = activeSession?.currentDir || '/data/data/com.termux/files/home';
+      const cwd = activeSession?.currentDir || getHomePath();
       const tempPath = `${FileSystem.cacheDirectory}${safeName}`;
       await FileSystem.copyAsync({ from: sourceUri, to: tempPath });
       // Use terminal to copy file to cwd

@@ -58,6 +58,11 @@ export default function RootLayout() {
     usePluginStore.getState().loadPlugins();
     logInfo('RootLayout', 'Loaded: plugins');
 
+    // Resolve dynamic HOME path from native layer
+    import('@/lib/home-path').then(({ initHomePath }) => {
+      initHomePath().then(() => logInfo('RootLayout', 'Loaded: homePath'));
+    });
+
     loadSettings().then(() => {
       logInfo('RootLayout', 'Loaded: settings');
     }).catch((e: any) => {

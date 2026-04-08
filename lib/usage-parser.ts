@@ -155,7 +155,8 @@ export async function parseUsage(
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const sinceDate = monthStart < sevenDaysAgo ? monthStart : sevenDaysAgo;
 
-  const claudeProjectsDir = `${process.env.HOME || '/data/data/com.termux/files/home'}/.claude/projects`;
+  const { getHomePath } = require('@/lib/home-path');
+  const claudeProjectsDir = `${getHomePath()}/.claude/projects`;
   let projectDirs: { name: string }[];
   try {
     projectDirs = await listFiles(claudeProjectsDir);

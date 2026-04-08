@@ -14,6 +14,7 @@ import { executeCommand } from '@/lib/pseudo-shell';
 import { execCommand } from '@/hooks/use-native-exec';
 import { useSettingsStore } from './settings-store';
 import { logInfo, logError } from '@/lib/debug-logger';
+import { getHomePath } from '@/lib/home-path';
 
 // ─── Multi-session pool ────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ function createSession(id: string, name: string, sessionName: string = SESSION_N
   return {
     id,
     name,
-    currentDir: '/data/data/com.termux/files/home',
+    currentDir: getHomePath(),
     blocks: [],
     entries: [],
     commandHistory: [],
@@ -208,7 +209,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     const session = get().sessions.find((s) => s.id === targetId);
     set((state) => ({
       sessions: state.sessions.map((s) =>
-        s.id === targetId ? { ...s, blocks: [], entries: [], commandHistory: [], currentDir: '/data/data/com.termux/files/home', sessionStatus: 'starting' as const, isAlive: false } : s
+        s.id === targetId ? { ...s, blocks: [], entries: [], commandHistory: [], currentDir: getHomePath(), sessionStatus: 'starting' as const, isAlive: false } : s
       ),
     }));
     // Also clear the execution log buffers so stale output doesn't reappear
@@ -594,7 +595,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       // Restore sessions with defaults for missing fields
       const restored: TabSession[] = parsed.sessions.map((s: any, index: number) => ({
         ...createSession(s.id, s.name, s.tmuxSession || SESSION_NAMES[index] || 'shelly-1'),
-        currentDir: s.currentDir || '/data/data/com.termux/files/home',
+        currentDir: s.currentDir || getHomePath(),
         commandHistory: s.commandHistory || [],
         blocks: (s.blocks || []).map((b: any) => ({ ...b, isRunning: false })),
         entries: (s.entries || []).map((e: any) => ({ ...e, isStreaming: false })),

@@ -340,7 +340,7 @@ export function buildStartAllScript(model: LlamaCppModel): string {
   const startCmd = buildRecommendedStartCommand(model);
 
   return [
-    `#!/data/data/com.termux/files/usr/bin/bash`,
+    `#!/bin/bash`,
     `# Shelly llama-server 起動スクリプト`,
     ``,
     `# 1. 既存プロセスを停止`,

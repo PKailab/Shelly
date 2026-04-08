@@ -1,4 +1,5 @@
 import { execCommand } from '@/hooks/use-native-exec';
+import { getHomePath } from '@/lib/home-path';
 
 export type Workflow = {
   name: string;
@@ -7,10 +8,12 @@ export type Workflow = {
   createdAt: number;
 };
 
-const WORKFLOWS_DIR = '/data/data/com.termux/files/home/.shelly/workflows';
+function getWorkflowsDir(): string {
+  return `${getHomePath()}/.shelly/workflows`;
+}
 
 export async function ensureWorkflowsDir() {
-  await execCommand(`mkdir -p "${WORKFLOWS_DIR}"`);
+  await execCommand(`mkdir -p "${getWorkflowsDir()}"`);
 }
 
 export async function saveWorkflow(name: string, commands: string[], description?: string): Promise<void> {
@@ -25,11 +28,11 @@ export async function saveWorkflow(name: string, commands: string[], description
   ].filter(Boolean).join('\n');
   // Write using base64 to avoid shell escaping
   const b64 = btoa(unescape(encodeURIComponent(content)));
-  await execCommand(`echo '${b64}' | base64 -d > "${WORKFLOWS_DIR}/${name}.sh" && chmod +x "${WORKFLOWS_DIR}/${name}.sh"`);
+  await execCommand(`echo '${b64}' | base64 -d > "${getWorkflowsDir()}/${name}.sh" && chmod +x "${getWorkflowsDir()}/${name}.sh"`);
 }
 
 export async function loadWorkflow(name: string): Promise<Workflow | null> {
-  const result = await execCommand(`cat "${WORKFLOWS_DIR}/${name}.sh" 2>/dev/null`);
+  const result = await execCommand(`cat "${getWorkflowsDir()}/${name}.sh" 2>/dev/null`);
   if (result.exitCode !== 0) return null;
   const lines = result.stdout.split('\n');
   const commands = lines.filter(l => !l.startsWith('#') && !l.startsWith('!') && l.trim());
@@ -39,7 +42,7 @@ export async function loadWorkflow(name: string): Promise<Workflow | null> {
 
 export async function listWorkflows(): Promise<Workflow[]> {
   await ensureWorkflowsDir();
-  const result = await execCommand(`ls -1 "${WORKFLOWS_DIR}"/*.sh 2>/dev/null`);
+  const result = await execCommand(`ls -1 "${getWorkflowsDir()}"/*.sh 2>/dev/null`);
   if (result.exitCode !== 0) return [];
   const files = result.stdout.trim().split('\n').filter(Boolean);
   const workflows: Workflow[] = [];
@@ -52,7 +55,7 @@ export async function listWorkflows(): Promise<Workflow[]> {
 }
 
 export async function deleteWorkflow(name: string): Promise<boolean> {
-  const result = await execCommand(`rm -f "${WORKFLOWS_DIR}/${name}.sh"`);
+  const result = await execCommand(`rm -f "${getWorkflowsDir()}/${name}.sh"`);
   return result.exitCode === 0;
 }
 

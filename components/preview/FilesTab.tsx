@@ -5,6 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { usePreviewStore } from '@/store/preview-store';
 import { useNativeExec } from '@/hooks/use-native-exec';
+import { getHomePath } from '@/lib/home-path';
 import {
   shellEscape, detectFileType, detectLanguage, formatFileSize,
   MAX_PREVIEW_SIZE, type FileEntry, type PreviewFileType,
@@ -71,10 +72,10 @@ export const FilesTab = memo(function FilesTab() {
       if (!dir) {
         try {
           const r = await runRawCommand('pwd');
-          dir = r.stdout?.trim() || '/data/data/com.termux/files/home';
+          dir = r.stdout?.trim() || getHomePath();
           setCurrentDir(dir);
         } catch {
-          dir = '/data/data/com.termux/files/home';
+          dir = getHomePath();
           setCurrentDir(dir);
         }
       }

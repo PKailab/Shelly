@@ -19,7 +19,7 @@ class AgentAlarmReceiver : BroadcastReceiver() {
         Log.i(TAG, "Alarm triggered for agent: $agentId")
 
         try {
-            val home = "/data/data/com.termux/files/home"
+            val home = HomeInitializer.getHomeDir(context).absolutePath
             val scriptPath = "$home/.shelly/agents/run-agent-$agentId.sh"
 
             val runIntent = Intent("com.termux.RUN_COMMAND").apply {
