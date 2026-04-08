@@ -63,7 +63,7 @@ pnpm install && pnpm android
 
 > **Requirements:** Android device. For building from source: Node.js 22+, pnpm, Android NDK r27+. Expo Go is not supported — Shelly uses native Kotlin/C modules.
 >
-> Termux is not required. Shelly ships with bash, Node.js 22, Python 3.12, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
+> Termux is not required. Shelly ships with bash, Node.js, Python 3, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
 
 On first launch, the Setup Wizard handles permissions and AI configuration. The terminal is ready in under 5 minutes.
 
@@ -404,7 +404,7 @@ Both were developed entirely on a Samsung Galaxy Z Fold6, without ever touching 
 ## Known Limitations
 
 - **No offline mode** — Cloud AI features require an internet connection. Local LLM support works offline, but the default experience assumes connectivity.
-- **Additional tools beyond the bundle** — Shelly ships with bash, Node.js 22, Python 3.12, git, curl, and sqlite3. For tools outside this set, Termux can be used alongside Shelly.
+- **Additional tools beyond the bundle** — Shelly ships with bash, Node.js, Python 3, git, curl, and sqlite3. For tools outside this set, Termux can be used alongside Shelly.
 - **@team routes to multiple APIs** — When using `@team`, Shelly queries multiple AI providers simultaneously. This consumes API credits on each provider. A cost warning is displayed before execution.
 
 ---

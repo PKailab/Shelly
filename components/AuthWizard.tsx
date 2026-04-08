@@ -30,6 +30,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTranslation } from '@/lib/i18n';
 import { useTerminalStore } from '@/store/terminal-store';
+import TerminalEmulator from '@/modules/terminal-emulator/src/TerminalEmulatorModule';
 import {
   AUTH_TOOL_CONFIGS,
   checkAllAuthStatus,

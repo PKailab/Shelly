@@ -18,7 +18,7 @@ Layout: AgentBar (top) + Sidebar (left) + PaneContainer (center, up to 4 panes) 
 - **Pane types**: Terminal, AI, Browser, Markdown — registered in `components/multi-pane/pane-registry.ts`
 - **Settings**: ConfigTUI modal (gear button or `shelly config`) — `components/config/ConfigTUI.tsx`
 - **API keys**: `lib/secure-store.ts` (expo-secure-store, encrypted)
-- **Bundled tools**: bash, Node.js 22, Python 3.12, git, curl, sqlite3. No `pkg install`.
+- **Bundled tools**: bash, Node.js, Python 3, git, curl, sqlite3. No `pkg install`.
 
 ## Key Stores (Zustand)
 

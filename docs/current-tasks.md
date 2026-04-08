@@ -50,7 +50,7 @@ useSettingsStore.getState().updateSettings({ fontSize: 16 });
 - **File**: `components/PackageManager.tsx`
 - **Problem**: `pkg install/upgrade/uninstall` only. Termux-only.
 - **Fix**: Replace with "Tool Status" panel showing bundled tool versions via `execCommand('node --version')` etc.
-- **Bundled**: bash, Node.js 22, Python 3.12, git, curl, sqlite3
+- **Bundled**: bash, Node.js, Python 3, git, curl, sqlite3
 
 ## Task 4: env-manager.ts — pkg install
 - **File**: `lib/env-manager.ts`
