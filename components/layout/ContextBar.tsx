@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Clipboard from 'expo-clipboard';
-import { useTheme } from '@/lib/theme-engine';
 import { useTerminalStore } from '@/store/terminal-store';
 import { execCommand } from '@/hooks/use-native-exec';
 import { getHomePath } from '@/lib/home-path';
+
+const ACCENT = '#00D4AA';
 
 function truncatePath(path: string, maxLen = 30): string {
   if (path.length <= maxLen) return path;
@@ -17,8 +18,6 @@ function truncatePath(path: string, maxLen = 30): string {
 }
 
 export function ContextBar() {
-  const theme = useTheme();
-  const c = theme.colors;
   const session = useTerminalStore((s) => {
     const active = s.sessions.find((sess) => sess.id === s.activeSessionId);
     return active;
@@ -27,7 +26,6 @@ export function ContextBar() {
   const cwd = session?.currentDir ?? '~';
   const connectionMode = useTerminalStore((s) => s.connectionMode);
 
-  // Git branch detection
   const [gitBranch, setGitBranch] = useState<string | null>(null);
   useEffect(() => {
     execCommand(`cd '${cwd}' && git branch --show-current 2>/dev/null`)
@@ -40,11 +38,11 @@ export function ContextBar() {
   };
 
   return (
-    <View style={[styles.bar, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+    <View style={styles.bar}>
       {/* CWD */}
       <Pressable onPress={handleCopyPath} style={styles.segment} hitSlop={4}>
-        <MaterialIcons name="folder" size={11} color={c.muted} />
-        <Text style={[styles.text, { color: c.muted }]} numberOfLines={1}>
+        <MaterialIcons name="folder" size={10} color="#6B7280" />
+        <Text style={styles.text} numberOfLines={1}>
           {truncatePath(cwd)}
         </Text>
       </Pressable>
@@ -52,19 +50,26 @@ export function ContextBar() {
       {/* Git branch */}
       {gitBranch && (
         <View style={[styles.segment, { marginLeft: 8 }]}>
-          <MaterialIcons name="call-split" size={11} color={c.accent} />
-          <Text style={[styles.text, { color: c.accent }]}>{gitBranch}</Text>
+          <MaterialIcons name="call-split" size={10} color={ACCENT} />
+          <Text style={[styles.text, { color: ACCENT }]}>{gitBranch}</Text>
         </View>
       )}
+
+      <View style={styles.spacer} />
+
+      {/* Tagline */}
+      <Text style={styles.tagline}>
+        BUILDING A TERMINAL IDE ON ANDROID WITH REACT NATIVE
+      </Text>
 
       <View style={styles.spacer} />
 
       {/* Connection status */}
       <View style={styles.segment}>
         <View style={[styles.dot, {
-          backgroundColor: connectionMode === 'native' ? c.success : c.error,
+          backgroundColor: connectionMode === 'native' ? ACCENT : '#FF5555',
         }]} />
-        <Text style={[styles.text, { color: c.muted }]}>
+        <Text style={styles.text}>
           {connectionMode === 'native' ? 'Native' : 'Off'}
         </Text>
       </View>
@@ -74,11 +79,13 @@ export function ContextBar() {
 
 const styles = StyleSheet.create({
   bar: {
-    height: 28,
+    height: 24,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+    backgroundColor: '#0D0D0D',
   },
   segment: {
     flexDirection: 'row',
@@ -87,12 +94,23 @@ const styles = StyleSheet.create({
   },
   spacer: { flex: 1 },
   text: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#6B7280',
+    letterSpacing: 0.3,
+  },
+  tagline: {
+    fontSize: 8,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#333',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
   },
 });

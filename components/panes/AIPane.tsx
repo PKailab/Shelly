@@ -2,8 +2,7 @@
  * components/panes/AIPane.tsx
  *
  * AI Pane — per-pane chat interface for the Superset UI.
- * Renders a message list (inverted FlatList) with user/assistant bubbles.
- * Input bar is a separate component (PaneInputBar — P2-T13).
+ * Redesigned to match mock: YOU/CLAUDE labels, inline diff, READING TERMINAL badge.
  */
 
 import React, { useContext, useCallback, useRef, useEffect } from 'react';
@@ -30,6 +29,8 @@ import { useAIPaneDispatch } from '@/hooks/use-ai-pane-dispatch';
 import VoiceWaveform from '@/components/panes/VoiceWaveform';
 import { usePaneVoice } from '@/hooks/use-pane-voice';
 import { useSettingsStore } from '@/store/settings-store';
+
+const ACCENT = '#00D4AA';
 
 // ─── Streaming Indicator ─────────────────────────────────────────────────────
 
@@ -73,48 +74,34 @@ const dotStyles = StyleSheet.create({
   },
 });
 
-// ─── Message Bubble ──────────────────────────────────────────────────────────
+// ─── Message Bubble (Redesigned) ────────────────────────────────────────────
 
 type BubbleProps = {
   message: ChatMessage;
   isStreaming: boolean;
-  accentColor: string;
-  surfaceColor: string;
-  foregroundColor: string;
-  mutedColor: string;
 };
 
 const MessageBubble = React.memo(function MessageBubble({
   message,
   isStreaming,
-  accentColor,
-  surfaceColor,
-  foregroundColor,
-  mutedColor,
 }: BubbleProps) {
   const isUser = message.role === 'user';
   const isLastStreaming = isStreaming && message.isStreaming;
   const displayText = message.streamingText ?? message.content;
 
-  if (isUser) {
+  if (message.role === 'system') {
     return (
-      <View style={bubbleStyles.userRow}>
-        <View style={[bubbleStyles.userBubble, { backgroundColor: accentColor }]}>
-          <Text style={[bubbleStyles.userText, { color: '#000' }]} selectable>
-            {displayText}
-          </Text>
-        </View>
+      <View style={bubbleStyles.systemRow}>
+        <Text style={bubbleStyles.systemText}>{displayText}</Text>
       </View>
     );
   }
 
-  // System message (e.g., "Switched to Claude")
-  if (message.role === 'system') {
+  if (isUser) {
     return (
-      <View style={bubbleStyles.systemRow}>
-        <Text style={[bubbleStyles.systemText, { color: mutedColor }]}>
-          {displayText}
-        </Text>
+      <View style={bubbleStyles.messageContainer}>
+        <Text style={bubbleStyles.roleLabel}>YOU</Text>
+        <Text style={bubbleStyles.userText} selectable>{displayText}</Text>
       </View>
     );
   }
@@ -123,80 +110,60 @@ const MessageBubble = React.memo(function MessageBubble({
   const containsDiff = !isLastStreaming && hasDiffContent(displayText);
 
   return (
-    <View style={bubbleStyles.assistantRow}>
-      {message.agent && (
-        <View style={[bubbleStyles.agentBadge, { borderColor: accentColor }]}>
-          <Text style={[bubbleStyles.agentBadgeText, { color: accentColor }]}>
-            {message.agent}
-          </Text>
-        </View>
-      )}
-      <View style={[bubbleStyles.assistantBubble, { backgroundColor: surfaceColor }]}>
+    <View style={bubbleStyles.messageContainer}>
+      <Text style={bubbleStyles.roleLabelClaude}>CLAUDE</Text>
+      <View style={bubbleStyles.assistantContent}>
         {containsDiff ? (
           <InlineDiff content={displayText} />
         ) : (
-          <Text
-            style={[bubbleStyles.assistantText, { color: foregroundColor }]}
-            selectable
-          >
-            {displayText}
-          </Text>
+          <Text style={bubbleStyles.assistantText} selectable>{displayText}</Text>
         )}
-        {isLastStreaming && <StreamingDots color={mutedColor} />}
+        {isLastStreaming && <StreamingDots color="#6B7280" />}
       </View>
     </View>
   );
 });
 
 const bubbleStyles = StyleSheet.create({
-  userRow: {
-    alignItems: 'flex-end',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  userBubble: {
-    maxWidth: '80%',
-    borderRadius: 14,
-    borderBottomRightRadius: 4,
+  messageContainer: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
-  userText: {
-    fontSize: 13,
-    fontFamily: 'monospace',
-    lineHeight: 18,
-  },
-  assistantRow: {
-    alignItems: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  agentBadge: {
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    marginBottom: 3,
-    alignSelf: 'flex-start',
-  },
-  agentBadgeText: {
+  roleLabel: {
     fontSize: 9,
     fontFamily: 'monospace',
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: ACCENT,
+    marginBottom: 3,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  assistantBubble: {
-    maxWidth: '90%',
-    borderRadius: 14,
-    borderBottomLeftRadius: 4,
-    paddingHorizontal: 12,
+  roleLabelClaude: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#D4A574',
+    marginBottom: 3,
+    textTransform: 'uppercase',
+  },
+  userText: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    lineHeight: 18,
+    color: '#E5E7EB',
+  },
+  assistantContent: {
+    backgroundColor: '#111',
+    borderRadius: 6,
+    paddingHorizontal: 10,
     paddingVertical: 8,
   },
   assistantText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'monospace',
     lineHeight: 18,
+    color: '#E5E7EB',
   },
   systemRow: {
     alignItems: 'center',
@@ -204,9 +171,9 @@ const bubbleStyles = StyleSheet.create({
     paddingVertical: 4,
   },
   systemText: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'monospace',
-    opacity: 0.6,
+    color: '#6B7280',
     fontStyle: 'italic',
   },
 });
@@ -218,61 +185,46 @@ export default function AIPane() {
   const theme = useTheme();
   const colors = theme.colors;
 
-  // Dispatch hook — handles message routing, terminal context injection, streaming
   const { dispatch, cancelStreaming, isStreaming: dispatchStreaming } = useAIPaneDispatch(paneId);
 
   const handleSubmit = useCallback(
-    (text: string) => {
-      dispatch(text);
-    },
+    (text: string) => { dispatch(text); },
     [dispatch],
   );
 
-  // Voice input — transcript is dispatched as a regular message
   const { startRecording, stopRecording, isRecording, isTranscribing } =
     usePaneVoice(handleSubmit);
 
   const handleMicPress = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
+    if (isRecording) stopRecording();
+    else startRecording();
   }, [isRecording, startRecording, stopRecording]);
 
   const handleMicLongPress = useCallback(() => {
     useSettingsStore.getState().setShowVoiceMode(true);
   }, []);
 
-  // While streaming, the attach button acts as a stop/cancel button
   const handleAttach = useCallback(() => {
     if (dispatchStreaming) {
       cancelStreaming();
-    } else {
-      console.log('[AIPane] attach pressed — not yet implemented');
     }
   }, [dispatchStreaming, cancelStreaming]);
 
-  // Ensure conversation exists and subscribe to it
   const conversation = useAIPaneStore((s) => {
-    // getOrCreate is called outside selector to avoid side-effects in render
     return s.conversations[paneId] ?? null;
   });
 
-  // Initialise conversation lazily on first render
   const initialised = useRef(false);
   if (!initialised.current) {
     useAIPaneStore.getState().getOrCreate(paneId);
     initialised.current = true;
   }
 
-  // Watch for bound agent changes and insert a system message on switch
   const boundAgent = usePaneStore((s) => s.paneAgents[paneId] ?? null);
   const prevAgentRef = useRef<string | null>(boundAgent);
   useEffect(() => {
     const prev = prevAgentRef.current;
     prevAgentRef.current = boundAgent;
-    // Skip on first mount (no actual switch happened)
     if (prev === boundAgent) return;
     const agentName = boundAgent
       ? boundAgent.charAt(0).toUpperCase() + boundAgent.slice(1)
@@ -296,34 +248,28 @@ export default function AIPane() {
       <MessageBubble
         message={item}
         isStreaming={isStreaming}
-        accentColor={colors.accent}
-        surfaceColor={colors.surface}
-        foregroundColor={colors.foreground}
-        mutedColor={colors.muted}
       />
     ),
-    [isStreaming, colors],
+    [isStreaming],
   );
 
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
 
   return (
-    <View style={[paneStyles.container, { backgroundColor: colors.background }]}>
-      {/* Context badge */}
+    <View style={paneStyles.container}>
+      {/* Context badge — READING TERMINAL 1 */}
       {contextBadge && (
-        <View style={[paneStyles.contextBadge, { borderBottomColor: colors.border }]}>
-          <View style={[paneStyles.contextDot, { backgroundColor: colors.accent }]} />
-          <Text style={[paneStyles.contextBadgeText, { color: colors.muted }]}>
-            {contextBadge}
-          </Text>
+        <View style={paneStyles.contextBadge}>
+          <View style={paneStyles.contextDot} />
+          <Text style={paneStyles.contextBadgeText}>{contextBadge}</Text>
         </View>
       )}
 
       {/* Message list */}
       {messages.length === 0 ? (
         <View style={paneStyles.emptyState}>
-          <Text style={[paneStyles.emptyText, { color: colors.muted }]}>
-            {'Ask anything. I can see your terminal output.'}
+          <Text style={paneStyles.emptyText}>
+            Ask anything. I can see your terminal output.
           </Text>
         </View>
       ) : (
@@ -339,27 +285,22 @@ export default function AIPane() {
         />
       )}
 
-      {/* Voice mode indicator — shown while recording or transcribing */}
+      {/* Voice mode indicator */}
       {(isRecording || isTranscribing) && (
-        <View style={[paneStyles.voiceBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View style={paneStyles.voiceBar}>
           <VoiceWaveform active={isRecording} />
-          <Text style={[paneStyles.voiceLabel, { color: colors.accent }]}>
+          <Text style={paneStyles.voiceLabel}>
             {isTranscribing ? 'Transcribing...' : 'Listening...'}
           </Text>
           {isRecording && (
-            <TouchableOpacity
-              onPress={stopRecording}
-              style={paneStyles.voiceStopButton}
-              accessibilityLabel="Stop recording"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="stop" size={16} color={colors.accent} />
+            <TouchableOpacity onPress={stopRecording} style={paneStyles.voiceStopButton}>
+              <MaterialIcons name="stop" size={16} color={ACCENT} />
             </TouchableOpacity>
           )}
         </View>
       )}
 
-      {/* Input bar — attach icon doubles as stop button while streaming */}
+      {/* Input bar + mic */}
       <View style={paneStyles.inputRow}>
         <View style={paneStyles.inputBarWrapper}>
           <PaneInputBar
@@ -374,16 +315,13 @@ export default function AIPane() {
           delayLongPress={500}
           style={[
             paneStyles.micButton,
-            { backgroundColor: isRecording ? colors.accent : colors.surface },
+            isRecording && { backgroundColor: ACCENT },
           ]}
-          accessibilityLabel={isRecording ? 'Stop recording' : 'Start voice input'}
-          accessibilityHint="Long press for full-screen voice mode"
-          accessibilityRole="button"
         >
           <MaterialIcons
             name={isRecording ? 'mic' : 'mic-none'}
             size={18}
-            color={isRecording ? '#000' : colors.muted}
+            color={isRecording ? '#000' : '#6B7280'}
           />
         </TouchableOpacity>
       </View>
@@ -396,25 +334,30 @@ export default function AIPane() {
 const paneStyles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0A0A0A',
   },
   contextBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1A',
   },
   contextDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    backgroundColor: ACCENT,
   },
   contextBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'monospace',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+    fontWeight: '700',
+    color: '#6B7280',
   },
   emptyState: {
     flex: 1,
@@ -423,11 +366,11 @@ const paneStyles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'monospace',
     textAlign: 'center',
     lineHeight: 18,
-    opacity: 0.5,
+    color: '#6B7280',
   },
   listContent: {
     paddingVertical: 8,
@@ -437,14 +380,17 @@ const paneStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+    backgroundColor: '#111',
     gap: 8,
   },
   voiceLabel: {
     flex: 1,
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'monospace',
     letterSpacing: 0.5,
+    color: ACCENT,
   },
   voiceStopButton: {
     width: 28,
@@ -464,9 +410,10 @@ const paneStyles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#1E1E1E',
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderLeftColor: '#1E1E1E',
+    backgroundColor: '#111',
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+    borderLeftWidth: 1,
+    borderLeftColor: '#1A1A1A',
   },
 });

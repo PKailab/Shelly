@@ -20,12 +20,20 @@ const WIDTH_EXPANDED = 240;
 const WIDTH_ICONS = 48;
 const WIDTH_HIDDEN = 0;
 const TIMING_MS = 200;
+const ACCENT = '#00D4AA';
 
 const QUICK_FOLDERS = [
-  { label: 'Home', path: '~/', icon: 'home' },
-  { label: 'Downloads', path: '~/storage/downloads', icon: 'download' },
-  { label: 'Documents', path: '~/storage/shared/Documents', icon: 'description' },
+  { label: '~/', path: '~/', icon: 'home' },
   { label: 'DCIM', path: '~/storage/dcim', icon: 'photo-camera' },
+  { label: 'DOWNLOAD', path: '~/storage/downloads', icon: 'download' },
+  { label: 'DOCUMENTS', path: '~/storage/shared/Documents', icon: 'description' },
+  { label: 'MUSIC', path: '~/storage/music', icon: 'music-note' },
+] as const;
+
+const CLOUD_SERVICES = [
+  { label: 'GOOGLE DRIVE', status: 'LINKED', icon: 'cloud', linked: true },
+  { label: 'DROPBOX', status: 'CONNECT', icon: 'cloud-queue', linked: false },
+  { label: 'ONEDRIVE', status: 'CONNECT', icon: 'cloud-queue', linked: false },
 ] as const;
 
 export function Sidebar() {
@@ -36,7 +44,6 @@ export function Sidebar() {
     useSidebarStore();
   const agents = useAgentStore((s) => s.agents);
 
-  // Running agents: enabled and had a last run (proxy for "active")
   const runningAgents = agents.filter((a) => a.enabled);
 
   const targetWidth =
@@ -49,7 +56,6 @@ export function Sidebar() {
 
   const iconsOnly = mode === 'icons';
 
-  // Toggle between expanded and icons-only (hidden→expanded on open)
   function handleToggle() {
     if (mode === 'expanded') setMode('icons');
     else setMode('expanded');
@@ -58,15 +64,15 @@ export function Sidebar() {
   if (mode === 'hidden') return null;
 
   return (
-    <Animated.View style={[styles.container, animatedStyle, { backgroundColor: c.surface, borderRightColor: c.border }]}>
+    <Animated.View style={[styles.container, animatedStyle, { backgroundColor: '#0D0D0D', borderRightColor: c.border }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Tasks */}
+        {/* TASKS */}
         <SidebarSection
-          title="Tasks"
+          title="TASKS"
           icon="smart-toy"
           isOpen={openSections.tasks}
           onToggle={() => toggleSection('tasks')}
@@ -74,58 +80,71 @@ export function Sidebar() {
           iconsOnly={iconsOnly}
         >
           {runningAgents.length === 0 ? (
-            <Text style={[styles.emptyText, { color: c.muted }]}>No running tasks</Text>
+            <Text style={styles.emptyText}>No running tasks</Text>
           ) : (
             runningAgents.map((agent) => (
-              <View key={agent.id} style={styles.row}>
-                <View style={[styles.dot, { backgroundColor: c.success }]} />
-                <Text style={[styles.rowText, { color: c.foreground }]} numberOfLines={1}>
-                  {agent.name}
-                </Text>
+              <View key={agent.id} style={styles.taskRow}>
+                <View style={styles.taskInfo}>
+                  <Text style={styles.taskName} numberOfLines={1}>
+                    {agent.name.toUpperCase()}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: 'rgba(0,212,170,0.15)' }]}>
+                  <Text style={[styles.statusBadgeText, { color: ACCENT }]}>RUNNING</Text>
+                </View>
               </View>
             ))
           )}
         </SidebarSection>
 
-        {/* Repos */}
+        {/* REPOSITORIES */}
         <SidebarSection
-          title="Repos"
+          title="REPOSITORIES"
           icon="folder-special"
           isOpen={openSections.repos}
           onToggle={() => toggleSection('repos')}
           iconsOnly={iconsOnly}
         >
           {repoPaths.length === 0 ? (
-            <Text style={[styles.emptyText, { color: c.muted }]}>No repos added</Text>
+            <Text style={styles.emptyText}>No repos added</Text>
           ) : (
             repoPaths.map((p) => {
               const isActive = p === activeRepoPath;
+              const name = p.replace(/^.*\//, '') || p;
               return (
                 <Pressable
                   key={p}
-                  style={[styles.row, isActive && { backgroundColor: c.accent + '20' }]}
+                  style={[styles.repoRow, isActive && { backgroundColor: ACCENT + '15' }]}
                   onPress={() => setActiveRepo(p)}
                 >
-                  <MaterialIcons
-                    name="folder"
-                    size={14}
-                    color={isActive ? c.accent : c.muted}
-                  />
+                  <View style={[styles.repoIcon, { backgroundColor: isActive ? ACCENT : '#333' }]}>
+                    <MaterialIcons
+                      name="folder"
+                      size={10}
+                      color={isActive ? '#000' : '#999'}
+                    />
+                  </View>
                   <Text
-                    style={[styles.rowText, { color: isActive ? c.accent : c.foreground }]}
+                    style={[styles.repoName, { color: isActive ? ACCENT : '#E5E7EB' }]}
                     numberOfLines={1}
                   >
-                    {p.replace(/^.*\//, '') || p}
+                    {name.toUpperCase()}
                   </Text>
+                  {isActive && (
+                    <Text style={styles.repoVersion}>V9.2</Text>
+                  )}
                 </Pressable>
               );
             })
           )}
+          <Pressable style={styles.addRow} onPress={() => {}}>
+            <Text style={styles.addRowText}>+ ADD REPOSITORY</Text>
+          </Pressable>
         </SidebarSection>
 
-        {/* Files */}
+        {/* FILE TREE */}
         <SidebarSection
-          title="Files"
+          title="FILE TREE"
           icon="folder-open"
           isOpen={openSections.files}
           onToggle={() => toggleSection('files')}
@@ -134,9 +153,9 @@ export function Sidebar() {
           <FileTree />
         </SidebarSection>
 
-        {/* Device */}
+        {/* DEVICE */}
         <SidebarSection
-          title="Device"
+          title="DEVICE"
           icon="phone-android"
           isOpen={openSections.device}
           onToggle={() => toggleSection('device')}
@@ -145,29 +164,71 @@ export function Sidebar() {
           {QUICK_FOLDERS.map(({ label, path, icon }) => (
             <Pressable
               key={path}
-              style={styles.row}
+              style={styles.deviceRow}
               onPress={() => setActiveRepo(path)}
             >
-              <MaterialIcons name={icon as any} size={14} color={c.muted} />
-              <Text style={[styles.rowText, { color: c.foreground }]}>{label}</Text>
+              <MaterialIcons name={icon as any} size={13} color="#6B7280" />
+              <Text style={styles.deviceLabel}>{label}</Text>
             </Pressable>
           ))}
         </SidebarSection>
 
-        {/* Ports */}
+        {/* CLOUD */}
         <SidebarSection
-          title="Ports"
+          title="CLOUD"
+          icon="cloud"
+          isOpen={openSections.cloud}
+          onToggle={() => toggleSection('cloud')}
+          iconsOnly={iconsOnly}
+        >
+          {CLOUD_SERVICES.map((svc) => (
+            <Pressable key={svc.label} style={styles.cloudRow}>
+              <MaterialIcons
+                name={svc.icon as any}
+                size={13}
+                color={svc.linked ? ACCENT : '#6B7280'}
+              />
+              <Text style={styles.cloudLabel}>{svc.label}</Text>
+              <View style={styles.cloudSpacer} />
+              <Text
+                style={[
+                  styles.cloudStatus,
+                  { color: svc.linked ? ACCENT : '#6B7280' },
+                ]}
+              >
+                {svc.status}
+              </Text>
+            </Pressable>
+          ))}
+        </SidebarSection>
+
+        {/* PORTS */}
+        <SidebarSection
+          title="PORTS"
           icon="lan"
           isOpen={openSections.ports}
           onToggle={() => toggleSection('ports')}
           iconsOnly={iconsOnly}
         >
-          <Text style={[styles.emptyText, { color: c.muted }]}>No forwarded ports</Text>
+          <View style={styles.portRow}>
+            <View style={[styles.portDot, { backgroundColor: ACCENT }]} />
+            <Text style={styles.portLabel}>:3000</Text>
+            <Text style={styles.portName}>NEXT.JS</Text>
+            <View style={styles.cloudSpacer} />
+            <MaterialIcons name="open-in-new" size={11} color="#6B7280" />
+          </View>
+          <View style={styles.portRow}>
+            <View style={[styles.portDot, { backgroundColor: ACCENT }]} />
+            <Text style={styles.portLabel}>:8081</Text>
+            <Text style={styles.portName}>EXPO</Text>
+            <View style={styles.cloudSpacer} />
+            <MaterialIcons name="open-in-new" size={11} color="#6B7280" />
+          </View>
         </SidebarSection>
 
-        {/* Profiles */}
+        {/* PROFILES */}
         <SidebarSection
-          title="Profiles"
+          title="PROFILES"
           icon="manage-accounts"
           isOpen={openSections.profiles}
           onToggle={() => toggleSection('profiles')}
@@ -177,7 +238,7 @@ export function Sidebar() {
         </SidebarSection>
       </ScrollView>
 
-      {/* Expand / collapse toggle */}
+      {/* Collapse toggle */}
       <Pressable
         style={[styles.toggleBtn, { borderTopColor: c.border }]}
         onPress={handleToggle}
@@ -186,10 +247,10 @@ export function Sidebar() {
         <MaterialIcons
           name={mode === 'expanded' ? 'chevron-left' : 'chevron-right'}
           size={20}
-          color={c.muted}
+          color="#6B7280"
         />
         {!iconsOnly && (
-          <Text style={[styles.toggleLabel, { color: c.muted }]}>Collapse</Text>
+          <Text style={styles.toggleLabel}>Collapse</Text>
         )}
       </Pressable>
     </Animated.View>
@@ -207,7 +268,45 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 8,
   },
-  row: {
+  emptyText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: '#6B7280',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontStyle: 'italic',
+  },
+  // Tasks
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    gap: 8,
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  taskName: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#E5E7EB',
+    letterSpacing: 0.3,
+  },
+  statusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  statusBadgeText: {
+    fontSize: 8,
+    fontFamily: 'monospace',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  // Repos
+  repoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -215,21 +314,102 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 4,
   },
-  rowText: {
-    fontSize: 12,
+  repoIcon: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  repoName: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    letterSpacing: 0.5,
     flex: 1,
   },
-  dot: {
+  repoVersion: {
+    fontSize: 9,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  addRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  addRowText: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#6B7280',
+    letterSpacing: 0.3,
+  },
+  // Device
+  deviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  deviceLabel: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#E5E7EB',
+    letterSpacing: 0.3,
+  },
+  // Cloud
+  cloudRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  cloudLabel: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#E5E7EB',
+    letterSpacing: 0.3,
+  },
+  cloudSpacer: {
+    flex: 1,
+  },
+  cloudStatus: {
+    fontSize: 8,
+    fontFamily: 'monospace',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  // Ports
+  portRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  portDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-  emptyText: {
-    fontSize: 11,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    fontStyle: 'italic',
+  portLabel: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    color: '#E5E7EB',
   },
+  portName: {
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  // Toggle
   toggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -239,6 +419,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   toggleLabel: {
-    fontSize: 11,
+    fontSize: 10,
+    fontFamily: 'monospace',
+    color: '#6B7280',
   },
 });

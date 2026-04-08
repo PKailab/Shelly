@@ -2,29 +2,26 @@
 import React from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useTheme } from '@/lib/theme-engine';
 import { usePaneStore, AGENT_COLORS } from '@/store/pane-store';
 import { useSettingsStore } from '@/store/settings-store';
 import { useCommandPaletteStore } from '@/hooks/use-command-palette';
-import { useSettingsStore as useSettingsStoreImport } from '@/store/settings-store';
 
 type AgentDef = {
   name: string;
-  icon: string;
   key: string;
 };
 
 const BUILT_IN_AGENTS: AgentDef[] = [
-  { name: 'Claude', icon: 'auto-awesome', key: 'claude' },
-  { name: 'Gemini', icon: 'diamond', key: 'gemini' },
-  { name: 'Codex', icon: 'code', key: 'codex' },
-  { name: 'Local', icon: 'smartphone', key: 'local' },
-  { name: 'Perplexity', icon: 'travel-explore', key: 'perplexity' },
+  { name: 'CLAUDE', key: 'claude' },
+  { name: 'GEMINI', key: 'gemini' },
+  { name: 'CODEX', key: 'codex' },
+  { name: 'OPENCODE', key: 'opencode' },
+  { name: 'COPILOT', key: 'copilot' },
 ];
 
+const ACCENT = '#00D4AA';
+
 export function AgentBar() {
-  const theme = useTheme();
-  const c = theme.colors;
   const { focusedPaneId, paneAgents, bindAgent } = usePaneStore();
   const settings = useSettingsStore((s) => s.settings);
 
@@ -40,7 +37,8 @@ export function AgentBar() {
   };
 
   return (
-    <View style={[styles.bar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+    <View style={styles.bar}>
+      {/* Agent tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -49,41 +47,49 @@ export function AgentBar() {
       >
         {agents.map((agent) => {
           const isActive = activeAgent === agent.key;
-          const color = AGENT_COLORS[agent.key] ?? c.muted;
           return (
             <Pressable
               key={agent.key}
-              style={[styles.agentBtn, isActive && { backgroundColor: color + '20' }]}
+              style={[
+                styles.agentTab,
+                isActive && styles.agentTabActive,
+              ]}
               onPress={() => handleAgentTap(agent.key)}
             >
-              <MaterialIcons name={agent.icon as any} size={14} color={isActive ? color : c.muted} />
-              <Text style={[styles.agentText, { color: isActive ? color : c.muted }]}>
+              <View style={[styles.statusDot, { backgroundColor: isActive ? ACCENT : '#6B7280' }]} />
+              <Text
+                style={[
+                  styles.agentText,
+                  { color: isActive ? '#E5E7EB' : '#6B7280' },
+                  isActive && { fontWeight: '800' },
+                ]}
+              >
                 {agent.name}
               </Text>
-              {isActive && <View style={[styles.activeDot, { backgroundColor: color }]} />}
             </Pressable>
           );
         })}
+        {/* Add agent button */}
+        <Pressable style={styles.addBtn} hitSlop={8}>
+          <Text style={styles.addBtnText}>+</Text>
+        </Pressable>
       </ScrollView>
 
-      {/* Right-side buttons */}
+      {/* Right-side action buttons */}
       <View style={styles.rightBtns}>
-        <Pressable style={styles.iconBtn} hitSlop={8}>
-          <MaterialIcons name="add" size={18} color={c.muted} />
-        </Pressable>
         <Pressable
           style={styles.iconBtn}
           onPress={() => useCommandPaletteStore.getState().toggle()}
           hitSlop={8}
         >
-          <MaterialIcons name="search" size={18} color={c.muted} />
+          <MaterialIcons name="search" size={16} color="#6B7280" />
         </Pressable>
         <Pressable
           style={styles.iconBtn}
-          onPress={() => useSettingsStoreImport.getState().setShowConfigTUI(true)}
+          onPress={() => useSettingsStore.getState().setShowConfigTUI(true)}
           hitSlop={8}
         >
-          <MaterialIcons name="settings" size={16} color={c.muted} />
+          <MaterialIcons name="settings" size={15} color="#6B7280" />
         </Pressable>
       </View>
     </View>
@@ -92,42 +98,62 @@ export function AgentBar() {
 
 const styles = StyleSheet.create({
   bar: {
-    height: 36,
+    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1A',
+    backgroundColor: '#0D0D0D',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
     alignItems: 'center',
-    paddingHorizontal: 8,
-    gap: 4,
+    paddingHorizontal: 6,
+    gap: 2,
   },
-  agentBtn: {
+  agentTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  agentTabActive: {
+    backgroundColor: 'rgba(0,212,170,0.10)',
+    borderColor: 'rgba(0,212,170,0.25)',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   agentText: {
-    fontSize: 11,
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  addBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  addBtnText: {
+    color: '#6B7280',
+    fontSize: 14,
     fontFamily: 'monospace',
     fontWeight: '600',
-  },
-  activeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
   },
   rightBtns: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingRight: 8,
-    gap: 4,
+    gap: 6,
   },
   iconBtn: {
     padding: 4,

@@ -15,6 +15,8 @@ import { useTheme } from '@/lib/theme-engine';
 import { useBrowserStore } from '@/store/browser-store';
 import PaneInputBar from '@/components/panes/PaneInputBar';
 
+const ACCENT = '#00D4AA';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -22,51 +24,9 @@ import PaneInputBar from '@/components/panes/PaneInputBar';
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return 'about:blank';
-  // Already has a scheme
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)) return trimmed;
-  // Looks like a bare domain (contains a dot, no spaces)
   if (!trimmed.includes(' ') && trimmed.includes('.')) return `https://${trimmed}`;
-  // Fall back to a search
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
-}
-
-// ---------------------------------------------------------------------------
-// NavButton
-// ---------------------------------------------------------------------------
-
-interface NavButtonProps {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  accent: string;
-  muted: string;
-  surface: string;
-  border: string;
-}
-
-function NavButton({ label, onPress, disabled, accent, muted, surface, border }: NavButtonProps) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled}
-      style={[
-        styles.navButton,
-        { backgroundColor: surface, borderColor: border },
-        disabled && styles.navButtonDisabled,
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <Text
-        style={[
-          styles.navButtonText,
-          { color: disabled ? muted : accent },
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +39,7 @@ export interface BrowserPaneProps {
 
 export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneProps) {
   const theme = useTheme();
-  const { background, surface, surfaceAlt, foreground, muted, accent, border } = theme.colors;
+  const { background, surface, foreground, muted, accent, border } = theme.colors;
 
   const { bookmarks, addBookmark, loadBookmarks } = useBrowserStore();
 
@@ -88,18 +48,17 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+  const [activeBookmarkIdx, setActiveBookmarkIdx] = useState(0);
 
   useEffect(() => {
     loadBookmarks();
   }, []);
 
-  // Called when the user commits the URL bar
   const handleSubmit = useCallback(() => {
     const url = normalizeUrl(inputUrl);
     setCurrentUrl(url);
   }, [inputUrl]);
 
-  // Sync URL bar with page navigations (e.g. link clicks inside WebView)
   const handleNavigationStateChange = useCallback((state: WebViewNavigation) => {
     setCanGoBack(state.canGoBack);
     setCanGoForward(state.canGoForward);
@@ -109,16 +68,14 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
     setCurrentUrl(state.url ?? 'about:blank');
   }, []);
 
-  const handleBack = useCallback(() => {
-    webviewRef.current?.goBack();
-  }, []);
+  const handleBack = useCallback(() => { webviewRef.current?.goBack(); }, []);
+  const handleForward = useCallback(() => { webviewRef.current?.goForward(); }, []);
+  const handleRefresh = useCallback(() => { webviewRef.current?.reload(); }, []);
 
-  const handleForward = useCallback(() => {
-    webviewRef.current?.goForward();
-  }, []);
-
-  const handleRefresh = useCallback(() => {
-    webviewRef.current?.reload();
+  const handleBookmarkTap = useCallback((url: string, index: number) => {
+    setActiveBookmarkIdx(index);
+    setInputUrl(url);
+    setCurrentUrl(url);
   }, []);
 
   const handleBottomBarSubmit = useCallback((text: string) => {
@@ -129,125 +86,98 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: background }]}
+      style={[styles.root, { backgroundColor: '#0A0A0A' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* ── URL bar ─────────────────────────────────────────────────── */}
-      <View style={[styles.toolbar, { backgroundColor: surfaceAlt, borderBottomColor: border }]}>
-        {/* Back */}
-        <NavButton
-          label="←"
+      {/* URL bar */}
+      <View style={styles.toolbar}>
+        <TouchableOpacity
           onPress={handleBack}
           disabled={!canGoBack}
-          accent={accent}
-          muted={muted}
-          surface={surface}
-          border={border}
-        />
-
-        {/* Forward */}
-        <NavButton
-          label="→"
+          style={[styles.navBtn, !canGoBack && styles.navBtnDisabled]}
+        >
+          <MaterialIcons name="arrow-back" size={16} color={canGoBack ? '#E5E7EB' : '#333'} />
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={handleForward}
           disabled={!canGoForward}
-          accent={accent}
-          muted={muted}
-          surface={surface}
-          border={border}
-        />
-
-        {/* Refresh */}
-        <NavButton
-          label="↻"
-          onPress={handleRefresh}
-          accent={accent}
-          muted={muted}
-          surface={surface}
-          border={border}
-        />
-
-        {/* URL TextInput */}
+          style={[styles.navBtn, !canGoForward && styles.navBtnDisabled]}
+        >
+          <MaterialIcons name="arrow-forward" size={16} color={canGoForward ? '#E5E7EB' : '#333'} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleRefresh} style={styles.navBtn}>
+          <MaterialIcons name="refresh" size={16} color="#E5E7EB" />
+        </TouchableOpacity>
         <TextInput
-          style={[
-            styles.urlInput,
-            {
-              backgroundColor: surface,
-              borderColor: border,
-              color: foreground,
-            },
-          ]}
+          style={styles.urlInput}
           value={inputUrl}
           onChangeText={setInputUrl}
           onSubmitEditing={handleSubmit}
           placeholder="Enter a URL"
-          placeholderTextColor={muted}
+          placeholderTextColor="#6B7280"
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
           returnKeyType="go"
           selectTextOnFocus
         />
+        <TouchableOpacity onPress={handleRefresh} style={styles.navBtn}>
+          <MaterialIcons name="close" size={14} color="#6B7280" />
+        </TouchableOpacity>
       </View>
 
-      {/* ── Bookmarks bar ───────────────────────────────────────────── */}
+      {/* Bookmark tabs — tab style matching mock */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[styles.bookmarksBar, { backgroundColor: surfaceAlt, borderBottomColor: border }]}
-        contentContainerStyle={styles.bookmarksBarContent}
+        style={styles.bookmarksBar}
+        contentContainerStyle={styles.bookmarksContent}
       >
-        {bookmarks.map((bm) => (
-          <TouchableOpacity
-            key={bm.url}
-            style={[styles.bookmarkPill, { borderColor: border, backgroundColor: surface }]}
-            onPress={() => {
-              setInputUrl(bm.url);
-              setCurrentUrl(bm.url);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={bm.label}
-          >
-            <MaterialIcons
-              name={bm.icon as any}
-              size={13}
-              color={accent}
-              style={{ marginRight: 3 }}
-            />
-            <Text style={[styles.bookmarkLabel, { color: foreground }]} numberOfLines={1}>
-              {bm.label.length > 8 ? bm.label.slice(0, 8) : bm.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-
-        {/* [+] add current URL */}
-        <TouchableOpacity
-          style={[styles.bookmarkPill, styles.bookmarkAddPill, { borderColor: accent, backgroundColor: surface }]}
-          onPress={() => {
-            const url = currentUrl && currentUrl !== 'about:blank' ? currentUrl : normalizeUrl(inputUrl);
-            if (!url || url === 'about:blank') return;
-            // derive a short label from hostname
-            let label = url;
-            try { label = new URL(url).hostname.replace(/^www\./, ''); } catch {}
-            if (label.length > 8) label = label.slice(0, 8);
-            addBookmark({ label, url, icon: 'bookmark' });
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Add bookmark"
-        >
-          <Text style={[styles.bookmarkLabel, { color: accent }]}>[+]</Text>
-        </TouchableOpacity>
+        {bookmarks.map((bm, idx) => {
+          const isActive = idx === activeBookmarkIdx;
+          return (
+            <TouchableOpacity
+              key={bm.url}
+              style={[
+                styles.bookmarkTab,
+                isActive && styles.bookmarkTabActive,
+              ]}
+              onPress={() => handleBookmarkTap(bm.url, idx)}
+            >
+              <MaterialIcons
+                name={bm.icon as any}
+                size={12}
+                color={isActive ? ACCENT : '#6B7280'}
+              />
+              <Text
+                style={[
+                  styles.bookmarkLabel,
+                  isActive && styles.bookmarkLabelActive,
+                ]}
+                numberOfLines={1}
+              >
+                {bm.label.toUpperCase()}
+              </Text>
+              {isActive && (
+                <TouchableOpacity hitSlop={8} style={styles.bookmarkClose}>
+                  <MaterialIcons name="close" size={10} color="#6B7280" />
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
-      {/* ── WebView ─────────────────────────────────────────────────── */}
+      {/* WebView */}
       {currentUrl === 'about:blank' ? (
-        <View style={[styles.blankScreen, { backgroundColor: background }]}>
-          <Text style={[styles.blankText, { color: muted }]}>Enter a URL above to browse</Text>
+        <View style={styles.blankScreen}>
+          <Text style={styles.blankText}>Enter a URL above to browse</Text>
         </View>
       ) : (
         <WebView
           ref={webviewRef}
           source={{ uri: currentUrl }}
-          style={[styles.webview, { backgroundColor: background }]}
+          style={styles.webview}
           onNavigationStateChange={handleNavigationStateChange}
           javaScriptEnabled
           domStorageEnabled
@@ -255,14 +185,14 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
           allowsFullscreenVideo
           startInLoadingState
           renderLoading={() => (
-            <View style={[styles.loadingOverlay, { backgroundColor: background }]}>
-              <Text style={[styles.blankText, { color: muted }]}>Loading…</Text>
+            <View style={styles.loadingOverlay}>
+              <Text style={styles.blankText}>Loading...</Text>
             </View>
           )}
         />
       )}
 
-      {/* ── Bottom search / navigation bar ──────────────────────────── */}
+      {/* Bottom bar */}
       <PaneInputBar
         placeholder="Search or enter URL..."
         onSubmit={handleBottomBarSubmit}
@@ -282,79 +212,97 @@ const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
     borderBottomWidth: 1,
-    gap: 6,
+    borderBottomColor: '#1A1A1A',
+    backgroundColor: '#111',
+    gap: 4,
   },
-  navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    borderWidth: 1,
+  navBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  navButtonDisabled: {
+  navBtnDisabled: {
     opacity: 0.35,
-  },
-  navButtonText: {
-    fontSize: 16,
-    fontFamily: 'monospace',
-    lineHeight: 20,
   },
   urlInput: {
     flex: 1,
-    height: 36,
-    borderRadius: 6,
-    borderWidth: 1,
-    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 4,
+    backgroundColor: '#1A1A1A',
+    paddingHorizontal: 8,
     fontFamily: 'monospace',
-    fontSize: 13,
+    fontSize: 11,
+    color: '#E5E7EB',
   },
   bookmarksBar: {
-    height: 40,
+    height: 32,
     borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1A',
+    backgroundColor: '#0D0D0D',
     flexGrow: 0,
   },
-  bookmarksBarContent: {
+  bookmarksContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    gap: 6,
-    height: 40,
+    paddingHorizontal: 6,
+    gap: 2,
+    height: 32,
   },
-  bookmarkPill: {
+  bookmarkTab: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 5,
     height: 26,
-    paddingHorizontal: 8,
-    borderRadius: 13,
-    borderWidth: 1,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    backgroundColor: 'transparent',
   },
-  bookmarkAddPill: {
-    borderStyle: 'dashed',
+  bookmarkTabActive: {
+    backgroundColor: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#333',
   },
   bookmarkLabel: {
     fontFamily: 'monospace',
-    fontSize: 11,
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#6B7280',
+    letterSpacing: 0.5,
+  },
+  bookmarkLabelActive: {
+    color: '#E5E7EB',
+  },
+  bookmarkClose: {
+    marginLeft: 4,
   },
   webview: {
     flex: 1,
+    backgroundColor: '#0A0A0A',
   },
   blankScreen: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#0A0A0A',
   },
   blankText: {
     fontFamily: 'monospace',
-    fontSize: 13,
+    fontSize: 11,
+    color: '#6B7280',
   },
   loadingOverlay: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  } as any,
+    backgroundColor: '#0A0A0A',
+  },
 });

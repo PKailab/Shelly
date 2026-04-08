@@ -8,6 +8,7 @@ import type { PaneTab } from '@/hooks/use-multi-pane';
 import { usePaneStore, getAgentColor, AGENT_COLORS } from '@/store/pane-store';
 import { useSettingsStore } from '@/store/settings-store';
 import { onCommandComplete } from '@/lib/cli-notification';
+import { useSidebarStore } from '@/store/sidebar-store';
 
 const ACCENT = '#00D4AA';
 const ZERO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -28,6 +29,17 @@ type Props = {
   canSplit: boolean;
 };
 
+/** Derive display title for pane header matching mock style */
+function getPaneTitle(tab: PaneTab): string {
+  switch (tab) {
+    case 'terminal': return 'CLAUDE CODE';
+    case 'ai': return 'CLAUDE CODE';
+    case 'browser': return 'BROWSER';
+    case 'markdown': return 'MARKDOWN';
+    default: return String(tab).toUpperCase();
+  }
+}
+
 const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV, canSplit }: Props) => {
   const [selectorVisible, setSelectorVisible] = useState(false);
   const [splitMenuVisible, setSplitMenuVisible] = useState(false);
@@ -35,7 +47,6 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
   const [paneWidth, setPaneWidth] = useState(0);
   const [notification, setNotification] = useState<{ status: 'done' | 'error' } | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Keep track of whether browser was ever the active tab so we can preserve its mount
   const wasBrowserRef = useRef(tab === 'browser');
   const entry = PANE_REGISTRY[tab];
   const agentColor = usePaneStore((s) => getAgentColor(s.paneAgents, leafId));
@@ -44,12 +55,11 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const { setFocusedPane } = usePaneStore();
   const teamMembers = useSettingsStore((s) => s.settings.teamMembers);
+  const activeRepoPath = useSidebarStore((s) => s.activeRepoPath);
   const Component = useMemo(() => entry.getComponent(), [tab]);
-  // BrowserComponent is memoised once — never remounts, even when hidden
   const BrowserComponent = useMemo(() => PANE_REGISTRY['browser'].getComponent(), []);
   const ctxValue = useMemo(() => ({ paneWidth }), [paneWidth]);
 
-  // Latch wasBrowserRef once the browser tab has been shown
   useEffect(() => {
     if (tab === 'browser') {
       wasBrowserRef.current = true;
@@ -58,7 +68,6 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
 
   useEffect(() => {
     const unsub = onCommandComplete((event) => {
-      // Only show badge when the event is for this pane and it's not focused
       if (event.paneId !== leafId) return;
       if (focusedPaneId === leafId) return;
       setNotification({ status: event.exitCode === 0 ? 'done' : 'error' });
@@ -71,74 +80,87 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
     };
   }, [leafId, focusedPaneId]);
 
+  const paneTitle = getPaneTitle(tab);
+  const cwdDisplay = activeRepoPath
+    ? `— ${activeRepoPath.replace(/^\/data\/data\/com\.termux\/files\/home/, '~')}`
+    : '';
+
   return (
     <View
       style={styles.pane}
       onTouchStart={() => setFocusedPane(leafId)}
       onLayout={(e) => setPaneWidth(e.nativeEvent.layout.width)}
     >
-      {/* Pane header */}
-      <View style={[styles.header, { borderTopWidth: 2, borderTopColor: agentColor }]}>
+      {/* Pane header — rich info display matching mock */}
+      <View style={[styles.header, { borderTopColor: agentColor }]}>
+        {/* Left: pane icon + title + cwd */}
         <Pressable
-          style={styles.headerTabBtn}
+          style={styles.headerLeft}
           onPress={() => setSelectorVisible(true)}
         >
-          <MaterialIcons name={entry.icon as any} size={13} color={ACCENT} />
+          <MaterialIcons name={entry.icon as any} size={12} color={ACCENT} />
           <Text style={styles.headerTitle} numberOfLines={1}>
-            {entry.title}
+            {paneTitle}
           </Text>
-          <MaterialIcons name="arrow-drop-down" size={14} color="#9BA1A6" />
-        </Pressable>
-        {tab === 'ai' && (
-          <Pressable
-            style={styles.agentBadgeBtn}
-            onPress={() => setAgentMenuVisible(true)}
-            hitSlop={6}
-          >
-            <View style={[styles.agentDot, { backgroundColor: agentColor }]} />
-            <Text style={styles.agentBadgeText}>
-              {boundAgent ?? 'unbound'}
+          {cwdDisplay ? (
+            <Text style={styles.headerPath} numberOfLines={1}>
+              {cwdDisplay}
             </Text>
-            <MaterialIcons name="arrow-drop-down" size={12} color="#9BA1A6" />
-          </Pressable>
-        )}
+          ) : null}
+        </Pressable>
+
+        {/* Center: token/usage indicator */}
+        <View style={styles.headerCenter}>
+          <MaterialIcons name="data-usage" size={10} color="#6B7280" />
+          <Text style={styles.tokenText}>42K / 1H</Text>
+        </View>
+
         {notification && (
           <View style={[
             styles.notificationBadge,
-            notification.status === 'done' ? styles.notificationBadgeDone : styles.notificationBadgeError,
+            notification.status === 'done' ? styles.notifDone : styles.notifError,
           ]}>
-            <Text style={styles.notificationBadgeText}>
+            <Text style={styles.notifText}>
               {notification.status === 'done' ? 'Done' : 'Error'}
             </Text>
           </View>
         )}
+
         <View style={styles.headerSpacer} />
-        {canSplit && (
+
+        {/* Right action icons: save, user, split, close */}
+        <View style={styles.headerActions}>
+          <Pressable style={styles.actionBtn} hitSlop={6}>
+            <MaterialIcons name="save" size={12} color="#6B7280" />
+          </Pressable>
+          <Pressable style={styles.actionBtn} hitSlop={6}>
+            <MaterialIcons name="person" size={12} color="#6B7280" />
+          </Pressable>
+          {canSplit && (
+            <Pressable
+              style={styles.actionBtn}
+              onPress={() => setSplitMenuVisible(true)}
+              hitSlop={6}
+            >
+              <MaterialIcons name="dashboard" size={12} color="#6B7280" />
+            </Pressable>
+          )}
           <Pressable
             style={styles.actionBtn}
-            onPress={() => setSplitMenuVisible(true)}
-            hitSlop={8}
+            onPress={onRemove}
+            hitSlop={6}
           >
-            <MaterialIcons name="dashboard" size={13} color={ACCENT} />
+            <MaterialIcons name="close" size={12} color="#6B7280" />
           </Pressable>
-        )}
-        <Pressable
-          style={styles.actionBtn}
-          onPress={onRemove}
-          hitSlop={8}
-        >
-          <MaterialIcons name="close" size={13} color="#666" />
-        </Pressable>
+        </View>
       </View>
 
-      {/* Pane content — override SafeArea to prevent double padding */}
+      {/* Pane content */}
       <View style={styles.content}>
         <SafeAreaInsetsContext.Provider value={ZERO_INSETS}>
           <MultiPaneContext.Provider value={ctxValue}>
             <PaneIdContext.Provider value={leafId}>
-              {/* Active non-browser pane — hidden when browser is active */}
               {tab !== 'browser' && <Component />}
-              {/* Browser pane rendered once and toggled via display so audio keeps playing */}
               {(tab === 'browser' || wasBrowserRef.current) && (
                 <View style={tab === 'browser' ? styles.fill : styles.hidden}>
                   <BrowserComponent />
@@ -222,36 +244,35 @@ function SplitMenu({
     onClose();
   };
 
-  // Find a suggested tab that's not currently shown
   const suggestedTab: PaneTab = (['terminal', 'ai', 'browser', 'markdown'] as PaneTab[])
     .find((t) => t !== currentTab) ?? 'terminal';
 
   return (
-    <Pressable style={splitStyles.backdrop} onPress={handleClose}>
-      <Pressable style={splitStyles.menu} onPress={(e) => e.stopPropagation()}>
+    <Pressable style={menuStyles.backdrop} onPress={handleClose}>
+      <Pressable style={menuStyles.menu} onPress={(e) => e.stopPropagation()}>
         {step === 'direction' ? (
           <>
-            <Text style={splitStyles.title}>Split Pane</Text>
-            <Pressable style={splitStyles.option} onPress={() => handleDirection('h')}>
-              <MaterialIcons name="view-column" size={20} color={ACCENT} />
-              <Text style={splitStyles.optionText}>Split Right</Text>
+            <Text style={menuStyles.title}>Split Pane</Text>
+            <Pressable style={menuStyles.option} onPress={() => handleDirection('h')}>
+              <MaterialIcons name="view-column" size={18} color={ACCENT} />
+              <Text style={menuStyles.optionText}>Split Right</Text>
             </Pressable>
-            <Pressable style={splitStyles.option} onPress={() => handleDirection('v')}>
-              <MaterialIcons name="view-stream" size={20} color={ACCENT} />
-              <Text style={splitStyles.optionText}>Split Down</Text>
+            <Pressable style={menuStyles.option} onPress={() => handleDirection('v')}>
+              <MaterialIcons name="view-stream" size={18} color={ACCENT} />
+              <Text style={menuStyles.optionText}>Split Down</Text>
             </Pressable>
           </>
         ) : (
           <>
-            <Text style={splitStyles.title}>Open In New Pane</Text>
+            <Text style={menuStyles.title}>Open In New Pane</Text>
             {(['terminal', 'ai', 'browser', 'markdown'] as PaneTab[]).map((t) => (
               <Pressable
                 key={t}
-                style={[splitStyles.option, t === suggestedTab && splitStyles.optionHighlight]}
+                style={[menuStyles.option, t === suggestedTab && menuStyles.optionHighlight]}
                 onPress={() => handleTabSelect(t)}
               >
-                <MaterialIcons name={PANE_REGISTRY[t].icon as any} size={18} color={t === suggestedTab ? ACCENT : '#9BA1A6'} />
-                <Text style={[splitStyles.optionText, t === suggestedTab && { color: ACCENT }]}>
+                <MaterialIcons name={PANE_REGISTRY[t].icon as any} size={16} color={t === suggestedTab ? ACCENT : '#6B7280'} />
+                <Text style={[menuStyles.optionText, t === suggestedTab && { color: ACCENT }]}>
                   {PANE_REGISTRY[t].title}
                 </Text>
               </Pressable>
@@ -285,24 +306,24 @@ function AgentMenu({
     .map(([key]) => key);
 
   return (
-    <Pressable style={splitStyles.backdrop} onPress={onClose}>
-      <Pressable style={agentMenuStyles.menu} onPress={(e) => e.stopPropagation()}>
-        <Text style={splitStyles.title}>Switch Agent</Text>
+    <Pressable style={menuStyles.backdrop} onPress={onClose}>
+      <Pressable style={agentStyles.menu} onPress={(e) => e.stopPropagation()}>
+        <Text style={menuStyles.title}>Switch Agent</Text>
         {agents.map((key) => {
           const color = AGENT_COLORS[key] ?? AGENT_COLORS.unbound;
           const isActive = key === boundAgent;
           return (
             <Pressable
               key={key}
-              style={[agentMenuStyles.row, isActive && agentMenuStyles.rowActive]}
+              style={[agentStyles.row, isActive && agentStyles.rowActive]}
               onPress={() => onSelect(key)}
             >
-              <View style={[agentMenuStyles.dot, { backgroundColor: color }]} />
-              <Text style={[agentMenuStyles.label, isActive && { color: ACCENT }]}>
+              <View style={[agentStyles.dot, { backgroundColor: color }]} />
+              <Text style={[agentStyles.label, isActive && { color: ACCENT }]}>
                 {key.charAt(0).toUpperCase() + key.slice(1)}
               </Text>
               {isActive && (
-                <MaterialIcons name="check" size={13} color={ACCENT} style={{ marginLeft: 'auto' }} />
+                <MaterialIcons name="check" size={12} color={ACCENT} style={{ marginLeft: 'auto' }} />
               )}
             </Pressable>
           );
@@ -323,74 +344,75 @@ const styles = StyleSheet.create({
     height: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     backgroundColor: '#111',
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
-    gap: 2,
+    borderBottomColor: '#1A1A1A',
+    borderTopWidth: 2,
+    gap: 4,
   },
-  headerTabBtn: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-    borderRadius: 4,
+    gap: 5,
+    flexShrink: 1,
   },
   headerTitle: {
-    color: '#ECEDEE',
+    color: '#E5E7EB',
     fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  headerPath: {
+    color: '#6B7280',
+    fontSize: 10,
+    fontFamily: 'monospace',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginLeft: 8,
+  },
+  tokenText: {
+    color: '#6B7280',
+    fontSize: 9,
     fontFamily: 'monospace',
     fontWeight: '600',
   },
   headerSpacer: {
     flex: 1,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   notificationBadge: {
     paddingHorizontal: 5,
     paddingVertical: 1,
-    borderRadius: 4,
+    borderRadius: 3,
     marginLeft: 4,
   },
-  notificationBadgeDone: {
-    backgroundColor: 'rgba(34,197,94,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(34,197,94,0.4)',
+  notifDone: {
+    backgroundColor: 'rgba(34,197,94,0.15)',
   },
-  notificationBadgeError: {
-    backgroundColor: 'rgba(239,68,68,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.4)',
+  notifError: {
+    backgroundColor: 'rgba(239,68,68,0.15)',
   },
-  notificationBadgeText: {
-    color: '#ECEDEE',
-    fontSize: 9,
+  notifText: {
+    color: '#E5E7EB',
+    fontSize: 8,
     fontFamily: 'monospace',
     fontWeight: '700',
+    textTransform: 'uppercase',
   },
   actionBtn: {
     padding: 3,
-    borderRadius: 4,
-  },
-  agentBadgeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  agentDot: {
-    width: 6,
-    height: 6,
     borderRadius: 3,
-  },
-  agentBadgeText: {
-    color: '#9BA1A6',
-    fontSize: 9,
-    fontFamily: 'monospace',
-    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -399,12 +421,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   hidden: {
-    // Keep mounted (audio alive) but invisible and zero-size
     display: 'none',
   },
 });
 
-const splitStyles = StyleSheet.create({
+const menuStyles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -415,39 +436,40 @@ const splitStyles = StyleSheet.create({
   menu: {
     width: 220,
     backgroundColor: '#1A1A1A',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 10,
     borderWidth: 1,
     borderColor: '#333',
   },
   title: {
-    color: '#9BA1A6',
-    fontSize: 10,
+    color: '#6B7280',
+    fontSize: 9,
     fontFamily: 'monospace',
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 6,
     paddingHorizontal: 8,
+    fontWeight: '700',
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 9,
+    paddingVertical: 8,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: 6,
   },
   optionHighlight: {
     backgroundColor: 'rgba(0,212,170,0.08)',
   },
   optionText: {
-    color: '#ECEDEE',
-    fontSize: 13,
+    color: '#E5E7EB',
+    fontSize: 12,
     fontFamily: 'monospace',
   },
 });
 
-const agentMenuStyles = StyleSheet.create({
+const agentStyles = StyleSheet.create({
   menu: {
     width: 180,
     backgroundColor: '#1A1A1A',
@@ -460,7 +482,7 @@ const agentMenuStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 7,
+    paddingVertical: 6,
     paddingHorizontal: 8,
     borderRadius: 6,
   },
@@ -473,8 +495,8 @@ const agentMenuStyles = StyleSheet.create({
     borderRadius: 4,
   },
   label: {
-    color: '#ECEDEE',
-    fontSize: 12,
+    color: '#E5E7EB',
+    fontSize: 11,
     fontFamily: 'monospace',
   },
 });

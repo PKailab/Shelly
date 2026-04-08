@@ -4,13 +4,14 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/lib/theme-engine';
 
+const ACCENT = '#00D4AA';
+
 type Props = {
   title: string;
   icon: string;
   isOpen: boolean;
   onToggle: () => void;
   badge?: number;
-  /** Icons-only mode: show icon only, no title or children */
   iconsOnly?: boolean;
   children: React.ReactNode;
 };
@@ -30,9 +31,9 @@ export function SidebarSection({
   if (iconsOnly) {
     return (
       <Pressable style={styles.iconBtn} onPress={onToggle} hitSlop={4}>
-        <MaterialIcons name={icon as any} size={18} color={isOpen ? c.accent : c.muted} />
+        <MaterialIcons name={icon as any} size={18} color={isOpen ? ACCENT : '#6B7280'} />
         {badge != null && badge > 0 && (
-          <View style={[styles.badge, { backgroundColor: c.accent }]}>
+          <View style={styles.badge}>
             <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
           </View>
         )}
@@ -41,22 +42,19 @@ export function SidebarSection({
   }
 
   return (
-    <View style={[styles.section, { borderBottomColor: c.border }]}>
+    <View style={styles.section}>
       <Pressable style={styles.header} onPress={onToggle}>
-        <MaterialIcons name={icon as any} size={14} color={c.muted} />
-        <Text style={[styles.title, { color: c.foreground }]} numberOfLines={1}>
-          {title}
-        </Text>
+        <Text style={styles.title}>{title}</Text>
         {badge != null && badge > 0 && (
-          <View style={[styles.countBadge, { backgroundColor: c.accent + '30' }]}>
-            <Text style={[styles.countText, { color: c.accent }]}>{badge}</Text>
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>{badge}</Text>
           </View>
         )}
         <View style={styles.spacer} />
         <MaterialIcons
           name={isOpen ? 'expand-less' : 'expand-more'}
-          size={16}
-          color={c.muted}
+          size={14}
+          color="#6B7280"
         />
       </Pressable>
       {isOpen && <View style={styles.body}>{children}</View>}
@@ -67,34 +65,39 @@ export function SidebarSection({
 const styles = StyleSheet.create({
   section: {
     borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1A',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 0,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 7,
   },
   title: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'monospace',
-    fontWeight: '700',
+    fontWeight: '800',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
+    color: '#6B7280',
   },
   spacer: { flex: 1 },
   countBadge: {
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 5,
     paddingVertical: 1,
+    marginLeft: 6,
+    backgroundColor: 'rgba(0,212,170,0.15)',
   },
   countText: {
-    fontSize: 9,
+    fontSize: 8,
     fontFamily: 'monospace',
-    fontWeight: '700',
+    fontWeight: '800',
+    color: ACCENT,
   },
   body: {
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   iconBtn: {
     alignItems: 'center',
@@ -109,6 +112,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
+    backgroundColor: ACCENT,
     alignItems: 'center',
     justifyContent: 'center',
   },
