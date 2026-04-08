@@ -52,6 +52,7 @@ import type { TabSession, SessionStatus } from '@/store/types';
 import { useChatStore } from '@/store/chat-store';
 import { generateId } from '@/lib/id';
 import { BlockList } from '@/components/terminal/BlockList';
+import { execCommand } from '@/hooks/use-native-exec';
 
 // ─── Status type for StatusBadge ─────────────────────────────────────────────
 
@@ -532,6 +533,21 @@ export default function TerminalScreen() {
                   connectionMode: useTerminalStore.getState().connectionMode,
                 });
               }
+              // Sync currentDir from PTY after each command block
+              execCommand('pwd').then((pwdResult) => {
+                if (pwdResult.exitCode === 0 && pwdResult.stdout.trim()) {
+                  const newDir = pwdResult.stdout.trim();
+                  const store = useTerminalStore.getState();
+                  const session = store.sessions.find(s => s.id === store.activeSessionId);
+                  if (session && session.currentDir !== newDir) {
+                    useTerminalStore.setState((state) => ({
+                      sessions: state.sessions.map(s =>
+                        s.id === store.activeSessionId ? { ...s, currentDir: newDir } : s
+                      ),
+                    }));
+                  }
+                }
+              }).catch(() => {});
             }}
             onUrlDetected={(e) => {
               const { url, type } = e.nativeEvent;
