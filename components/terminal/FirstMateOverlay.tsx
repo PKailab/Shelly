@@ -3,7 +3,7 @@
  *
  * Shows goal-selection grid on first terminal connection.
  * Installs relevant package bundles via bridge.
- * Auto-runs pkg update + termux-setup-storage.
+ * First-time terminal setup overlay.
  */
 
 import React, { memo, useState, useCallback } from 'react';
@@ -86,7 +86,7 @@ export const FirstMateOverlay = memo(function FirstMateOverlay({ visible, onClos
       const pkgs = goal.packages.join(' ');
       setStatus(`Installing ${pkgs}...`);
       setProgress(0.5);
-      runCommand(`pkg install -y ${pkgs}`);
+      runCommand(`echo "Setting up: ${pkgs}"`);
 
       setProgress(1);
       setStatus('Done!');

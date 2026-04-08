@@ -1,10 +1,10 @@
 /**
  * lib/llamacpp-setup.ts — v2.7
  *
- * llama.cpp on Termux セットアップ支援ライブラリ。
+ * llama.cpp setup for local LLM
  *
  * 設計方針:
- * - Termux公式パッケージ（pkg install llama-cpp）を使用（ビルド不要）
+ * - llama.cpp setup for local LLM（ビルド不要）
  * - モデルはHugging FaceからGGUF形式で直接ダウンロード
  * - ShellyのLocal LLM設定（http://127.0.0.1:8080）と自動連携
  * - llama-serverはOpenAI互換API（/v1/chat/completions）を提供
@@ -168,20 +168,20 @@ export const MODEL_CATALOG: LlamaCppModel[] = [
 // ─── Setup Script Generator ───────────────────────────────────────────────────
 
 const MODELS_DIR = '$HOME/models';
-// pkg install llama-cpp でインストールされるバイナリパス
+// llama-server binary path
 const SERVER_BIN = 'llama-server';
 
 /**
  * llama.cppのセットアップステップ一覧を生成する。
- * v2.7: pkg install を使用（ビルド不要・数秒で完了）
+ * v2.7: npm or manual install（ビルド不要・数秒で完了）
  */
 export function buildSetupSteps(): LlamaCppSetupStep[] {
   return [
     {
       id: 'install_llamacpp',
-      label: 'llama-cppをインストール（pkg）',
-      command: 'pkg install -y llama-cpp',
-      estimatedSeconds: 15,
+      label: 'llama-cppをインストール',
+      command: 'wget -q https://github.com/ggml-org/llama.cpp/releases/latest/download/llama-server-android-arm64.zip -O /tmp/llama-server.zip && unzip -o /tmp/llama-server.zip llama-server -d $HOME/.local/bin && chmod +x $HOME/.local/bin/llama-server',
+      estimatedSeconds: 30,
       critical: true,
     },
     {
@@ -332,7 +332,7 @@ export function estimateTotalSetupTime(steps: LlamaCppSetupStep[]): number {
 
 /**
  * llama-server を起動するスクリプトを生成する。
- * Termuxのマルチウィンドウ不要。llama-serverをバックグラウンドで起動する。
+ * llama-serverをバックグラウンドで起動する。
  */
 export function buildStartAllScript(model: LlamaCppModel): string {
   const logFile = `${MODELS_DIR}/llama-server.log`;

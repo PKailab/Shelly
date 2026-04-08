@@ -1,7 +1,7 @@
 /**
- * lib/package-doctor.ts — Diagnose and auto-repair common Termux package errors
+ * lib/package-doctor.ts — Diagnose and auto-repair common package errors
  *
- * Analyzes stderr from pkg/apt commands and suggests (or auto-runs) fixes.
+ * Analyzes stderr from package manager commands and suggests (or auto-runs) fixes.
  * Covers: stale mirrors, GPG errors, dpkg interruption, lock files, broken dependencies.
  */
 
@@ -15,7 +15,7 @@ export type PackageFix = {
 export function diagnosePackageError(stderr: string): PackageFix | null {
   if (stderr.includes('Unable to locate package')) {
     return {
-      fix: 'pkg update -y',
+      fix: 'npm update -g',
       message: 'Updating package list...',
       messageJa: 'パッケージリストを更新中...',
       autoRun: true,
@@ -47,7 +47,7 @@ export function diagnosePackageError(stderr: string): PackageFix | null {
   }
   if (stderr.includes('404  Not Found') || stderr.includes('Failed to fetch')) {
     return {
-      fix: 'pkg update -y',
+      fix: 'npm update -g',
       message: 'Refreshing repository cache...',
       messageJa: 'リポジトリキャッシュを更新中...',
       autoRun: true,
@@ -55,7 +55,7 @@ export function diagnosePackageError(stderr: string): PackageFix | null {
   }
   if (stderr.includes('Unmet dependencies') || stderr.includes('Depends:')) {
     return {
-      fix: 'pkg install -f -y',
+      fix: 'npm install -g',
       message: 'Fixing broken dependencies...',
       messageJa: '壊れた依存関係を修復中...',
       autoRun: true,
@@ -63,7 +63,7 @@ export function diagnosePackageError(stderr: string): PackageFix | null {
   }
   if (stderr.includes('Hash Sum mismatch')) {
     return {
-      fix: 'rm -rf $PREFIX/var/cache/apt/archives/* && pkg update -y',
+      fix: 'npm cache clean --force && npm update -g',
       message: 'Clearing corrupted cache and updating...',
       messageJa: '壊れたキャッシュをクリアして更新中...',
       autoRun: true,

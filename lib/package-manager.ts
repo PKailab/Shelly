@@ -1,7 +1,7 @@
 /**
- * lib/package-manager.ts — Termux Package Manager abstraction
+ * lib/package-manager.ts — Package Manager abstraction
  *
- * Wraps `pkg` commands via the Termux WebSocket bridge.
+ * Wraps package manager commands via the native bridge.
  * Provides structured data for the Package Manager UI.
  */
 import { create } from 'zustand';
@@ -156,35 +156,35 @@ export function buildListUpgradableCmd(): string {
  * Build install command.
  */
 export function buildInstallCmd(name: string): string {
-  return `pkg install -y ${name}`;
+  return `npm install -g ${name}`;
 }
 
 /**
  * Build remove command.
  */
 export function buildRemoveCmd(name: string): string {
-  return `pkg uninstall -y ${name}`;
+  return `npm uninstall -g ${name}`;
 }
 
 /**
  * Build upgrade command.
  */
 export function buildUpgradeCmd(name?: string): string {
-  return name ? `pkg upgrade -y ${name}` : 'pkg upgrade -y';
+  return name ? `npm update -g ${name}` : 'npm update -g';
 }
 
 /**
  * Build search command.
  */
 export function buildSearchCmd(query: string): string {
-  return `pkg search ${query} 2>/dev/null`;
+  return `npm search ${query} 2>/dev/null`;
 }
 
 /**
  * Build repo update command.
  */
 export function buildUpdateCmd(): string {
-  return 'pkg update -y 2>/dev/null';
+  return 'npm update -g 2>/dev/null';
 }
 
 // ── Output Parsers ───────────────────────────────────────────────────────────
