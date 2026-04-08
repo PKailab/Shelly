@@ -16,9 +16,10 @@ import Animated, {
   withSequence,
   FadeIn,
 } from 'react-native-reanimated';
-import { CommandBlock, TerminalEntry, AiBlock as AiBlockType } from '@/store/types';
+import { CommandBlock, TerminalEntry, AiBlock as AiBlockType, SetupBlock as SetupBlockType } from '@/store/types';
 import { TerminalBlock } from './TerminalBlock';
 import { AiBlock } from '@/components/terminal/AiBlock';
+import { SetupBlock } from '@/components/terminal/SetupBlock';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useTranslation } from '@/lib/i18n';
 import { useTheme } from '@/hooks/use-theme';
@@ -36,6 +37,10 @@ type Props = {
 
 function isAiBlock(entry: TerminalEntry): entry is AiBlockType {
   return 'blockType' in entry && entry.blockType === 'ai';
+}
+
+function isSetupBlock(entry: TerminalEntry): entry is SetupBlockType {
+  return 'blockType' in entry && entry.blockType === 'setup';
 }
 
 // ─── BlinkingCursor ─────────────────────────────────────────────────────────
@@ -167,8 +172,57 @@ export function BlockList({ blocks, entries, currentDir, onRerun, onCancel, onSe
     isAtBottomRef.current = true;
   }, []);
 
+  // Setup block interaction handlers
+  const setupFlowRef = useRef<any>(null);
+  const getSetupFlow = useCallback(() => {
+    if (!setupFlowRef.current) {
+      const { SetupFlow } = require('@/lib/setup-flow');
+      const store = useTerminalStore.getState();
+      const session = store.sessions.find((s: any) => s.id === store.activeSessionId);
+      setupFlowRef.current = new SetupFlow(
+        store.addSetupBlock.bind(store),
+        store.updateSetupBlock.bind(store),
+        session?.id || 'session-1',
+        store.setShowSetupOverlay.bind(store),
+      );
+    }
+    return setupFlowRef.current;
+  }, []);
+
+  const handleSetupOptionToggle = useCallback((blockId: string, optionId: string) => {
+    getSetupFlow().onOptionToggle(blockId, optionId);
+  }, [getSetupFlow]);
+
+  const handleSetupInputSubmit = useCallback((blockId: string, values: Record<string, string>) => {
+    getSetupFlow().onInputSubmit(blockId, values);
+  }, [getSetupFlow]);
+
+  const handleSetupSkip = useCallback((blockId: string) => {
+    getSetupFlow().onSkip(blockId);
+  }, [getSetupFlow]);
+
+  const handleSetupBack = useCallback((blockId: string) => {
+    getSetupFlow().onBack(blockId);
+  }, [getSetupFlow]);
+
+  const handleSetupAction = useCallback((blockId: string, action: string) => {
+    getSetupFlow().onAction(blockId, action);
+  }, [getSetupFlow]);
+
   const renderItem = useCallback(
     ({ item }: { item: TerminalEntry }) => {
+      if (isSetupBlock(item)) {
+        return (
+          <SetupBlock
+            block={item}
+            onOptionToggle={handleSetupOptionToggle}
+            onInputSubmit={handleSetupInputSubmit}
+            onSkip={handleSetupSkip}
+            onBack={handleSetupBack}
+            onAction={handleSetupAction}
+          />
+        );
+      }
       if (isAiBlock(item)) {
         return (
           <AiBlock
@@ -191,7 +245,7 @@ export function BlockList({ blocks, entries, currentDir, onRerun, onCancel, onSe
         />
       );
     },
-    [fontSize, lineHeight, onRerun, onCancel, onSelectTool]
+    [fontSize, lineHeight, onRerun, onCancel, onSelectTool, handleSetupOptionToggle, handleSetupInputSubmit, handleSetupSkip, handleSetupBack, handleSetupAction]
   );
 
   const keyExtractor = useCallback((item: TerminalEntry) => item.id, []);

@@ -159,6 +159,7 @@ const SECTIONS: { title: string; icon: string; items: SettingDef[] }[] = [
     title: 'Data',
     icon: 'storage',
     items: [
+      { key: 'rerunSetup',       label: 'Re-run Setup Wizard', type: 'action', source: 'custom', actionLabel: 'Run', description: 'Run initial setup again' },
       { key: 'usageAlertEnabled', label: 'Usage Alerts',  type: 'boolean', source: 'custom', description: 'Notify on cost threshold' },
       { key: 'exportLogs',        label: 'Export Logs',    type: 'action', source: 'custom', actionLabel: 'Share as text' },
       { key: 'deleteHistory',     label: 'Delete All History', type: 'action', source: 'custom', actionLabel: 'Delete', dangerAction: true },
@@ -523,6 +524,14 @@ export function ConfigTUI({ visible, onClose }: ConfigTUIProps) {
   const handleAction = useCallback((def: SettingDef) => {
     logInfo('ConfigTUI', 'Action: ' + def.key);
     switch (def.key) {
+      case 'rerunSetup': {
+        const AsyncStorageModule = require('@react-native-async-storage/async-storage').default;
+        AsyncStorageModule.removeItem('@shelly/setup_wizard_complete').then(() => {
+          useTerminalStore.getState().runCommand('shelly setup');
+        });
+        onClose();
+        break;
+      }
       case 'exportLogs': {
         // Try execution log first (has actual native terminal output)
         let text = '';

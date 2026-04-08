@@ -127,19 +127,33 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
         sigfillset(&sigs);
         sigprocmask(SIG_UNBLOCK, &sigs, NULL);
 
-        /* Build environment */
-        clearenv();
-        setenv("HOME",            homePath,                          1);
-        setenv("TERM",            "dumb",                            1);
-        setenv("LANG",            "en_US.UTF-8",                     1);
-        setenv("LD_LIBRARY_PATH", ldLibPath,                         1);
-        setenv("SHELL",           bashPath,                          1);
-        /* PATH: include lib dir (bundled binaries) + npm bin + system fallbacks */
+        /* Build environment — use explicit envp array instead of clearenv+setenv
+         * because Android Bionic's clearenv() can leave environ in a state
+         * where subsequent setenv() calls don't actually populate the
+         * environ pointer used by execve(). */
         char pathBuf[2048];
         snprintf(pathBuf, sizeof(pathBuf),
-                 "%s:%s/node_modules/npm/bin:%s/node_modules/.bin:/usr/bin:/usr/sbin:/bin:/sbin",
+                 "PATH=%s:%s/node_modules/npm/bin:%s/node_modules/.bin:/usr/bin:/usr/sbin:/bin:/sbin",
                  ldLibPath, ldLibPath, ldLibPath);
-        setenv("PATH", pathBuf, 1);
+
+        char homeBuf[512];
+        snprintf(homeBuf, sizeof(homeBuf), "HOME=%s", homePath);
+
+        char ldBuf[512];
+        snprintf(ldBuf, sizeof(ldBuf), "LD_LIBRARY_PATH=%s", ldLibPath);
+
+        char shellBuf[512];
+        snprintf(shellBuf, sizeof(shellBuf), "SHELL=%s", bashPath);
+
+        char *envp[] = {
+            pathBuf,
+            homeBuf,
+            (char *)"TERM=dumb",
+            (char *)"LANG=en_US.UTF-8",
+            ldBuf,
+            shellBuf,
+            NULL
+        };
 
         if (chdir(homePath) != 0) { /* non-fatal */ }
 
@@ -151,8 +165,7 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
             (char *)command,
             NULL
         };
-        extern char **environ;
-        execve(linkerPath, argv, environ);
+        execve(linkerPath, argv, envp);
 
         /* If execve failed */
         _exit(127);

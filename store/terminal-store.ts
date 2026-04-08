@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   CommandBlock,
   AiBlock,
+  SetupBlock,
   TerminalEntry,
   TabSession,
   AppSettings,
@@ -130,6 +131,15 @@ type TerminalState = {
   updateAiBlock: (blockId: string, updates: Partial<AiBlock>) => void;
   /** Add a CommandBlock to entries (mirrors blocks for unified display) */
   addEntryBlock: (block: CommandBlock) => void;
+
+  // Actions — Setup blocks
+  /** Add a setup block to the active session's entries */
+  addSetupBlock: (block: SetupBlock) => void;
+  /** Update an existing setup block */
+  updateSetupBlock: (blockId: string, updates: Partial<SetupBlock>) => void;
+  /** Whether the setup overlay should be shown */
+  showSetupOverlay: boolean;
+  setShowSetupOverlay: (show: boolean) => void;
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -538,7 +548,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
             blockStatus: b.exitCode === 0 ? 'done' : b.exitCode !== null ? 'error' : undefined,
           })),
         entries: s.entries
-          .filter((e: any) => !e.isStreaming) // skip streaming AI blocks
+          .filter((e: any) => !e.isStreaming && e.blockType !== 'setup') // skip streaming AI blocks and setup blocks
           .slice(-50)
           .map((e: any) => ({
             ...e,
@@ -621,7 +631,7 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     if (sIdx === -1) return;
     const eIdx = sessions[sIdx].entries.findIndex((e) => e.id === blockId);
     if (eIdx === -1) return;
-    const updatedEntry = { ...sessions[sIdx].entries[eIdx], ...updates };
+    const updatedEntry = { ...sessions[sIdx].entries[eIdx], ...updates } as TerminalEntry;
     const updatedEntries = [...sessions[sIdx].entries];
     updatedEntries[eIdx] = updatedEntry;
     const updatedSession = { ...sessions[sIdx], entries: updatedEntries };
@@ -639,6 +649,37 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
           : s
       ),
     }));
+  },
+
+  // ── Setup blocks ──────────────────────────────────────────────────────────
+
+  showSetupOverlay: false,
+  setShowSetupOverlay: (show: boolean) => set({ showSetupOverlay: show }),
+
+  addSetupBlock: (block: SetupBlock) => {
+    const { activeSessionId } = get();
+    set((state) => ({
+      sessions: state.sessions.map((s) =>
+        s.id === activeSessionId
+          ? { ...s, entries: [...s.entries, block] }
+          : s
+      ),
+    }));
+  },
+
+  updateSetupBlock: (blockId: string, updates: Partial<SetupBlock>) => {
+    const { sessions, activeSessionId } = get();
+    const sIdx = sessions.findIndex((s) => s.id === activeSessionId);
+    if (sIdx === -1) return;
+    const eIdx = sessions[sIdx].entries.findIndex((e) => e.id === blockId);
+    if (eIdx === -1) return;
+    const updatedEntry = { ...sessions[sIdx].entries[eIdx], ...updates } as TerminalEntry;
+    const updatedEntries = [...sessions[sIdx].entries];
+    updatedEntries[eIdx] = updatedEntry;
+    const updatedSession = { ...sessions[sIdx], entries: updatedEntries };
+    const updatedSessions = [...sessions];
+    updatedSessions[sIdx] = updatedSession;
+    set({ sessions: updatedSessions });
   },
 }));
 

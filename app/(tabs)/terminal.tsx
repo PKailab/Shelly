@@ -126,6 +126,14 @@ export default function TerminalScreen() {
   // Block History panel toggle
   const [showBlockHistory, setShowBlockHistory] = useState(false);
 
+  // Auto-show Block History when setup overlay is requested
+  const showSetupOverlay = useTerminalStore((s) => s.showSetupOverlay);
+  useEffect(() => {
+    if (showSetupOverlay) {
+      setShowBlockHistory(true);
+    }
+  }, [showSetupOverlay]);
+
   // Scroll state — show FAB when user scrolls up
   const [isScrolledUp, setIsScrolledUp] = useState(false);
   const terminalViewRef = useRef<any>(null);
@@ -593,11 +601,13 @@ export default function TerminalScreen() {
           {/* Panel Header */}
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.surface }}>
             <Text style={{ color: c.foreground, fontFamily: 'monospace', fontSize: 13, fontWeight: '700', flex: 1 }}>
-              Block History
+              {showSetupOverlay ? 'Setup' : 'Block History'}
             </Text>
-            <TouchableOpacity onPress={() => setShowBlockHistory(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialIcons name="close" size={20} color={c.muted} />
-            </TouchableOpacity>
+            {!showSetupOverlay && (
+              <TouchableOpacity onPress={() => setShowBlockHistory(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialIcons name="close" size={20} color={c.muted} />
+              </TouchableOpacity>
+            )}
           </View>
           <BlockList
             blocks={activeSession.blocks}

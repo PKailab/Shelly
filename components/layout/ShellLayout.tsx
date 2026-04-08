@@ -1,5 +1,5 @@
 // components/layout/ShellLayout.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { logInfo, logLifecycle } from '@/lib/debug-logger';
 import { View, Platform, StyleSheet, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,9 @@ import { AgentBar } from './AgentBar';
 import { ContextBar } from './ContextBar';
 import { MultiPaneContainer } from '@/components/multi-pane/MultiPaneContainer';
 import { CommandPalette } from '@/components/CommandPalette';
-import { WelcomeWizard, isWizardComplete } from '@/components/WelcomeWizard';
+// WelcomeWizard kept as import for potential fallback — replaced by shelly setup
+// import { WelcomeWizard, isWizardComplete } from '@/components/WelcomeWizard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { matchKeybinding, type KeyAction } from '@/lib/keybindings';
 import { useTerminalStore } from '@/store/terminal-store';
 import { useCommandPaletteStore } from '@/hooks/use-command-palette';
@@ -77,13 +79,15 @@ export function ShellLayout() {
     if (showConfig) logInfo('ShellLayout', 'ConfigTUI: open');
   }, [showConfig]);
 
-  // Welcome wizard state
-  const [showWizard, setShowWizard] = useState(false);
-  const [wizardChecked, setWizardChecked] = useState(false);
+  // Interactive setup — auto-run `shelly setup` on first launch
   useEffect(() => {
-    isWizardComplete().then((done) => {
-      if (!done) setShowWizard(true);
-      setWizardChecked(true);
+    AsyncStorage.getItem('@shelly/setup_wizard_complete').then((val) => {
+      if (val !== 'true') {
+        // Delay to let terminal session initialize
+        setTimeout(() => {
+          useTerminalStore.getState().runCommand('shelly setup');
+        }, 800);
+      }
     });
   }, []);
 
@@ -159,9 +163,6 @@ export function ShellLayout() {
 
       {/* Overlays */}
       <CommandPalette />
-      {wizardChecked && (
-        <WelcomeWizard visible={showWizard} onComplete={() => setShowWizard(false)} />
-      )}
 
       {/* Settings TUI overlay */}
       <ConfigTUI visible={showConfig} onClose={closeConfig} />

@@ -115,8 +115,55 @@ export type AiBlock = {
   llmModelLabel?: string;
 };
 
+// ─── Setup Block ────────────────────────────────────────────────────────────
+
+export type SetupStepId = 'welcome' | 'cli-select' | 'cli-install' | 'cli-auth' | 'git-config' | 'git-input' | 'git-ssh' | 'project-scan' | 'done';
+
+export type SetupOption = {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  badge?: string;
+  selected?: boolean;
+};
+
+export type SetupBlock = {
+  id: string;
+  sessionId: string;
+  blockType: 'setup';
+  stepId: SetupStepId;
+  title: string;
+  description?: string;
+  /** Tappable options (buttons/checkboxes) */
+  options?: SetupOption[];
+  /** Whether multiple options can be selected */
+  multiSelect?: boolean;
+  /** Text input fields */
+  inputs?: Array<{
+    key: string;
+    label: string;
+    placeholder?: string;
+    value?: string;
+  }>;
+  /** Log lines (install progress, etc.) */
+  logLines?: string[];
+  /** Step status */
+  status: 'active' | 'completed' | 'skipped' | 'error';
+  /** Error message */
+  errorMessage?: string;
+  /** Show skip button */
+  skippable: boolean;
+  /** Show back button */
+  showBack?: boolean;
+  /** Primary action label override */
+  actionLabel?: string;
+  timestamp: number;
+};
+
 /** ターミナルに表示するブロックの共用型 */
-export type TerminalEntry = CommandBlock | AiBlock;
+export type TerminalEntry = CommandBlock | AiBlock | SetupBlock;
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 

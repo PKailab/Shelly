@@ -521,6 +521,28 @@ export async function executeCommand(
         return { lines: info('Opening voice mode…'), newState: {} };
       }
 
+      // ── shelly setup ─────────────────────────────────────────────────────────
+      if (sub === 'setup') {
+        // Dynamically import to avoid circular dependency
+        const { SetupFlow } = require('@/lib/setup-flow');
+        const { useTerminalStore } = require('@/store/terminal-store');
+        const store = useTerminalStore.getState();
+        const session = store.sessions.find((s: any) => s.id === store.activeSessionId);
+        const sessionId = session?.id || 'session-1';
+        const flow = new SetupFlow(
+          store.addSetupBlock.bind(store),
+          store.updateSetupBlock.bind(store),
+          sessionId,
+          store.setShowSetupOverlay.bind(store),
+        );
+        const subCmd = args[1];
+        if (subCmd === 'cli') flow.startCli();
+        else if (subCmd === 'git') flow.startGit();
+        else if (subCmd === 'projects') flow.startProjects();
+        else flow.startFull();
+        return { lines: [], newState: {} };
+      }
+
       if (sub !== 'workflow') {
         return {
           lines: out(
@@ -529,6 +551,7 @@ export async function executeCommand(
             'Commands:',
             '  shelly config    View and edit settings',
             '  shelly voice     Open full-screen voice chat',
+            '  shelly setup     Interactive setup wizard',
             '  shelly workflow  Manage saved workflows'
           ),
           newState: {},
