@@ -324,7 +324,8 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       logInfo('TerminalStore', 'Routing to JNI exec');
       const currentSession = get().sessions.find((s) => s.id === activeSessionId);
       const cwd = currentSession?.currentDir;
-      const fullCmd = cwd ? `cd '${cwd}' && ${command}` : command;
+      // Use cd only if cwd looks valid; skip if it's a legacy Termux path that may not exist
+      const fullCmd = cwd ? `cd '${cwd}' 2>/dev/null; ${command}` : command;
       execCommand(fullCmd).then((result) => {
         logInfo('TerminalStore', 'Exit code: ' + result.exitCode);
         if (result.stdout) {

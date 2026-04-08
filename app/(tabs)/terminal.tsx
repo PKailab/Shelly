@@ -603,11 +603,14 @@ export default function TerminalScreen() {
             <Text style={{ color: c.foreground, fontFamily: 'monospace', fontSize: 13, fontWeight: '700', flex: 1 }}>
               {showSetupOverlay ? 'Setup' : 'Block History'}
             </Text>
-            {!showSetupOverlay && (
-              <TouchableOpacity onPress={() => setShowBlockHistory(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <MaterialIcons name="close" size={20} color={c.muted} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={() => {
+              setShowBlockHistory(false);
+              if (showSetupOverlay) {
+                useTerminalStore.getState().setShowSetupOverlay(false);
+              }
+            }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialIcons name="close" size={20} color={c.muted} />
+            </TouchableOpacity>
           </View>
           <BlockList
             blocks={activeSession.blocks}
