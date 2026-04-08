@@ -174,6 +174,8 @@ const en: Record<string, string> = {
   'wizard2.skip_setup': 'Skip for Now',
   'wizard2.auth_title': 'Sign In',
   'wizard2.auth_hint': 'Setting up authentication...',
+  'wizard2.installing_title': 'Installing',
+  'wizard2.installing_desc': 'Setting up your AI tools...',
   'wizard2.done_title': 'You\'re All Set!',
   'wizard2.configured_label': 'CONFIGURED',
   'wizard2.done_no_cli': 'No AI configured yet — that\'s fine!\nJust use the terminal, or set up AI later in Settings.',

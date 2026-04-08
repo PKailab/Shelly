@@ -174,6 +174,8 @@ const ja: Record<string, string> = {
   'wizard2.skip_setup': 'あとで設定',
   'wizard2.auth_title': 'サインイン',
   'wizard2.auth_hint': '認証を設定中...',
+  'wizard2.installing_title': 'インストール中',
+  'wizard2.installing_desc': 'AIツールをセットアップしています...',
   'wizard2.done_title': '準備完了！',
   'wizard2.configured_label': '設定済み',
   'wizard2.done_no_cli': 'AI未設定ですが、問題ありません。\nターミナルをそのまま使うか、設定からAIを追加できます。',
