@@ -169,6 +169,16 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
         setenv("LANG",            "en_US.UTF-8",                     1);
         setenv("LD_LIBRARY_PATH", ldLibPath,                         1);
         setenv("SHELL",           bashPath,                          1);
+        /* LD_PRELOAD exec wrapper: intercepts execve() so that all child
+         * processes (node, git, python, etc.) are automatically launched
+         * via /system/bin/linker64, bypassing Android's SELinux noexec
+         * restriction on app_data_file (targetSdk >= 29). */
+        {
+            char preloadPath[1024];
+            snprintf(preloadPath, sizeof(preloadPath),
+                     "%s/libexec_wrapper.so", ldLibPath);
+            setenv("LD_PRELOAD", preloadPath, 1);
+        }
         /* npm global install prefix — avoids writing to /apex or system paths */
         {
             char npmPrefix[1024];
@@ -215,12 +225,14 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
                     fprintf(rc, "export NPM_CONFIG_PREFIX=\"%s\"\n", npmPrefix);
                 }
                 fprintf(rc, "export PS1='shelly:~$ '\n");
-                /* CLI functions — must use linker64 to exec node on Android */
-                fprintf(rc, "claude() { /system/bin/linker64 \"%s/node\" \"%s/node_modules/@anthropic-ai/claude-code/cli.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
-                fprintf(rc, "gemini() { /system/bin/linker64 \"%s/node\" \"%s/node_modules/@google/gemini-cli/bundle/gemini.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
-                fprintf(rc, "codex() { /system/bin/linker64 \"%s/node\" \"%s/node_modules/@openai/codex/bin/codex.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
-                fprintf(rc, "node() { /system/bin/linker64 \"%s/node\" \"$@\"; }\n", ldLibPath);
-                fprintf(rc, "export -f claude gemini codex node\n");
+                /* CLI convenience functions: map command names to node + entry script.
+                 * LD_PRELOAD=libexec_wrapper.so handles the linker64 wrapping
+                 * transparently for all execve() calls, so we can use plain
+                 * "node" here instead of "/system/bin/linker64 .../node". */
+                fprintf(rc, "claude() { \"%s/node\" \"%s/node_modules/@anthropic-ai/claude-code/cli.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
+                fprintf(rc, "gemini() { \"%s/node\" \"%s/node_modules/@google/gemini-cli/bundle/gemini.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
+                fprintf(rc, "codex() { \"%s/node\" \"%s/node_modules/@openai/codex/bin/codex.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
+                fprintf(rc, "export -f claude gemini codex\n");
                 fclose(rc);
             }
         }

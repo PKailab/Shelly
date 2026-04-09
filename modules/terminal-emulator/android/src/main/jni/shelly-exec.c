@@ -145,6 +145,11 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
         char shellBuf[512];
         snprintf(shellBuf, sizeof(shellBuf), "SHELL=%s", bashPath);
 
+        /* LD_PRELOAD exec wrapper for linker64 redirection */
+        char preloadBuf[1024];
+        snprintf(preloadBuf, sizeof(preloadBuf),
+                 "LD_PRELOAD=%s/libexec_wrapper.so", ldLibPath);
+
         char *envp[] = {
             pathBuf,
             homeBuf,
@@ -152,6 +157,7 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
             (char *)"LANG=en_US.UTF-8",
             ldBuf,
             shellBuf,
+            preloadBuf,
             NULL
         };
 
