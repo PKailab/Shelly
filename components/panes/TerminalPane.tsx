@@ -400,15 +400,15 @@ export default function TerminalScreen() {
     }
   }, [pendingResetId, sessions, resetSession]);
 
-  // FirstMate: check on first successful connection
-  useEffect(() => {
-    if (isConnected && !firstMateChecked.current) {
-      firstMateChecked.current = true;
-      shouldShowFirstMate().then((show) => {
-        if (show) setShowFirstMate(true);
-      });
-    }
-  }, [isConnected]);
+  // FirstMate disabled — CLI tools are pre-installed, MOTD is sufficient
+  // useEffect(() => {
+  //   if (isConnected && !firstMateChecked.current) {
+  //     firstMateChecked.current = true;
+  //     shouldShowFirstMate().then((show) => {
+  //       if (show) setShowFirstMate(true);
+  //     });
+  //   }
+  // }, [isConnected]);
 
   // Japanese input proxy removed — NativeTerminalView handles inline JP input
 

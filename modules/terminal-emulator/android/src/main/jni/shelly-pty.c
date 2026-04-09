@@ -189,7 +189,7 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
             /* non-fatal, fall through */
         }
 
-        /* Write .bashrc with correct PATH if it doesn't exist or is outdated */
+        /* Write .bashrc with correct PATH and CLI aliases */
         {
             char bashrcPath[1024];
             snprintf(bashrcPath, sizeof(bashrcPath), "%s/.bashrc", homePath);
@@ -215,6 +215,11 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
                     fprintf(rc, "export NPM_CONFIG_PREFIX=\"%s\"\n", npmPrefix);
                 }
                 fprintf(rc, "export PS1='shelly:~$ '\n");
+                /* CLI aliases — avoids shebang/interpreter permission issues on Android */
+                fprintf(rc, "claude() { node \"%s/node_modules/@anthropic-ai/claude-code/cli.js\" \"$@\"; }\n", ldLibPath);
+                fprintf(rc, "gemini() { node \"%s/node_modules/@google/gemini-cli/bundle/gemini.js\" \"$@\"; }\n", ldLibPath);
+                fprintf(rc, "codex() { node \"%s/node_modules/@openai/codex/bin/codex.js\" \"$@\"; }\n", ldLibPath);
+                fprintf(rc, "export -f claude gemini codex\n");
                 fclose(rc);
             }
         }
