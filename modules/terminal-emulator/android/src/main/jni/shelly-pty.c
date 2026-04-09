@@ -169,12 +169,18 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
         setenv("LANG",            "en_US.UTF-8",                     1);
         setenv("LD_LIBRARY_PATH", ldLibPath,                         1);
         setenv("SHELL",           bashPath,                          1);
-        /* PATH: include lib dir (bundled binaries) + npm bin + system fallbacks */
+        /* npm global install prefix — avoids writing to /apex or system paths */
+        {
+            char npmPrefix[1024];
+            snprintf(npmPrefix, sizeof(npmPrefix), "%s/.npm-global", homePath);
+            setenv("NPM_CONFIG_PREFIX", npmPrefix, 1);
+        }
+        /* PATH: include lib dir (bundled binaries) + npm global bin + npm bin + system fallbacks */
         {
             char pathBuf[2048];
             snprintf(pathBuf, sizeof(pathBuf),
-                     "%s:%s/node_modules/npm/bin:%s/node_modules/.bin:/usr/bin:/usr/sbin:/bin:/sbin",
-                     ldLibPath, ldLibPath, ldLibPath);
+                     "%s:%s/.npm-global/bin:%s/node_modules/npm/bin:%s/node_modules/.bin:/usr/bin:/usr/sbin:/bin:/sbin",
+                     ldLibPath, homePath, ldLibPath, ldLibPath);
             setenv("PATH", pathBuf, 1);
         }
 

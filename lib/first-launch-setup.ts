@@ -14,17 +14,6 @@ import { logInfo } from '@/lib/debug-logger';
 
 const SETUP_KEY = '@shelly/setup_wizard_complete';
 
-const WELCOME = `
-\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m
-\x1b[1;32m  Welcome to Shelly\x1b[0m
-\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m
-
-  Your terminal is ready. Let's install AI coding tools.
-  Each step is optional — press \x1b[33mCtrl+C\x1b[0m to skip any install.
-
-\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m
-`;
-
 /**
  * Check if first-launch setup has been completed.
  */
@@ -59,14 +48,18 @@ export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
   logInfo('FirstLaunchSetup', 'Starting first-launch setup on session ' + sessionId);
 
   // Small delay to let the shell prompt appear
-  await sleep(800);
+  await sleep(1200);
 
-  // Write welcome message
-  await writeToTerminal(sessionId, `echo "${escapeForEcho(WELCOME)}"`);
+  // Configure npm to use Shelly's lib dir (not system /apex paths)
+  await writeToTerminal(sessionId, 'export NPM_CONFIG_PREFIX="$HOME/.npm-global" && export PATH="$HOME/.npm-global/bin:$PATH" && mkdir -p "$HOME/.npm-global"');
+  await sleep(300);
+
+  // Write welcome message using printf (echo doesn't interpret ANSI escapes)
+  await writeToTerminal(sessionId, `printf '\\n\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n\\033[1;32m  Welcome to Shelly\\033[0m\\n\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n\\n  Your terminal is ready. Let\\'s install AI coding tools.\\n  Each step is optional — press \\033[33mCtrl+C\\033[0m to skip any install.\\n\\n\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n\\n'`);
   await sleep(500);
 
   // Step 1: Check what's already installed
-  await writeToTerminal(sessionId, 'echo "\\x1b[1;33m[1/3]\\x1b[0m Checking installed tools..."');
+  await writeToTerminal(sessionId, `printf '\\033[1;33m[1/3]\\033[0m Checking installed tools...\\n'`);
   await sleep(300);
   await writeToTerminal(sessionId, 'which claude 2>/dev/null && echo "  ✓ Claude Code already installed" || echo "  ✗ Claude Code not found"');
   await sleep(300);
@@ -77,7 +70,7 @@ export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
 
   // Step 2: Install Gemini CLI (free, recommended)
   await writeToTerminal(sessionId, 'echo ""');
-  await writeToTerminal(sessionId, 'echo "\\x1b[1;33m[2/3]\\x1b[0m Installing Gemini CLI (free)..."');
+  await writeToTerminal(sessionId, `printf '\\033[1;33m[2/3]\\033[0m Installing Gemini CLI (free)...\\n'`);
   await writeToTerminal(sessionId, 'echo "  Press Ctrl+C to skip"');
   await sleep(300);
   await writeToTerminal(sessionId, 'which gemini >/dev/null 2>&1 || npm install -g @google/gemini-cli');
@@ -85,28 +78,14 @@ export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
 
   // Step 3: Install Claude Code
   await writeToTerminal(sessionId, 'echo ""');
-  await writeToTerminal(sessionId, 'echo "\\x1b[1;33m[3/3]\\x1b[0m Installing Claude Code..."');
+  await writeToTerminal(sessionId, `printf '\\033[1;33m[3/3]\\033[0m Installing Claude Code...\\n'`);
   await writeToTerminal(sessionId, 'echo "  Press Ctrl+C to skip"');
   await sleep(300);
   await writeToTerminal(sessionId, 'which claude >/dev/null 2>&1 || npm install -g @anthropic-ai/claude-code');
   await sleep(500);
 
   // Done
-  await writeToTerminal(sessionId, 'echo ""');
-  await writeToTerminal(sessionId, `echo "${escapeForEcho(`
-\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m
-\x1b[1;32m  Setup complete!\x1b[0m
-
-  To authenticate:
-    \x1b[33mclaude auth login\x1b[0m
-    \x1b[33mgemini auth login\x1b[0m
-
-  To start coding:
-    \x1b[33mclaude\x1b[0m  or  \x1b[33mgemini\x1b[0m
-
-  Run \x1b[33mshelly setup\x1b[0m anytime to re-run this setup.
-\x1b[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\x1b[0m
-`)}"`);
+  await writeToTerminal(sessionId, `printf '\\n\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n\\033[1;32m  Setup complete!\\033[0m\\n\\n  To authenticate:\\n    \\033[33mclaude auth login\\033[0m\\n    \\033[33mgemini auth login\\033[0m\\n\\n  To start coding:\\n    \\033[33mclaude\\033[0m  or  \\033[33mgemini\\033[0m\\n\\n  Run \\033[33mshelly setup\\033[0m anytime to re-run this setup.\\n\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n\\n'`);
 
   // Mark complete
   await markSetupComplete();
@@ -121,11 +100,6 @@ async function writeToTerminal(sessionId: string, command: string): Promise<void
   } catch (e) {
     logInfo('FirstLaunchSetup', 'writeToSession failed: ' + e);
   }
-}
-
-function escapeForEcho(text: string): string {
-  // Escape double quotes and backslashes for bash echo
-  return text.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
 }
 
 function sleep(ms: number): Promise<void> {
