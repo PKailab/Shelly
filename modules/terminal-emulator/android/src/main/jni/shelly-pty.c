@@ -189,11 +189,42 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
             /* non-fatal, fall through */
         }
 
-        /* execve via linker64 */
+        /* Write .bashrc with correct PATH if it doesn't exist or is outdated */
+        {
+            char bashrcPath[1024];
+            snprintf(bashrcPath, sizeof(bashrcPath), "%s/.bashrc", homePath);
+
+            char pathVal[2048];
+            char *pathEnv = getenv("PATH");
+            if (pathEnv) {
+                snprintf(pathVal, sizeof(pathVal), "%s", pathEnv);
+            }
+
+            char npmPrefix[1024];
+            char *npmEnv = getenv("NPM_CONFIG_PREFIX");
+            if (npmEnv) {
+                snprintf(npmPrefix, sizeof(npmPrefix), "%s", npmEnv);
+            }
+
+            FILE *rc = fopen(bashrcPath, "w");
+            if (rc) {
+                fprintf(rc, "# Shelly auto-generated — do not edit\n");
+                fprintf(rc, "export PATH=\"%s\"\n", pathVal);
+                fprintf(rc, "export LD_LIBRARY_PATH=\"%s\"\n", ldLibPath);
+                if (npmEnv) {
+                    fprintf(rc, "export NPM_CONFIG_PREFIX=\"%s\"\n", npmPrefix);
+                }
+                fprintf(rc, "export PS1='shelly:~$ '\n");
+                fclose(rc);
+            }
+        }
+
+        /* execve via linker64 — no --login to avoid /etc/profile overwriting PATH */
         char *argv[] = {
             (char *)linkerPath,
             (char *)bashPath,
-            "--login",
+            "--rcfile",
+            ".bashrc",
             NULL
         };
         extern char **environ;

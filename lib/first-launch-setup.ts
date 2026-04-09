@@ -42,10 +42,8 @@ export async function resetSetup(): Promise<void> {
  * CLIs are pre-installed — just tell the user they're ready.
  */
 export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
-  // TODO: remove debug bypass after CLI launch is confirmed working
   const done = await isSetupComplete();
-  // Temporarily always show for debugging
-  // if (done) return;
+  if (done) return;
 
   logInfo('FirstLaunchSetup', 'Showing MOTD on session ' + sessionId);
 
@@ -56,14 +54,8 @@ export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
   const preinstalled = t('motd.cli_preinstalled');
   const loginPrompt = t('motd.login_prompt');
 
-  // Debug: show PATH and check launchers
-  await writeToTerminal(sessionId, 'echo "DEBUG PATH=$PATH"');
-  await sleep(200);
-  await writeToTerminal(sessionId, 'ls -la $(echo $PATH | tr ":" "\\n" | head -1)/claude 2>&1');
-  await sleep(200);
-  await writeToTerminal(sessionId, 'type claude 2>&1');
-  await sleep(200);
-  await writeToTerminal(sessionId, 'cat $(echo $PATH | tr ":" "\\n" | head -1)/claude 2>&1');
+  // Clear screen before MOTD
+  await writeToTerminal(sessionId, 'clear');
   await sleep(300);
 
   // Build MOTD with ANSI colors via printf
