@@ -126,6 +126,15 @@ class TerminalViewModule : Module() {
         AsyncFunction("scrollToRow") { viewTag: Int, row: Int ->
             findView(viewTag)?.scrollToRowCommand(row)
         }
+
+        AsyncFunction("refreshScreen") { viewTag: Int ->
+            findView(viewTag)?.let { view ->
+                view.post {
+                    view.onScreenUpdated()
+                    view.invalidate()
+                }
+            }
+        }
     }
 
     private fun findView(viewTag: Int): ShellyTerminalView? {

@@ -325,6 +325,13 @@ export default function TerminalScreen() {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         ensureNativeSessions();
+        // Force redraw terminal content after app resume
+        setTimeout(() => {
+          const tag = findNodeHandle(terminalViewRef.current);
+          if (tag) {
+            TerminalViewModule.refreshScreen(tag);
+          }
+        }, 200);
       }
     });
     return () => sub.remove();
