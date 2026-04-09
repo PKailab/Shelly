@@ -215,11 +215,12 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
                     fprintf(rc, "export NPM_CONFIG_PREFIX=\"%s\"\n", npmPrefix);
                 }
                 fprintf(rc, "export PS1='shelly:~$ '\n");
-                /* CLI aliases — avoids shebang/interpreter permission issues on Android */
-                fprintf(rc, "claude() { node \"%s/node_modules/@anthropic-ai/claude-code/cli.js\" \"$@\"; }\n", ldLibPath);
-                fprintf(rc, "gemini() { node \"%s/node_modules/@google/gemini-cli/bundle/gemini.js\" \"$@\"; }\n", ldLibPath);
-                fprintf(rc, "codex() { node \"%s/node_modules/@openai/codex/bin/codex.js\" \"$@\"; }\n", ldLibPath);
-                fprintf(rc, "export -f claude gemini codex\n");
+                /* CLI functions — must use linker64 to exec node on Android */
+                fprintf(rc, "claude() { /system/bin/linker64 \"%s/node\" \"%s/node_modules/@anthropic-ai/claude-code/cli.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
+                fprintf(rc, "gemini() { /system/bin/linker64 \"%s/node\" \"%s/node_modules/@google/gemini-cli/bundle/gemini.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
+                fprintf(rc, "codex() { /system/bin/linker64 \"%s/node\" \"%s/node_modules/@openai/codex/bin/codex.js\" \"$@\"; }\n", ldLibPath, ldLibPath);
+                fprintf(rc, "node() { /system/bin/linker64 \"%s/node\" \"$@\"; }\n", ldLibPath);
+                fprintf(rc, "export -f claude gemini codex node\n");
                 fclose(rc);
             }
         }
