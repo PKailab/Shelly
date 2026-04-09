@@ -159,15 +159,15 @@ object LibExtractor {
     /** Create a shell launcher script for a Node.js CLI tool */
     private fun createCliLauncher(libDir: File, name: String, relPath: String) {
         val launcher = File(libDir, name)
-        if (launcher.exists()) return
         val script = File(libDir, relPath)
         if (!script.exists()) {
-            Log.w(TAG, "CLI entry point not found: $relPath")
+            Log.w(TAG, "CLI entry point not found: ${script.absolutePath}")
             return
         }
-        launcher.writeText("#!/bin/sh\nexec node \"${script.absolutePath}\" \"$@\"\n")
+        val nodePath = File(libDir, "node").absolutePath
+        launcher.writeText("#!/system/bin/sh\nexec /system/bin/linker64 \"$nodePath\" \"${script.absolutePath}\" \"$@\"\n")
         launcher.setExecutable(true, false)
-        Log.i(TAG, "CLI launcher created: $name → $relPath")
+        Log.i(TAG, "CLI launcher: $name → ${script.absolutePath} (exists=${launcher.exists()}, exec=${launcher.canExecute()}, size=${launcher.length()})")
     }
 
     /** Try .tar first (aapt strips .gz), fall back to .tar.gz */

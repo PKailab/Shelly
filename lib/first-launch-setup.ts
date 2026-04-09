@@ -54,6 +54,10 @@ export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
   const preinstalled = t('motd.cli_preinstalled');
   const loginPrompt = t('motd.login_prompt');
 
+  // Clear any stale prompt then show MOTD
+  await writeToTerminal(sessionId, 'clear');
+  await sleep(300);
+
   // Build MOTD with ANSI colors via printf
   const motd = [
     '',
