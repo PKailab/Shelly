@@ -282,22 +282,7 @@ export default function TerminalScreen() {
     try {
       for (const session of sessions) {
         if (session.sessionStatus === 'starting' || session.sessionStatus === 'alive') {
-          // In MultiPane context, the tab-side instance already owns the Kotlin session.
-          if (isRenderedInMultiPane) {
-            try {
-              const alive = await TerminalEmulator.isSessionAlive(session.nativeSessionId);
-              if (alive) {
-                useTerminalStore.setState((state) => ({
-                  sessions: state.sessions.map((s) =>
-                    s.id === session.id ? { ...s, sessionStatus: 'alive' as const, isAlive: true } : s
-                  ),
-                }));
-                continue;
-              }
-            } catch {}
-            continue;
-          }
-
+          // Check if session is already alive (works in both MultiPane and tab contexts)
           try {
             const alive = await TerminalEmulator.isSessionAlive(session.nativeSessionId);
             if (alive) {
@@ -310,10 +295,10 @@ export default function TerminalScreen() {
             }
           } catch {}
 
-          console.log('[Terminal] ensureNativeSessions: session not alive, re-creating:', session.nativeSessionId);
+          // Session not alive — create it regardless of MultiPane context
+          console.log('[Terminal] ensureNativeSessions: session not alive, creating:', session.nativeSessionId);
           await createNativeSession(session);
         } else if (session.sessionStatus === 'exited') {
-          if (isRenderedInMultiPane) continue;
           console.log('[Terminal] ensureNativeSessions: session exited, recovering:', session.nativeSessionId);
           await recoverSession(session);
         }
@@ -321,7 +306,7 @@ export default function TerminalScreen() {
     } finally {
       sessionMutexRef.current = false;
     }
-  }, [sessions, createNativeSession, recoverSession, isHiddenBehindMultiPane, isRenderedInMultiPane]);
+  }, [sessions, createNativeSession, recoverSession]);
 
   // Run on initial mount
   useEffect(() => {
