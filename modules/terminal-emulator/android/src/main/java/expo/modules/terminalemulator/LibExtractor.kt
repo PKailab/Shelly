@@ -144,7 +144,9 @@ object LibExtractor {
         extractTarGzAsset(context, "pip.tar.gz", sitePackages, "pip")
 
         // Extract bundled AI CLIs (Claude Code, Gemini CLI, Codex)
+        Log.i(TAG, "Attempting CLI tools extraction...")
         extractTarGzAsset(context, "cli-tools.tar.gz", libDir, "node_modules/@anthropic-ai/claude-code")
+        Log.i(TAG, "CLI tools extraction done, checking launchers...")
 
         // Create CLI launcher scripts in libDir so they're on PATH
         createCliLauncher(libDir, "claude", "node_modules/@anthropic-ai/claude-code/cli.js")
@@ -180,7 +182,12 @@ object LibExtractor {
     }
 
     private fun extractTarGzAsset(context: Context, assetName: String, destDir: File, checkDir: String) {
-        if (File(destDir, checkDir).exists()) return
+        val checkPath = File(destDir, checkDir)
+        if (checkPath.exists()) {
+            Log.i(TAG, "$assetName: already extracted (${checkPath.absolutePath} exists)")
+            return
+        }
+        Log.i(TAG, "$assetName: extracting (${checkPath.absolutePath} not found)")
         try {
             // aapt may strip .gz, so try both .tar and .tar.gz
             val baseName = assetName.removeSuffix(".gz")
