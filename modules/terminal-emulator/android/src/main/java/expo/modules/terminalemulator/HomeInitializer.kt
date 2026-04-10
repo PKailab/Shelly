@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 8
+    private const val BASHRC_VERSION = 9
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -89,21 +89,18 @@ object HomeInitializer {
             }
             sb.appendLine()
 
-            // Prompt: simple green \w + $ with OSC 133 markers for block detection
-            // Written via sb.append to avoid Kotlin/bash escape hell
-            // Target .bashrc content:
-            //   PS1='\[\e]133;A\a\]\[\033[1;32m\]\w\[\033[0m\]\$ \[\e]133;B\a\]'
-            //   PROMPT_COMMAND='builtin echo -ne "\033]133;D;$?\007"'
-            sb.appendLine("# Prompt")
-            sb.append("PS1='")
-            sb.append("\\[\\e]133;A\\a\\]")       // OSC 133 prompt start
-            sb.append("\\[\\033[1;32m\\]")         // green bold
-            sb.append("\\w")                        // working dir (~ shortening)
-            sb.append("\\[\\033[0m\\]")             // reset
-            sb.append("\\$ ")                       // $ or #
-            sb.append("\\[\\e]133;B\\a\\]")         // OSC 133 command start
-            sb.appendLine("'")
-            sb.appendLine("""PROMPT_COMMAND='echo -ne "\033]133;D;${'$'}?\007"'""")
+            // Prompt: PROMPT_COMMAND dynamically builds PS1 with HOME→~ replacement
+            // bash's \w doesn't shorten HOME when launched via linker64,
+            // so we do it manually in PROMPT_COMMAND
+            sb.appendLine("# Prompt with OSC 133 + dynamic HOME shortening")
+            sb.appendLine("__shelly_prompt() {")
+            sb.appendLine("  local ec=\$?")
+            sb.appendLine("  local d=\"\$(pwd)\"")
+            sb.appendLine("  d=\"\${d/#\$HOME/~}\"")
+            sb.appendLine("  echo -ne \"\\033]133;D;\${ec}\\007\"")
+            sb.appendLine("  PS1=\"\\[\\e]133;A\\a\\]\\[\\033[1;32m\\]\${d}\\[\\033[0m\\]\\\$ \\[\\e]133;B\\a\\]\"")
+            sb.appendLine("}")
+            sb.appendLine("PROMPT_COMMAND=__shelly_prompt")
 
             // MOTD — displayed once on first login, then flag file prevents repeat
             sb.appendLine()
