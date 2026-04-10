@@ -10,6 +10,7 @@ import { useSettingsStore } from '@/store/settings-store';
 import { onCommandComplete } from '@/lib/cli-notification';
 import { useSidebarStore } from '@/store/sidebar-store';
 import { useBrowserStore } from '@/store/browser-store';
+import { SessionInfoBar } from './SessionInfoBar';
 
 const ACCENT = '#00D4AA';
 const ZERO_INSETS = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -127,6 +128,16 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           <View style={styles.headerCenter}>
             <MaterialIcons name="data-usage" size={10} color="#6B7280" />
             <Text style={styles.tokenText}>42K / 1H</Text>
+            <Pressable style={styles.headerMiniBtn} hitSlop={4} onPress={() => {
+              import('@/hooks/use-native-exec').then((m) =>
+                m.execCommand('cd "$(pwd)" && git add -A && git commit -m "savepoint" 2>&1 | tail -3')
+              ).catch(() => {});
+            }}>
+              <MaterialIcons name="save" size={11} color="#6B7280" />
+            </Pressable>
+            <Pressable style={styles.headerMiniBtn} hitSlop={4}>
+              <MaterialIcons name="push-pin" size={11} color="#6B7280" />
+            </Pressable>
           </View>
         )}
 
@@ -173,6 +184,11 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
         </View>
       </View>
 
+      {/* Session info bar (terminal/AI panes only) */}
+      {(tab === 'terminal' || tab === 'ai') && (
+        <SessionInfoBar leafId={leafId} />
+      )}
+
       {/* Pane content */}
       <View style={styles.content}>
         <SafeAreaInsetsContext.Provider value={ZERO_INSETS}>
@@ -188,6 +204,36 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           </MultiPaneContext.Provider>
         </SafeAreaInsetsContext.Provider>
       </View>
+
+      {/* Floating action buttons (save + push) — terminal/AI panes */}
+      {(tab === 'terminal' || tab === 'ai') && (
+        <View style={styles.fabContainer}>
+          <Pressable
+            style={styles.fab}
+            onPress={() => {
+              // Auto-savepoint trigger
+              import('@/hooks/use-native-exec').then((m) =>
+                m.execCommand('cd "$(pwd)" && git add -A && git commit -m "savepoint" 2>&1 | tail -3')
+              ).catch(() => {});
+            }}
+            hitSlop={6}
+          >
+            <MaterialIcons name="save" size={16} color="#0A0A0A" />
+          </Pressable>
+          <Pressable
+            style={styles.fab}
+            onPress={() => {
+              // Quick git push
+              import('@/hooks/use-native-exec').then((m) =>
+                m.execCommand('cd "$(pwd)" && git add -A && git push 2>&1 | tail -3')
+              ).catch(() => {});
+            }}
+            hitSlop={6}
+          >
+            <MaterialIcons name="arrow-upward" size={16} color="#0A0A0A" />
+          </Pressable>
+        </View>
+      )}
 
       {/* Tab selector modal */}
       <PaneSelector
@@ -401,6 +447,11 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontWeight: '600',
   },
+  headerMiniBtn: {
+    padding: 2,
+    borderRadius: 2,
+    marginLeft: 2,
+  },
   browserNav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -450,6 +501,27 @@ const styles = StyleSheet.create({
   },
   hidden: {
     display: 'none',
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 50,
+  },
+  fab: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });
 

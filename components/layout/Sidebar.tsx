@@ -26,6 +26,14 @@ const WIDTH_HIDDEN = 0;
 const TIMING_MS = 200;
 const ACCENT = '#00D4AA';
 
+function formatTimeAgo(ts: number): string {
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return `${diff}S AGO`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}M AGO`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}H AGO`;
+  return `${Math.floor(diff / 86400)}D AGO`;
+}
+
 const QUICK_FOLDERS = [
   { label: '~/', path: '~/', icon: 'home' },
   { label: 'DCIM', path: '~/storage/dcim', icon: 'photo-camera' },
@@ -47,8 +55,33 @@ export function Sidebar() {
   const { mode, openSections, toggleSection, activeRepoPath, repoPaths, setActiveRepo, setMode, addRepo } =
     useSidebarStore();
   const agents = useAgentStore((s) => s.agents);
+  const runHistory = useAgentStore((s) => s.runHistory);
   const [addRepoVisible, setAddRepoVisible] = useState(false);
   const [repoInput, setRepoInput] = useState('');
+
+  // Derive recent completed tasks from run history
+  const recentTasks = React.useMemo(() => {
+    const allLogs: Array<{ id: string; name: string; timestamp: number }> = [];
+    for (const [agentId, logs] of Object.entries(runHistory)) {
+      const agent = agents.find((a) => a.id === agentId);
+      for (const log of logs) {
+        if (log.status === 'success' || log.status === 'error') {
+          allLogs.push({
+            id: `${agentId}-${log.timestamp}`,
+            name: agent?.name ?? agentId,
+            timestamp: log.timestamp,
+          });
+        }
+      }
+    }
+    return allLogs
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 5)
+      .map((log) => ({
+        ...log,
+        age: formatTimeAgo(log.timestamp),
+      }));
+  }, [runHistory, agents]);
 
   const runningAgents = agents.filter((a) => a.enabled);
 
@@ -85,21 +118,35 @@ export function Sidebar() {
           badge={runningAgents.length}
           iconsOnly={iconsOnly}
         >
-          {runningAgents.length === 0 ? (
+          {runningAgents.length === 0 && recentTasks.length === 0 ? (
             <Text style={styles.emptyText}>No running tasks</Text>
           ) : (
-            runningAgents.map((agent) => (
-              <View key={agent.id} style={styles.taskRow}>
-                <View style={styles.taskInfo}>
-                  <Text style={styles.taskName} numberOfLines={1}>
-                    {agent.name.toUpperCase()}
-                  </Text>
+            <>
+              {runningAgents.map((agent) => (
+                <View key={agent.id} style={styles.taskRow}>
+                  <View style={[styles.taskDot, { backgroundColor: '#EF4444' }]} />
+                  <View style={styles.taskInfo}>
+                    <Text style={styles.taskName} numberOfLines={1}>
+                      {agent.name.toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
+                    <Text style={[styles.statusBadgeText, { color: '#EF4444' }]}>RUNNING</Text>
+                  </View>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: 'rgba(0,212,170,0.15)' }]}>
-                  <Text style={[styles.statusBadgeText, { color: ACCENT }]}>RUNNING</Text>
+              ))}
+              {recentTasks.map((task) => (
+                <View key={task.id} style={styles.taskRow}>
+                  <MaterialIcons name="check-circle" size={10} color={ACCENT} />
+                  <View style={styles.taskInfo}>
+                    <Text style={styles.taskName} numberOfLines={1}>
+                      {task.name.toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.taskAge}>{task.age}</Text>
                 </View>
-              </View>
-            ))
+              ))}
+            </>
           )}
         </SidebarSection>
 
@@ -358,10 +405,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 5,
-    gap: 8,
+    gap: 6,
+  },
+  taskDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   taskInfo: {
     flex: 1,
+  },
+  taskAge: {
+    fontSize: 8,
+    fontFamily: 'monospace',
+    fontWeight: '600',
+    color: '#6B7280',
+    letterSpacing: 0.3,
   },
   taskName: {
     fontSize: 10,

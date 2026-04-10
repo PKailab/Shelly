@@ -82,13 +82,17 @@ export function FileTree() {
   return (
     <View style={styles.container}>
       {/* Search */}
-      <TextInput
-        style={[styles.search, { color: c.foreground, borderColor: c.border }]}
-        placeholder="Search files..."
-        placeholderTextColor={c.muted}
-        value={search}
-        onChangeText={setSearch}
-      />
+      <View style={styles.searchRow}>
+        <MaterialIcons name="search" size={12} color="#6B7280" />
+        <TextInput
+          style={[styles.search, { color: c.foreground }]}
+          placeholder="SEARCH FILES..."
+          placeholderTextColor="#6B7280"
+          value={search}
+          onChangeText={setSearch}
+        />
+        <MaterialIcons name="edit" size={11} color="#6B7280" />
+      </View>
 
       {/* Breadcrumb */}
       {cwd !== repoPath && (
@@ -126,15 +130,25 @@ const styles = StyleSheet.create({
     flex: 1,
     maxHeight: 300,
   },
-  search: {
-    height: 28,
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: 8,
     marginBottom: 4,
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    fontSize: 11,
+    paddingHorizontal: 6,
+    height: 24,
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#1A1A1A',
+  },
+  search: {
+    flex: 1,
+    height: 24,
+    fontSize: 10,
     fontFamily: 'monospace',
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    padding: 0,
   },
   breadcrumb: {
     flexDirection: 'row',
