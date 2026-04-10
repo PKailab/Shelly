@@ -45,44 +45,12 @@ export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
   const done = await isSetupComplete();
   if (done) return;
 
-  logInfo('FirstLaunchSetup', 'Showing MOTD on session ' + sessionId);
+  logInfo('FirstLaunchSetup', 'MOTD now handled by .bashrc — marking complete');
 
-  // Wait for shell prompt to appear
-  await sleep(1000);
-
-  const welcome = t('motd.welcome');
-  const preinstalled = t('motd.cli_preinstalled');
-  const loginPrompt = t('motd.login_prompt');
-
-  // Clear screen before MOTD
-  await writeToTerminal(sessionId, 'clear');
-  await sleep(300);
-
-  // Write MOTD using builtin printf (coreutils printf breaks ANSI escapes)
-  const L = (s: string) => writeToTerminal(sessionId, `builtin printf '%b\\n' '${s}'`);
-  const B = '\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m';
-  await L('');
-  await L(B);
-  await L(`\\033[1;32m  ${welcome}\\033[0m`);
-  await L(B);
-  await L('');
-  await L(`  ${preinstalled}`);
-  await L('');
-  await L('    \\033[33mclaude\\033[0m    — Claude Code (Anthropic)');
-  await L('    \\033[33mgemini\\033[0m    — Gemini CLI  (Google)');
-  await L('    \\033[33mcodex\\033[0m     — Codex CLI   (OpenAI)');
-  await L('');
-  await L(`  ${loginPrompt}`);
-  await L('');
-  await L('    \\033[90m$\\033[0m claude auth login');
-  await L('    \\033[90m$\\033[0m gemini auth login');
-  await L('');
-  await L(B);
-  await L('');
-
-  // Mark complete
+  // MOTD is now displayed by .bashrc on first launch (checks ~/.shelly_motd_shown)
+  // This function just marks the TS-side flag as complete
   await markSetupComplete();
-  logInfo('FirstLaunchSetup', 'MOTD shown, flag saved');
+  logInfo('FirstLaunchSetup', 'Setup flag saved');
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

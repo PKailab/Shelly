@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 7
+    private const val BASHRC_VERSION = 8
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -89,13 +89,46 @@ object HomeInitializer {
             }
             sb.appendLine()
 
-            // OSC 133 for command block detection
-            sb.appendLine("# OSC 133 for command block detection")
-            // Use custom prompt that manually shortens HOME to ~
-            // (\w may show full path if HOME isn't set before bash initializes)
-            sb.appendLine("__shelly_cwd() { local d=\"\\\$(pwd)\"; echo \"\\\${d/#\\\$HOME/\\~}\"; }")
-            sb.appendLine("PS1='\\[\\e]133;A\\a\\]\\[\\033[1;32m\\]\\\$(__shelly_cwd)\\[\\033[0m\\]\\\$ \\[\\e]133;B\\a\\]'")
-            sb.appendLine("PROMPT_COMMAND='builtin echo -ne \"\\033]133;D;\\\$?\\007\"'")
+            // Prompt: simple green \w + $ with OSC 133 markers for block detection
+            // Written via sb.append to avoid Kotlin/bash escape hell
+            // Target .bashrc content:
+            //   PS1='\[\e]133;A\a\]\[\033[1;32m\]\w\[\033[0m\]\$ \[\e]133;B\a\]'
+            //   PROMPT_COMMAND='builtin echo -ne "\033]133;D;$?\007"'
+            sb.appendLine("# Prompt")
+            sb.append("PS1='")
+            sb.append("\\[\\e]133;A\\a\\]")       // OSC 133 prompt start
+            sb.append("\\[\\033[1;32m\\]")         // green bold
+            sb.append("\\w")                        // working dir (~ shortening)
+            sb.append("\\[\\033[0m\\]")             // reset
+            sb.append("\\$ ")                       // $ or #
+            sb.append("\\[\\e]133;B\\a\\]")         // OSC 133 command start
+            sb.appendLine("'")
+            sb.appendLine("""PROMPT_COMMAND='builtin echo -ne "\033]133;D;${'$'}?\007"'""")
+
+            // MOTD — displayed once on first login, then flag file prevents repeat
+            sb.appendLine()
+            sb.appendLine("# Welcome MOTD (first launch only)")
+            sb.appendLine("if [ ! -f \"\$HOME/.shelly_motd_shown\" ]; then")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  builtin printf '\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n'")
+            sb.appendLine("  builtin printf '\\033[1;32m  Shelly へようこそ\\033[0m\\n'")
+            sb.appendLine("  builtin printf '\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n'")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  builtin printf '  以下のCLIツールがインストール済みです:\\n'")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  builtin printf '    \\033[33mclaude\\033[0m    — Claude Code (Anthropic)\\n'")
+            sb.appendLine("  builtin printf '    \\033[33mgemini\\033[0m    — Gemini CLI  (Google)\\n'")
+            sb.appendLine("  builtin printf '    \\033[33mcodex\\033[0m     — Codex CLI   (OpenAI)\\n'")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  builtin printf '  お持ちのアカウントでログインしてください:\\n'")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  builtin printf '    \\033[90m\$\\033[0m claude auth login\\n'")
+            sb.appendLine("  builtin printf '    \\033[90m\$\\033[0m gemini auth login\\n'")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  builtin printf '\\033[36m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\\033[0m\\n'")
+            sb.appendLine("  builtin printf '\\n'")
+            sb.appendLine("  touch \"\$HOME/.shelly_motd_shown\"")
+            sb.appendLine("fi")
 
             bashrc.writeText(sb.toString())
             versionFile.writeText(BASHRC_VERSION.toString())
