@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 10
+    private const val BASHRC_VERSION = 11
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -94,7 +94,7 @@ object HomeInitializer {
             // so we do it manually in PROMPT_COMMAND
             sb.appendLine("# Prompt with OSC 133 + dynamic HOME shortening")
             sb.appendLine("# Resolve real HOME path once (symlink: /data/user/0 vs /data/data)")
-            sb.appendLine("SHELLY_HOME_REAL=\"\$(cd \"\$HOME\" && pwd -P)\"")
+            sb.appendLine("SHELLY_HOME_REAL=\$(cd \$HOME && pwd -P)")
             sb.appendLine("__shelly_prompt() {")
             sb.appendLine("  local ec=\$?")
             sb.appendLine("  local d=\"\$(pwd -P)\"")
