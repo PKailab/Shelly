@@ -355,13 +355,16 @@ public class TerminalView extends View {
 
             private void eraseComposingFromPty() {
                 if (mLastComposingSent.isEmpty()) return;
-                // Send one DEL per Unicode code point (not per Java char)
+                // Send one DEL (0x7F) per Unicode code point directly to the terminal
+                // session — NOT via sendKeyEvent which dispatches asynchronously through
+                // the Android input pipeline and can race with subsequent text writes.
                 int codePointCount = mLastComposingSent.codePointCount(0, mLastComposingSent.length());
                 Log.d("ShellyIME", "eraseComposing DEL×" + codePointCount + " for=\"" + mLastComposingSent + "\"");
-                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
+                StringBuilder delSeq = new StringBuilder(codePointCount);
                 for (int i = 0; i < codePointCount; i++) {
-                    sendKeyEvent(deleteKey);
+                    delSeq.append('\u007F');
                 }
+                sendTextToTerminal(delSeq);
                 mLastComposingSent = "";
             }
 
@@ -461,9 +464,15 @@ public class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
-                // The stock Samsung keyboard with 'Auto check spelling' enabled sends leftLength > 1.
-                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < leftLength; i++) sendKeyEvent(deleteKey);
+                // Send DEL (0x7F) directly to the terminal session to avoid async
+                // race conditions with sendKeyEvent dispatching through the input pipeline.
+                if (leftLength > 0) {
+                    StringBuilder delSeq = new StringBuilder(leftLength);
+                    for (int i = 0; i < leftLength; i++) {
+                        delSeq.append('\u007F');
+                    }
+                    sendTextToTerminal(delSeq);
+                }
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
 

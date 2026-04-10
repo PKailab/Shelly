@@ -114,7 +114,14 @@ class TerminalEmulatorModule : Module() {
             val session = sessions.remove(sessionId)
                 ?: throw IllegalArgumentException("Session $sessionId not found")
             session.destroy()
-            if (sessions.isEmpty()) releaseWakeLock()
+            if (sessions.isEmpty()) {
+                releaseWakeLock()
+                // Stop foreground service when no sessions remain
+                val context = appContext.reactContext
+                if (context != null) {
+                    context.stopService(Intent(context, TerminalSessionService::class.java))
+                }
+            }
         }
 
         AsyncFunction("writeToSession") { sessionId: String, data: String ->
@@ -165,10 +172,7 @@ class TerminalEmulatorModule : Module() {
 
         AsyncFunction("startSessionService") {
             val context = appContext.reactContext ?: return@AsyncFunction null
-            val serviceClass = Class.forName(
-                context.packageName + ".TerminalSessionService"
-            )
-            val intent = Intent(context, serviceClass)
+            val intent = Intent(context, TerminalSessionService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -179,20 +183,14 @@ class TerminalEmulatorModule : Module() {
 
         AsyncFunction("stopSessionService") {
             val context = appContext.reactContext ?: return@AsyncFunction null
-            val serviceClass = Class.forName(
-                context.packageName + ".TerminalSessionService"
-            )
-            context.stopService(Intent(context, serviceClass))
+            context.stopService(Intent(context, TerminalSessionService::class.java))
             null
         }
 
         AsyncFunction("updateSessionNotification") { info: String ->
             val context = appContext.reactContext ?: return@AsyncFunction null
-            val serviceClass = Class.forName(
-                context.packageName + ".TerminalSessionService"
-            )
-            val intent = Intent(context, serviceClass).apply {
-                action = "space.manus.shelly.terminal.UPDATE_NOTIFICATION"
+            val intent = Intent(context, TerminalSessionService::class.java).apply {
+                action = TerminalSessionService.ACTION_UPDATE_NOTIFICATION
                 putExtra("session_info", info)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

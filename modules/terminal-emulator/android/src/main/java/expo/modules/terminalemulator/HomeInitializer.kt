@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 5
+    private const val BASHRC_VERSION = 6
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -39,14 +39,15 @@ object HomeInitializer {
         if (!bashrc.exists() || currentVersion < BASHRC_VERSION) {
             val sb = StringBuilder()
 
-            // Environment
+            // Environment — preserve PATH/LD_LIBRARY_PATH if already set by
+            // shelly-pty.c (which includes lib dir, npm bins, etc.)
             sb.appendLine("export HOME=\"${home.absolutePath}\"")
             sb.appendLine("export TERM=xterm-256color")
             sb.appendLine("export COLORTERM=truecolor")
             sb.appendLine("export LANG=en_US.UTF-8")
             sb.appendLine("export SHELL=\"$libDir/libbash.so\"")
-            sb.appendLine("export PATH=\"/system/bin:/vendor/bin\"")
-            sb.appendLine("export LD_LIBRARY_PATH=\"$libDir\"")
+            sb.appendLine("export PATH=\"\${PATH:-$libDir:/system/bin:/vendor/bin}\"")
+            sb.appendLine("export LD_LIBRARY_PATH=\"\${LD_LIBRARY_PATH:-$libDir}\"")
             sb.appendLine()
 
             // Linker64 helper function
@@ -68,6 +69,14 @@ object HomeInitializer {
             sb.appendLine("rg() { _run $libDir/rg \"\$@\"; }")
             sb.appendLine("jq() { _run $libDir/jq \"\$@\"; }")
             sb.appendLine("sqlite3() { _run $libDir/sqlite3 \"\$@\"; }")
+            sb.appendLine()
+
+            // AI CLI tools (node-based)
+            sb.appendLine("# AI CLI tools")
+            sb.appendLine("claude() { _run $libDir/node $libDir/node_modules/@anthropic-ai/claude-code/cli.js \"\$@\"; }")
+            sb.appendLine("gemini() { _run $libDir/node $libDir/node_modules/@google/gemini-cli/bundle/gemini.js \"\$@\"; }")
+            sb.appendLine("codex() { _run $libDir/node $libDir/node_modules/@openai/codex/bin/codex.js \"\$@\"; }")
+            sb.appendLine("export -f claude gemini codex")
             sb.appendLine()
 
             // Coreutils: use --coreutils-prog=NAME to select applet

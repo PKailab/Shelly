@@ -66,6 +66,7 @@ const config: ExpoConfig & { android?: any } = {
     "expo-router",
     "./plugins/with-multi-window",
     "./plugins/with-android-security",
+    "./plugins/with-terminal-service",
     [
       "expo-audio",
       {
