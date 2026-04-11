@@ -20,7 +20,7 @@ object HomeInitializer {
     )
 
     /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 12
+    private const val BASHRC_VERSION = 13
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -30,6 +30,14 @@ object HomeInitializer {
         val libDir = LibExtractor.getLibDir(context).absolutePath
 
         File(home, "projects").mkdirs()
+
+        // Create ~/bin/ with proot wrapper for codex.js spawn() calls
+        val binDir = File(home, "bin")
+        binDir.mkdirs()
+        val prootWrapper = File(binDir, "proot")
+        // Always regenerate to keep in sync with lib path
+        prootWrapper.writeText("#!/system/bin/sh\nexec /system/bin/linker64 $libDir/libproot.so \"\$@\"\n")
+        prootWrapper.setExecutable(true, false)
 
         // Regenerate .bashrc if version changed
         val bashrc = File(home, ".bashrc")
@@ -46,7 +54,7 @@ object HomeInitializer {
             sb.appendLine("export COLORTERM=truecolor")
             sb.appendLine("export LANG=en_US.UTF-8")
             sb.appendLine("export SHELL=\"$libDir/libbash.so\"")
-            sb.appendLine("export PATH=\"\${PATH:-$libDir:/system/bin:/vendor/bin}\"")
+            sb.appendLine("export PATH=\"${home.absolutePath}/bin:\${PATH:-$libDir:/system/bin:/vendor/bin}\"")
             sb.appendLine("export LD_LIBRARY_PATH=\"\${LD_LIBRARY_PATH:-$libDir}\"")
             sb.appendLine()
 
@@ -71,11 +79,17 @@ object HomeInitializer {
             sb.appendLine("sqlite3() { _run $libDir/sqlite3 \"\$@\"; }")
             sb.appendLine()
 
-            // AI CLI tools (node-based)
-            sb.appendLine("# AI CLI tools")
-            sb.appendLine("claude() { _run $libDir/node $libDir/node_modules/@anthropic-ai/claude-code/cli.js \"\$@\"; }")
-            sb.appendLine("gemini() { _run $libDir/node $libDir/node_modules/@google/gemini-cli/bundle/gemini.js \"\$@\"; }")
-            sb.appendLine("codex() { _run $libDir/node $libDir/node_modules/@openai/codex/bin/codex.js \"\$@\"; }")
+            // AI CLI tools — use updated CLIs ($HOME/.shelly-cli) if available, else bundled
+            sb.appendLine("# AI CLI tools (with auto-update support)")
+            sb.appendLine("__shelly_cli_dir=\"\$HOME/.shelly-cli\"")
+            sb.appendLine("if [ -d \"\$__shelly_cli_dir/node_modules\" ]; then")
+            sb.appendLine("  __cli_dir=\"\$__shelly_cli_dir/node_modules\"")
+            sb.appendLine("else")
+            sb.appendLine("  __cli_dir=\"$libDir/node_modules\"")
+            sb.appendLine("fi")
+            sb.appendLine("claude() { _run $libDir/node \"\$__cli_dir/@anthropic-ai/claude-code/cli.js\" \"\$@\"; }")
+            sb.appendLine("gemini() { _run $libDir/node \"\$__cli_dir/@google/gemini-cli/bundle/gemini.js\" \"\$@\"; }")
+            sb.appendLine("codex() { _run $libDir/node \"\$__cli_dir/@openai/codex/bin/codex.js\" \"\$@\"; }")
             sb.appendLine("export -f claude gemini codex")
             sb.appendLine()
 
@@ -87,6 +101,27 @@ object HomeInitializer {
                 if (applet in bashBuiltins) continue
                 sb.appendLine("$applet() { _run $libDir/coreutils --coreutils-prog=$applet \"\$@\"; }")
             }
+            sb.appendLine()
+
+            // CLI auto-update (background, once per day)
+            // Placed after coreutils so date/cat functions are available
+            sb.appendLine("# Auto-update CLI tools (background, once per day)")
+            sb.appendLine("__shelly_update_marker=\"\$HOME/.shelly_last_update\"")
+            sb.appendLine("__shelly_update_interval=86400")
+            sb.appendLine("__shelly_now=\$(date +%s 2>/dev/null || printf '%(%s)T' -1 2>/dev/null || echo 0)")
+            sb.appendLine("__shelly_last_update=\$(cat \"\$__shelly_update_marker\" 2>/dev/null || echo 0)")
+            sb.appendLine("if [ \$(( __shelly_now - __shelly_last_update )) -ge \$__shelly_update_interval ]; then")
+            sb.appendLine("  (")
+            sb.appendLine("    mkdir -p \"\$__shelly_cli_dir\"")
+            sb.appendLine("    _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js install --prefix \"\$__shelly_cli_dir\" @anthropic-ai/claude-code@latest @google/gemini-cli@latest @openai/codex@latest 2>/dev/null")
+            sb.appendLine("    # Patch codex.js to use proot for ET_EXEC binary on Android")
+            sb.appendLine("    __codex_js=\"\$__shelly_cli_dir/node_modules/@openai/codex/bin/codex.js\"")
+            sb.appendLine("    if [ -f \"\$__codex_js\" ] && ! grep -q proot \"\$__codex_js\" 2>/dev/null; then")
+            sb.appendLine("      _run $libDir/coreutils --coreutils-prog=sed -i 's/spawn(binaryPath, process.argv.slice(2)/spawn(\"proot\", [binaryPath, ...process.argv.slice(2)]/' \"\$__codex_js\" 2>/dev/null")
+            sb.appendLine("    fi")
+            sb.appendLine("    echo \"\$__shelly_now\" > \"\$__shelly_update_marker\"")
+            sb.appendLine("  ) &>/dev/null &")
+            sb.appendLine("fi")
             sb.appendLine()
 
             // Prompt: PROMPT_COMMAND dynamically builds PS1 with HOME→~ replacement
