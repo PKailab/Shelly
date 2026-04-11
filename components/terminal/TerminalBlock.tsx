@@ -40,6 +40,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { SPRING_CONFIGS, TIMING_CONFIGS } from '@/hooks/use-motion';
 import { playSound } from '@/lib/sounds';
+import { parseAnsi, hasAnsiCodes } from '@/lib/ansi-parser';
 
 export { getOutputColor };
 
@@ -604,22 +605,31 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
               <View style={styles.outputBody}>
                 {block.output.length > 0 && (
                   <View style={styles.outputLines}>
-                    {block.output.map((line, i) => (
-                      <Text
-                        key={i}
-                        style={[
-                          styles.outputLine,
-                          {
-                            fontSize: fontSize - 1,
-                            lineHeight: lineHeightPx,
-                            color: getOutputColor(line.type, useHighContrast),
-                          },
-                        ]}
-                        selectable
-                      >
-                        {line.text}
-                      </Text>
-                    ))}
+                    {block.output.map((line, i) => {
+                      const baseColor = getOutputColor(line.type, useHighContrast);
+                      if (hasAnsiCodes(line.text)) {
+                        const segments = parseAnsi(line.text);
+                        return (
+                          <Text key={i} style={[styles.outputLine, { fontSize: fontSize - 1, lineHeight: lineHeightPx, color: baseColor }]} selectable>
+                            {segments.map((seg, j) => (
+                              <Text key={j} style={[
+                                seg.color ? { color: seg.color } : undefined,
+                                seg.bold ? { fontWeight: '700' } : undefined,
+                                seg.dim ? { opacity: 0.6 } : undefined,
+                                seg.underline ? { textDecorationLine: 'underline' as const } : undefined,
+                              ].filter(Boolean) as any}>
+                                {seg.text}
+                              </Text>
+                            ))}
+                          </Text>
+                        );
+                      }
+                      return (
+                        <Text key={i} style={[styles.outputLine, { fontSize: fontSize - 1, lineHeight: lineHeightPx, color: baseColor }]} selectable>
+                          {line.text}
+                        </Text>
+                      );
+                    })}
                   </View>
                 )}
                 <View style={styles.runningFooter}>
@@ -753,7 +763,18 @@ function TerminalBlockComponent({ block, fontSize, lineHeight, onRerun, onCancel
                                   </Text>
                                 );
                               })
-                            : line.text}
+                            : hasAnsiCodes(line.text)
+                              ? parseAnsi(line.text).map((seg, j) => (
+                                  <Text key={j} style={[
+                                    seg.color ? { color: seg.color } : undefined,
+                                    seg.bold ? { fontWeight: '700' } : undefined,
+                                    seg.dim ? { opacity: 0.6 } : undefined,
+                                    seg.underline ? { textDecorationLine: 'underline' as const } : undefined,
+                                  ].filter(Boolean) as any}>
+                                    {seg.text}
+                                  </Text>
+                                ))
+                              : line.text}
                         </Text>
                       );
                     })}
