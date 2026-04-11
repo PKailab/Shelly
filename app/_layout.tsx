@@ -9,6 +9,7 @@ import { AppState, View, Text, Pressable, StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
+import { useFonts } from "expo-font";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useSoundStore, unloadSounds } from "@/lib/sounds";
 import { loadAgentsFromDisk } from "@/lib/agent-manager";
@@ -16,6 +17,7 @@ import { useI18n } from '@/lib/i18n';
 import { useThemeStore } from '@/lib/theme-engine';
 import { useA11yStore } from '@/lib/accessibility';
 import { usePluginStore } from '@/lib/plugin-api';
+import { useSettingsStore } from '@/store/settings-store';
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   logError('ErrorBoundary', 'Uncaught error', error);
@@ -43,7 +45,27 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    'PixelMplus12': require('@/assets/fonts/PixelMplus12-Regular.ttf'),
+  });
+  const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'pixel');
   const loadSettings = useTerminalStore((s) => s.loadSettings);
+
+  // Override default Text fontFamily globally
+  useEffect(() => {
+    const fontFamily = uiFont === 'pixel' ? 'PixelMplus12' : 'monospace';
+    const defaultStyle = (Text as any).render;
+    if (defaultStyle) {
+      // Wrap Text.render to inject fontFamily
+    }
+    // Set defaultProps for all Text components
+    (Text as any).defaultProps = (Text as any).defaultProps || {};
+    (Text as any).defaultProps.style = {
+      ...((Text as any).defaultProps?.style || {}),
+      fontFamily,
+    };
+    logInfo('RootLayout', `UI font set to: ${fontFamily}`);
+  }, [uiFont, fontsLoaded]);
 
   useEffect(() => {
     logLifecycle('RootLayout', 'mounted');

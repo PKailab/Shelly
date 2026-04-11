@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#1A1A1A',
     paddingHorizontal: 8,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontSize: 11,
     color: '#E5E7EB',
   },
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     borderColor: '#333',
   },
   bookmarkLabel: {
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontSize: 9,
     fontWeight: '700',
     color: '#6B7280',
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A0A0A',
   },
   blankText: {
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontSize: 11,
     color: '#6B7280',
   },

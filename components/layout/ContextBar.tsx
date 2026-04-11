@@ -95,14 +95,14 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   text: {
     fontSize: 9,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '600',
     color: '#6B7280',
     letterSpacing: 0.3,
   },
   tagline: {
     fontSize: 8,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '600',
     color: '#333',
     letterSpacing: 0.5,

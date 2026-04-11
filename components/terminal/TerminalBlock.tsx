@@ -101,9 +101,9 @@ function RunningDots({ color }: { color: string }) {
 
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
-      <Animated.Text style={[{ color, fontSize: 14, fontFamily: 'monospace' }, s1]}>{'\u00B7'}</Animated.Text>
-      <Animated.Text style={[{ color, fontSize: 14, fontFamily: 'monospace' }, s2]}>{'\u00B7'}</Animated.Text>
-      <Animated.Text style={[{ color, fontSize: 14, fontFamily: 'monospace' }, s3]}>{'\u00B7'}</Animated.Text>
+      <Animated.Text style={[{ color, fontSize: 14, fontFamily: 'PixelMplus12' }, s1]}>{'\u00B7'}</Animated.Text>
+      <Animated.Text style={[{ color, fontSize: 14, fontFamily: 'PixelMplus12' }, s2]}>{'\u00B7'}</Animated.Text>
+      <Animated.Text style={[{ color, fontSize: 14, fontFamily: 'PixelMplus12' }, s3]}>{'\u00B7'}</Animated.Text>
     </View>
   );
 }
@@ -883,11 +883,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   prompt: {
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '700',
   },
   command: {
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     flex: 1,
     flexWrap: 'wrap',
   },
@@ -900,7 +900,7 @@ const styles = StyleSheet.create({
   },
   userTimestamp: {
     fontSize: 9,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
   termuxBadge: {
     paddingHorizontal: 4,
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
   termuxBadgeText: {
     fontSize: 8,
     fontWeight: '700',
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     letterSpacing: 0.5,
   },
   snippetStar: {
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
   exitText: {
     fontSize: 10,
     fontWeight: '600',
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
 
   // ─── Cancelled row ─────────────────────────────────────────────────────────
@@ -942,7 +942,7 @@ const styles = StyleSheet.create({
   },
   cancelledBannerText: {
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
 
   // ─── Output bubble (left-aligned, terminal style) ─────────────────────────
@@ -966,7 +966,7 @@ const styles = StyleSheet.create({
   terminalIconText: {
     fontSize: 9,
     fontWeight: '800',
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
   outputBubble: {
     flex: 1,
@@ -985,7 +985,7 @@ const styles = StyleSheet.create({
   },
   outputHeaderLabel: {
     fontSize: 9,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
   contentTypeLabel: {
     fontSize: 8,
     fontWeight: '700',
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
   },
@@ -1029,7 +1029,7 @@ const styles = StyleSheet.create({
   },
   viewToggleText: {
     fontSize: 9,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '600',
     letterSpacing: 0.3,
   },
@@ -1044,7 +1044,7 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   outputLine: {
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     flexWrap: 'wrap',
     minHeight: 0,
   },
@@ -1056,7 +1056,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   noOutputText: {
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontSize: 11,
     fontStyle: 'italic',
     paddingVertical: 2,
@@ -1070,7 +1070,7 @@ const styles = StyleSheet.create({
   },
   collapseText: {
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
 
   // ─── Running / Cancel ──────────────────────────────────────────────────────
@@ -1087,7 +1087,7 @@ const styles = StyleSheet.create({
   },
   runningLabel: {
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
   cancelButton: {
     paddingHorizontal: 10,
@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 11,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '600',
   },
 
@@ -1112,7 +1112,7 @@ const styles = StyleSheet.create({
   },
   feedbackText: {
     fontSize: 10,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
 
   // ─── LLM Interpret (left-aligned bubble) ──────────────────────────────────
@@ -1136,7 +1136,7 @@ const styles = StyleSheet.create({
   interpretAvatarText: {
     fontSize: 10,
     fontWeight: '800',
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
   interpretContainer: {
     flex: 1,
@@ -1154,20 +1154,20 @@ const styles = StyleSheet.create({
   },
   interpretLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   interpretText: {
     fontSize: 12,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     lineHeight: 18,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   interpretCursor: {
     fontSize: 12,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
   suggestBox: {
     marginHorizontal: 8,
@@ -1178,7 +1178,7 @@ const styles = StyleSheet.create({
   },
   suggestLabel: {
     fontSize: 9,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -1186,7 +1186,7 @@ const styles = StyleSheet.create({
   suggestCommand: {
     color: '#86EFAC',
     fontSize: 12,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
 });
 
@@ -1205,7 +1205,7 @@ const menuStyles = StyleSheet.create({
   },
   menuTitle: {
     fontSize: 12,
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
     textAlign: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
@@ -1222,7 +1222,7 @@ const menuStyles = StyleSheet.create({
     fontSize: 16,
     width: 20,
     textAlign: 'center',
-    fontFamily: 'monospace',
+    fontFamily: 'PixelMplus12',
   },
   menuLabel: {
     fontSize: 15,
