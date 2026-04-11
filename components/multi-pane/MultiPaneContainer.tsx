@@ -123,11 +123,11 @@ const styles = StyleSheet.create({
   },
   dividerV: {
     width: 3,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#1A1A1A',
   },
   dividerH: {
     height: 3,
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#1A1A1A',
   },
   // Larger hit area for touch
   dividerVHit: {

@@ -5,8 +5,8 @@
  * in tests without pulling in React Native UI dependencies.
  *
  * Contrast ratios against block background (#1A1A1A):
- *   stdout  #E8E8E8  → ~13.5:1  (WCAG AAA)
- *   stderr  #FF7878  → ~6.2:1   (WCAG AA)
+ *   stdout  #E5E7EB  → ~12.9:1  (WCAG AAA)
+ *   stderr  #EF4444  → ~4.6:1   (WCAG AA)
  *   info    #9BA1A6  → ~4.7:1   (WCAG AA)
  *   prompt  #00D4AA  → ~7.1:1   (WCAG AA)
  */
@@ -24,17 +24,17 @@ import { OutputLine } from '@/store/types';
 export function getOutputColor(type: OutputLine['type'], highContrast = true): string {
   if (highContrast) {
     switch (type) {
-      case 'stderr': return '#FF7878';
+      case 'stderr': return '#EF4444';
       case 'info':   return '#9BA1A6';
       case 'prompt': return '#00D4AA';
-      default:       return '#E8E8E8'; // stdout — near-white, always readable on OLED
+      default:       return '#E5E7EB'; // stdout — primary text, always readable on OLED
     }
   }
   // Legacy / theme-dependent colors
   switch (type) {
-    case 'stderr': return '#F87171';
+    case 'stderr': return '#EF4444';
     case 'info':   return '#6B7280';
     case 'prompt': return '#00D4AA';
-    default:       return '#D4D4D4';
+    default:       return '#E5E7EB';
   }
 }
