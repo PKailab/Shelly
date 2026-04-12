@@ -52,6 +52,30 @@ export async function execCommand(command: string, timeoutMs?: number): Promise<
   }
 }
 
+/**
+ * Top-level writeFile — same base64 strategy as useNativeExec.writeFile so
+ * non-React callers (lib/ai-edit.ts, command palette actions, plugins) can
+ * persist edits without going through a hook.
+ */
+export async function writeFileNative(
+  filePath: string,
+  content: string,
+): Promise<WriteFileResult> {
+  try {
+    const base64Content = btoa(unescape(encodeURIComponent(content)));
+    const esc = filePath.replace(/'/g, "'\\''");
+    const result = await execCommand(
+      `echo '${base64Content}' | base64 -d > '${esc}'`,
+      30_000,
+    );
+    return result.exitCode === 0
+      ? { ok: true }
+      : { ok: false, error: result.stderr || `exit code ${result.exitCode}` };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 export function useNativeExec() {
   // ── Command execution ───────────────────────────────────────────────────
 

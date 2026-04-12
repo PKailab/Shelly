@@ -19,6 +19,7 @@ import {
   ToastAndroid,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { getStagedEdit, acceptStagedDiff } from '@/lib/ai-edit';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -362,9 +363,10 @@ const hunkStyles = StyleSheet.create({
 
 type DiffBlockProps = {
   initialHunks: DiffHunk[];
+  rawBlock: string;
 };
 
-function DiffBlock({ initialHunks }: DiffBlockProps) {
+function DiffBlock({ initialHunks, rawBlock }: DiffBlockProps) {
   const [hunks, setHunks] = useState<DiffHunk[]>(initialHunks);
 
   const handleAccept = useCallback(async (index: number) => {
@@ -387,13 +389,30 @@ function DiffBlock({ initialHunks }: DiffBlockProps) {
 
   const handleAcceptAll = useCallback(async () => {
     const pendingHunks = hunks.filter((h) => h.status === 'pending');
+
+    // Try the AI-edit write-back first — if a file is staged, apply the
+    // unified diff to disk and refresh the Code tab.
+    if (getStagedEdit()) {
+      const err = await acceptStagedDiff(rawBlock);
+      if (err === null) {
+        ToastAndroid.show('Applied to file', ToastAndroid.SHORT);
+        setHunks((prev) =>
+          prev.map((h) => (h.status === 'pending' ? { ...h, status: 'accepted' } : h)),
+        );
+        return;
+      }
+      ToastAndroid.show(err, ToastAndroid.LONG);
+      // Fall through to clipboard behaviour so the user still gets the
+      // patch, and the diff stays pending so they can retry.
+    }
+
     const allPatched = pendingHunks.map(hunkPatchedContent).join('\n');
     await Clipboard.setStringAsync(allPatched);
     ToastAndroid.show('All hunks copied to clipboard', ToastAndroid.SHORT);
     setHunks((prev) =>
       prev.map((h) => (h.status === 'pending' ? { ...h, status: 'accepted' } : h)),
     );
-  }, [hunks]);
+  }, [hunks, rawBlock]);
 
   const handleRejectAll = useCallback(() => {
     ToastAndroid.show('All hunks rejected', ToastAndroid.SHORT);
@@ -519,7 +538,7 @@ export default function InlineDiff({ content }: InlineDiffProps) {
             </Text>
           ) : null;
         }
-        return <DiffBlock key={i} initialHunks={seg.hunks} />;
+        return <DiffBlock key={i} initialHunks={seg.hunks} rawBlock={seg.rawBlock} />;
       })}
     </ScrollView>
   );

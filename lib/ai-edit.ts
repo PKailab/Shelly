@@ -19,10 +19,11 @@
  * FileTree, CodeTab, or a command-palette action.
  */
 
-import { execCommand } from '@/hooks/use-native-exec';
+import { execCommand, writeFileNative } from '@/hooks/use-native-exec';
 import { usePaneStore } from '@/store/pane-store';
 import { useAIPaneStore } from '@/store/ai-pane-store';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
+import { usePreviewStore } from '@/store/preview-store';
 
 /**
  * Find the first AI pane in the current multi-pane tree, or null if
@@ -47,6 +48,155 @@ function findAiPaneId(): string | null {
   // Fallback: any leaf that has an agent bound
   const firstBound = Object.keys(panes)[0];
   return firstBound ?? null;
+}
+
+// ── Module-level staged edit ──────────────────────────────────────────
+//
+// Exactly one file can be "staged" for AI editing at a time. Holding this
+// in a module variable (rather than inside a React store) lets InlineDiff
+// look it up from anywhere in the render tree without threading props or
+// context through the 5+ components between Preview and the diff block.
+
+type StagedEdit = {
+  path: string;
+  originalContent: string;
+};
+
+let stagedEdit: StagedEdit | null = null;
+
+export function getStagedEdit(): StagedEdit | null {
+  return stagedEdit;
+}
+
+export function clearStagedEdit(): void {
+  stagedEdit = null;
+}
+
+/**
+ * Write new content to the staged file via writeFileNative and refresh
+ * the Preview pane so the on-screen Code tab reflects the change. Returns
+ * an error message on failure, or null on success.
+ */
+export async function applyStagedEdit(newContent: string): Promise<string | null> {
+  if (!stagedEdit) return 'No file staged';
+  const { path } = stagedEdit;
+  const result = await writeFileNative(path, newContent);
+  if (result.ok === false) return result.error;
+
+  // Refresh the Code tab so the user sees the updated content
+  usePreviewStore.getState().notifyFileChange(path);
+  stagedEdit = { path, originalContent: newContent };
+  return null;
+}
+
+// ── Unified diff apply ────────────────────────────────────────────────
+//
+// Minimal unified-diff applier. Enough to handle the diffs Cerebras /
+// Claude / Gemini generate for small file edits, not a full `patch(1)`
+// replacement. Supports multiple hunks in a single diff and assumes
+// the hunks apply in order against the *original* content.
+
+type ParsedHunk = {
+  oldStart: number; // 1-based original line where this hunk starts
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+  lines: string[];  // raw lines with leading ' ', '+', '-'
+};
+
+function parseHunks(diff: string): ParsedHunk[] {
+  const hunks: ParsedHunk[] = [];
+  const lines = diff.split('\n');
+  let current: ParsedHunk | null = null;
+
+  for (const raw of lines) {
+    if (raw.startsWith('---') || raw.startsWith('+++')) continue;
+
+    const header = raw.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
+    if (header) {
+      if (current) hunks.push(current);
+      current = {
+        oldStart: parseInt(header[1], 10),
+        oldCount: header[2] ? parseInt(header[2], 10) : 1,
+        newStart: parseInt(header[3], 10),
+        newCount: header[4] ? parseInt(header[4], 10) : 1,
+        lines: [],
+      };
+      continue;
+    }
+
+    if (current && (raw.startsWith(' ') || raw.startsWith('+') || raw.startsWith('-'))) {
+      current.lines.push(raw);
+    }
+  }
+
+  if (current) hunks.push(current);
+  return hunks;
+}
+
+/**
+ * Apply a unified diff to the original content. Returns the patched
+ * content or null on any apply failure (line count mismatch, context
+ * drift, etc). Callers should fall back to showing the raw diff when
+ * this returns null.
+ */
+export function applyUnifiedDiff(original: string, diff: string): string | null {
+  const origLines = original.split('\n');
+  const hunks = parseHunks(diff);
+  if (hunks.length === 0) return null;
+
+  const out: string[] = [];
+  let cursor = 0; // 0-based index into origLines
+
+  for (const hunk of hunks) {
+    const hunkStart = hunk.oldStart - 1; // -> 0-based
+    if (hunkStart < cursor) return null; // overlapping / out-of-order
+    if (hunkStart > origLines.length) return null;
+
+    // Emit untouched lines between previous hunk and this one
+    while (cursor < hunkStart) {
+      out.push(origLines[cursor++]);
+    }
+
+    // Walk hunk lines
+    for (const line of hunk.lines) {
+      const marker = line[0];
+      const body = line.slice(1);
+      if (marker === ' ') {
+        // Context: must match original
+        if (origLines[cursor] !== body) return null;
+        out.push(origLines[cursor]);
+        cursor++;
+      } else if (marker === '-') {
+        // Removal: must match, advance original, skip output
+        if (origLines[cursor] !== body) return null;
+        cursor++;
+      } else if (marker === '+') {
+        // Addition: emit, don't advance original
+        out.push(body);
+      }
+    }
+  }
+
+  // Tail
+  while (cursor < origLines.length) {
+    out.push(origLines[cursor++]);
+  }
+
+  return out.join('\n');
+}
+
+/**
+ * Convenience: apply diff to the currently-staged file, write it back,
+ * and refresh the preview. Returns an error message or null.
+ */
+export async function acceptStagedDiff(diff: string): Promise<string | null> {
+  if (!stagedEdit) return 'No file staged';
+  const patched = applyUnifiedDiff(stagedEdit.originalContent, diff);
+  if (patched === null) {
+    return 'Could not apply diff — context mismatch. Ask the AI to regenerate against the latest file.';
+  }
+  return applyStagedEdit(patched);
 }
 
 /**
@@ -79,6 +229,9 @@ export async function stageAiEdit(path: string): Promise<boolean> {
       `Cannot read ${path}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+
+  // Remember the file + snapshot so Accept can write back later.
+  stagedEdit = { path, originalContent: content };
 
   const paneId = findAiPaneId();
   if (!paneId) return false;
