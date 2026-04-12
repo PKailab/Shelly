@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useContext, useEffect } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -17,6 +17,7 @@ import { usePreviewStore } from '@/store/preview-store';
 import { ConnectionMode } from '@/store/types';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
+import { MultiPaneContext } from '@/components/multi-pane/PaneSlot';
 import { UsageIndicator } from '@/components/UsageIndicator';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
@@ -80,6 +81,14 @@ export function TerminalHeader() {
   } = useTerminalStore();
   const layout = useDeviceLayout();
   const { isMultiPane, toggleMultiPane } = useMultiPaneStore();
+  // Pane-width aware density. When TerminalHeader is rendered inside a
+  // grid pane (2×2 / 4 Terminal), MultiPaneContext exposes the real pane
+  // width so the header can drop non-essential chrome (preview, usage,
+  // mode badge) once the row would otherwise overflow.
+  const multiPaneCtx = useContext(MultiPaneContext);
+  const paneWidth = multiPaneCtx?.paneWidth ?? Infinity;
+  const isNarrowPane = paneWidth < 420;
+  const isVeryNarrowPane = paneWidth < 300;
 
   const previewOpen = usePreviewStore((s) => s.isOpen);
   const hasNewContent = usePreviewStore((s) => s.hasNewContent);
@@ -236,47 +245,51 @@ export function TerminalHeader() {
         </Pressable>
       )}
 
-      {/* Preview button */}
-      <Pressable
-        onPress={togglePreview}
-        hitSlop={6}
-        style={[styles.previewButton, previewOpen && { backgroundColor: withAlpha(colors.accent, 0.15) }]}
-      >
-        <MaterialIcons name="open-in-new" size={14} color={previewOpen ? colors.accent : colors.muted} />
-        {!isMultiPane && (
-          <Text style={[styles.previewLabel, { color: previewOpen ? colors.accent : colors.muted }]}>Preview</Text>
-        )}
-        {hasNewContent && !previewOpen && (
-          <View style={styles.previewBadge} />
-        )}
-      </Pressable>
-
-      {/* Usage cost */}
-      <UsageIndicator />
-
-      {/* Connection mode badge — compact in split view */}
-      <Animated.View style={badgeAnimStyle}>
+      {/* Preview button — hidden on very narrow panes (2×2 grid) */}
+      {!isVeryNarrowPane && (
         <Pressable
-          onPress={handleModePress}
-          onLongPress={handleModeLongPress}
-          delayLongPress={600}
-          style={[
-            styles.statusContainer,
-            { backgroundColor: colors.surface, borderColor: colors.borderLight },
-            connectionMode === 'disconnected' && {
-              borderColor: colors.borderLight,
-              opacity: 0.6,
-            },
-          ]}
+          onPress={togglePreview}
+          hitSlop={6}
+          style={[styles.previewButton, previewOpen && { backgroundColor: withAlpha(colors.accent, 0.15) }]}
         >
-          <MaterialIcons name={modeConfig.icon} size={13} color={modeColor} />
-          {!isMultiPane && (
-            <Text style={[styles.statusText, { color: modeColor }]}>
-              {modeConfig.label}
-            </Text>
+          <MaterialIcons name="open-in-new" size={14} color={previewOpen ? colors.accent : colors.muted} />
+          {!isMultiPane && !isNarrowPane && (
+            <Text style={[styles.previewLabel, { color: previewOpen ? colors.accent : colors.muted }]}>Preview</Text>
+          )}
+          {hasNewContent && !previewOpen && (
+            <View style={styles.previewBadge} />
           )}
         </Pressable>
-      </Animated.View>
+      )}
+
+      {/* Usage cost — only when there's room */}
+      {!isNarrowPane && <UsageIndicator />}
+
+      {/* Connection mode badge — hide on very narrow panes */}
+      {!isVeryNarrowPane && (
+        <Animated.View style={badgeAnimStyle}>
+          <Pressable
+            onPress={handleModePress}
+            onLongPress={handleModeLongPress}
+            delayLongPress={600}
+            style={[
+              styles.statusContainer,
+              { backgroundColor: colors.surface, borderColor: colors.borderLight },
+              connectionMode === 'disconnected' && {
+                borderColor: colors.borderLight,
+                opacity: 0.6,
+              },
+            ]}
+          >
+            <MaterialIcons name={modeConfig.icon} size={13} color={modeColor} />
+            {!isMultiPane && !isNarrowPane && (
+              <Text style={[styles.statusText, { color: modeColor }]}>
+                {modeConfig.label}
+              </Text>
+            )}
+          </Pressable>
+        </Animated.View>
+      )}
     </View>
   );
 }

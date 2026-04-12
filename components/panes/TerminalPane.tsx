@@ -636,7 +636,7 @@ export default function TerminalScreen() {
         <CommandKeyBar
           sendKey={sendKey}
           sendText={sendToTerminal}
-          isCompact={layout.isCompact || layout.width < 400}
+          isCompact={layout.isCompact || (multiPaneCtx?.paneWidth ?? layout.width) < 420}
           onAttach={() => {
             import('expo-document-picker').then((mod) => {
               mod.getDocumentAsync({ copyToCacheDirectory: true }).then((result) => {

@@ -89,6 +89,13 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
   const cwdDisplay = activeRepoPath
     ? `— ${activeRepoPath.replace(/^\/data\/data\/com\.termux\/files\/home/, '~')}`
     : '';
+  // Pane-width-aware density. Grid layouts (2×2 etc) drop each pane below
+  // ~350dp which is where the mock-faithful header starts overflowing: the
+  // cwd path, token badge, and full pane-title label all compete for the
+  // same row. Hide them progressively so the action icons at the right
+  // edge always stay tappable.
+  const isNarrow = paneWidth > 0 && paneWidth < 360;
+  const isVeryNarrow = paneWidth > 0 && paneWidth < 260;
 
   return (
     <View
@@ -108,12 +115,14 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           accessibilityLabel="Change pane type"
         >
           <MaterialIcons name={entry.icon as any} size={11} color={C.accent} />
-          <Text style={styles.paneTypeLabel} numberOfLines={1}>
-            {paneTitle}
-          </Text>
+          {!isVeryNarrow && (
+            <Text style={styles.paneTypeLabel} numberOfLines={1}>
+              {paneTitle}
+            </Text>
+          )}
           <MaterialIcons name="arrow-drop-down" size={12} color={C.text2} />
         </Pressable>
-        {cwdDisplay ? (
+        {cwdDisplay && !isNarrow ? (
           <Text style={styles.headerPath} numberOfLines={1}>
             {cwdDisplay}
           </Text>
@@ -144,12 +153,12 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
             </Text>
             <MaterialIcons name="arrow-drop-down" size={12} color={C.text2} />
           </Pressable>
-        ) : (
+        ) : !isNarrow ? (
           <View style={styles.headerCenter}>
             <MaterialIcons name="data-usage" size={10} color={C.text2} />
             <Text style={styles.tokenText}>42K / 1H</Text>
           </View>
-        )}
+        ) : null}
 
         {notification && (
           <View style={[
@@ -165,7 +174,7 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
         <View style={styles.headerSpacer} />
 
         <View style={styles.headerActions}>
-          {canSplit && (
+          {canSplit && !isVeryNarrow && (
             <Pressable
               style={styles.actionBtn}
               onPress={() => setSplitMenuVisible(true)}
