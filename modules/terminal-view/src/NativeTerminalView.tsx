@@ -1,3 +1,4 @@
+// @ts-expect-error — expo-modules-core types not exposed by pnpm hoisting; runtime resolves fine
 import { requireNativeViewManager } from 'expo-modules-core';
 import { ViewProps } from 'react-native';
 

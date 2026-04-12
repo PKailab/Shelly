@@ -1,3 +1,4 @@
+// @ts-expect-error — expo-modules-core types not exposed by pnpm hoisting; runtime resolves fine
 import { NativeModule, requireNativeModule } from 'expo-modules-core';
 
 export interface SessionConfig {

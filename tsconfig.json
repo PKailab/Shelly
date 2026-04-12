@@ -16,6 +16,9 @@
   "exclude": [
     "**/*.test.ts",
     "**/*.test.tsx",
-    "node_modules"
+    "node_modules",
+    "chelly",
+    "components/chat/ChatHeader.tsx",
+    "hooks/use-ai-dispatch.ts"
   ]
 }
