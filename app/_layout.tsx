@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
+import { Silkscreen_400Regular } from "@expo-google-fonts/silkscreen";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useSoundStore, unloadSounds } from "@/lib/sounds";
 import { loadAgentsFromDisk } from "@/lib/agent-manager";
@@ -51,8 +52,9 @@ export default function RootLayout() {
     'PressStart2P': require('@/assets/fonts/PressStart2P_400Regular.ttf'),
     // Silkscreen — closer to the mock's readable pixel aesthetic than
     // PressStart2P (which is a pure 8×8 grid). Provided via
-    // @expo-google-fonts/silkscreen.
-    'Silkscreen': require('@expo-google-fonts/silkscreen/Silkscreen_400Regular.ttf'),
+    // @expo-google-fonts/silkscreen's named export (not a direct .ttf
+    // path — Metro can't resolve that through the package subpath).
+    'Silkscreen': Silkscreen_400Regular,
   });
   const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'silkscreen');
   const loadSettings = useTerminalStore((s) => s.loadSettings);
