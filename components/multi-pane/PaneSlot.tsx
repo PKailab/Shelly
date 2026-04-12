@@ -36,11 +36,12 @@ type Props = {
 /** Derive display title for pane header matching mock style */
 function getPaneTitle(tab: PaneTab): string {
   switch (tab) {
-    case 'terminal': return 'CLAUDE CODE';
-    case 'ai': return 'CLAUDE CODE';
-    case 'browser': return 'BROWSER';
+    case 'terminal': return 'TERMINAL';
+    case 'ai':       return 'AI';
+    case 'browser':  return 'BROWSER';
     case 'markdown': return 'MARKDOWN';
-    default: return String(tab).toUpperCase();
+    case 'preview':  return 'PREVIEW';
+    default:         return String(tab).toUpperCase();
   }
 }
 

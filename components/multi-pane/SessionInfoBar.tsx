@@ -6,11 +6,13 @@ import { useSidebarStore } from '@/store/sidebar-store';
 import { colors as C, fonts as F, sizes as S } from '@/theme.config';
 
 const AGENT_INFO: Record<string, { name: string; version: string; model: string }> = {
-  claude: { name: 'CLAUDE CODE', version: 'V2.1.92', model: 'OPUS 4.6 (1M CONTEXT)' },
-  gemini: { name: 'GEMINI CLI', version: 'V0.1', model: 'GEMINI 2.5 PRO' },
-  codex: { name: 'CODEX', version: 'V0.1', model: 'O4-MINI' },
-  opencode: { name: 'OPENCODE', version: 'V0.1', model: 'SONNET 4.6' },
-  copilot: { name: 'COPILOT', version: 'V1.0', model: 'GPT-4.1' },
+  claude:     { name: 'CLAUDE CODE', version: 'V2.1.92', model: 'OPUS 4.6 (1M CONTEXT)' },
+  gemini:     { name: 'GEMINI CLI',  version: 'V0.1',    model: 'GEMINI 2.5 PRO' },
+  codex:      { name: 'CODEX',       version: 'V0.1',    model: 'O4-MINI' },
+  cerebras:   { name: 'CEREBRAS',    version: 'QWEN3',   model: '235B-A22B' },
+  groq:       { name: 'GROQ',        version: 'LLAMA3',  model: '3.3 70B VERSATILE' },
+  perplexity: { name: 'PERPLEXITY',  version: 'SONAR',   model: 'PRO' },
+  local:      { name: 'LOCAL LLM',   version: 'LLAMA',   model: 'ON-DEVICE' },
 };
 
 type Props = {
