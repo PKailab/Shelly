@@ -7,19 +7,19 @@
  *   1. @mention    — @claude / @gemini / @local for direct tool targeting
  *   2. NL + tool   — Natural language containing tool name keywords
  *   3. NL only     — Natural language → AI suggests best tool
- *   4. Shell cmd   — ls / git status etc → Termux direct execution
+ *   4. Shell cmd   — ls / git status etc → Native shell direct execution
  */
 import { t } from '@/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type RouteTarget = 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'groq' | 'cerebras' | 'team' | 'browser' | 'git' | 'agent' | 'codex' | 'plan' | 'arena' | 'actions';
+export type RouteTarget = 'claude' | 'gemini' | 'local' | 'shell' | 'suggest' | 'perplexity' | 'groq' | 'cerebras' | 'team' | 'browser' | 'git' | 'agent' | 'codex' | 'plan' | 'arena' | 'actions';
 
 export type InputLayer =
   | 'mention'        // @claude / @gemini / @local
   | 'nl_with_tool'   // 自然言語 + ツール名キーワード
   | 'natural'        // 自然言語のみ → ツール提案
-  | 'command';       // シェルコマンド → Termux直接実行
+  | 'command';       // シェルコマンド → ネイティブシェル直接実行
 
 export interface ParsedInput {
   layer: InputLayer;
@@ -454,10 +454,10 @@ export function parseInput(input: string): ParsedInput {
   if (isShellCommand(trimmed)) {
     return {
       layer: 'command',
-      target: 'termux',
+      target: 'shell',
       prompt: trimmed,
       raw: trimmed,
-      logSummary: `[Termux] ${trimmed}`,
+      logSummary: `[Shell] ${trimmed}`,
     };
   }
 
@@ -477,10 +477,10 @@ export function parseInput(input: string): ParsedInput {
   if (shellShortcut) {
     return {
       layer: 'command',
-      target: 'termux',
+      target: 'shell',
       prompt: shellShortcut.command,
       raw: trimmed,
-      logSummary: `[Termux] ${shellShortcut.label}`,
+      logSummary: `[Shell] ${shellShortcut.label}`,
     };
   }
 
@@ -539,7 +539,7 @@ export function buildRoutingDetail(parsed: ParsedInput): string {
 
     case 'command':
       lines.push(t('router.detail_command'));
-      lines.push(t('router.detail_target', { target: 'Termux' }));
+      lines.push(t('router.detail_target', { target: 'Shell' }));
       lines.push(t('router.detail_prompt', { prompt: parsed.prompt }));
       break;
   }
@@ -552,7 +552,7 @@ export function getTargetLabel(target: RouteTarget): string {
     claude: 'Claude Code',
     gemini: 'Gemini CLI',
     local: 'Local LLM',
-    termux: 'Termux',
+    shell: 'Shell',
     suggest: t('router.suggest'),
     perplexity: 'Perplexity',
     team: 'Team Table',
@@ -574,7 +574,7 @@ export function getTargetColor(target: RouteTarget): string {
     claude:     '#F59E0B', // アンバー
     gemini:     '#3B82F6', // ブルー
     local:      '#8B5CF6', // パープル
-    termux:     '#00D4AA', // ティール（既存ブランドカラー）
+    shell:      '#00D4AA', // ティール（既存ブランドカラー）
     suggest:    '#6B7280', // グレー
     perplexity: '#20B2AA', // ティールグリーン（Perplexityブランドカラー）
     groq:       '#F97316', // オレンジ（Groqブランドカラー）

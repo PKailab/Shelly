@@ -68,7 +68,7 @@ interface ToolsLaneProps {
   lastProject: CreatorProject | null;
   /** 全プロジェクト一覧（ターゲット選択用） */
   projects: CreatorProject[];
-  /** コマンド実行（Termux bridge経由） */
+  /** コマンド実行（JNI forkpty経由） */
   onRunCommand: (
     command: string,
     opts?: {
@@ -168,16 +168,11 @@ export function ToolsLane({
         ]);
         setStatus('done');
       } else if (result.delegatedCommand) {
-        // Claude/Gemini/Termuxに委譲
+        // Claude/Gemini/Codexに委譲
         setLocalLlmStatus('done');
         addLog('info', `[${getHandlerLabel(result.handledBy)}] ${getCategoryLabel(result.category)} → ${result.reasoning}`);
 
-        if (result.handledBy === 'termux') {
-          // Termux直接実行
-          onSendToTerminal(result.delegatedCommand);
-          addLog('system', `Sent to Terminal: ${result.delegatedCommand}`);
-          setStatus('done');
-        } else {
+        {
           setStatus('running');
           addLog('system', `Running: ${result.delegatedCommand}`);
           const execResult = await onRunCommand(result.delegatedCommand);

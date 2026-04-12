@@ -74,7 +74,7 @@ export type AiBlock = {
   /** 元のユーザー入力 */
   input: string;
   /** ルーティング先 */
-  target: 'claude' | 'gemini' | 'local' | 'termux' | 'suggest' | 'perplexity' | 'groq' | 'team' | 'browser' | 'git' | 'agent';
+  target: 'claude' | 'gemini' | 'local' | 'shell' | 'suggest' | 'perplexity' | 'groq' | 'team' | 'browser' | 'git' | 'agent';
   /** 入力レイヤー */
   layer: 'mention' | 'nl_with_tool' | 'natural' | 'command';
   /** 1行サマリー（常時表示） */

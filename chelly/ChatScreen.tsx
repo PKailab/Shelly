@@ -476,7 +476,7 @@ export default function ChatScreen() {
       learnFromCommand(parsed.prompt).catch(() => {});
     } else {
       learnFromUserInput(parsed.prompt).catch(() => {});
-      if (parsed.target !== 'termux' && parsed.target !== 'suggest') {
+      if (parsed.target !== 'shell' && parsed.target !== 'suggest') {
         learnFromAgentUse(parsed.target).catch(() => {});
       }
     }
