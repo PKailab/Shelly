@@ -288,7 +288,7 @@ export function Sidebar() {
               style={styles.deviceRow}
               onPress={() => setActiveRepo(path)}
             >
-              <MaterialIcons name={icon as any} size={13} color={C.text2} />
+              <MaterialIcons name={icon as any} size={13} color={C.accentBlue} />
               <Text style={styles.deviceLabel}>{label}</Text>
             </Pressable>
           ))}
@@ -313,7 +313,7 @@ export function Sidebar() {
               <MaterialIcons
                 name={svc.icon as any}
                 size={13}
-                color={svc.linked ? C.accent : C.text2}
+                color={svc.linked ? C.accent : C.accentBlue}
               />
               <Text style={styles.cloudLabel}>{svc.label}</Text>
               <View style={styles.cloudSpacer} />
@@ -342,7 +342,7 @@ export function Sidebar() {
             <MaterialIcons name="open-in-new" size={I.externalLink} color={C.text2} />
           </View>
           <View style={styles.portRow}>
-            <View style={[styles.portDot, { backgroundColor: C.accentGreen }, neonDotGlow]} />
+            <View style={[styles.portDot, { backgroundColor: C.accentSky }, neonDotGlow]} />
             <Text style={styles.portLabel}>:8081</Text>
             <Text style={styles.portName}>EXPO</Text>
             <View style={styles.cloudSpacer} />

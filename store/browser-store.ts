@@ -26,10 +26,10 @@ interface BrowserState {
 
 /** Built-in preset bookmarks. Always shown, not editable, not persisted. */
 export const PRESET_BOOKMARKS: readonly Bookmark[] = [
-  { label: 'YouTube', url: 'https://youtube.com', icon: 'play-circle-filled', color: '#FF0000' },
-  { label: 'X',       url: 'https://x.com',       icon: 'close',              color: '#000000' },
-  { label: 'GitHub',  url: 'https://github.com',  icon: 'code',               color: '#FFFFFF' },
-  { label: 'localhost', url: 'http://localhost:3000', icon: 'computer',       color: '#22C55E' },
+  { label: 'YouTube',   url: 'https://youtube.com',    icon: 'play-circle-filled', color: '#FF0000' },
+  { label: 'X',         url: 'https://x.com',          icon: 'close',              color: '#E5E7EB' },
+  { label: 'GitHub',    url: 'https://github.com',     icon: 'code',               color: '#A78BFA' },
+  { label: 'localhost', url: 'http://localhost:3000',  icon: 'computer',           color: '#22C55E' },
 ] as const;
 
 export const useBrowserStore = create<BrowserState>((set, get) => ({

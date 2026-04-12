@@ -11,11 +11,15 @@ export const colors = {
   border: '#1C1C1C',        // standard border
 
   // Accent
-  accent: '#00D4AA',        // primary accent (cyan)
-  accentGreen: '#22C55E',   // running dot green
-  accentBlue: '#60A5FA',    // file/folder icon blue (mock)
-  accentCode: '#60A5FA',    // code ls-dir color
-  warning: '#F59E0B',       // ⚠ warning amber
+  accent: '#00D4AA',        // primary accent (teal)
+  accentGreen: '#22C55E',   // running dot, + diff, LINKED, :3000 port
+  accentBlue: '#60A5FA',    // folder/file icons, ls directories, YOU label
+  accentSky: '#38BDF8',     // ports, :8081 expo
+  accentPurple: '#A78BFA',  // import/from keywords, CLAUDE brand label
+  accentPink: '#EC4899',    // string literals 'react', 'react-native'
+  accentAmber: '#F59E0B',   // ⚠ warning, EDIT dots, ALLOW, yellow hint
+  accentCode: '#60A5FA',    // code ls-dir color (alias for accentBlue)
+  warning: '#F59E0B',       // ⚠ warning amber (alias)
 
   // Text
   text1: '#E5E7EB',         // main text

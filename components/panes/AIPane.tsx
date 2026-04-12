@@ -15,7 +15,16 @@ import {
   Easing,
   TouchableOpacity,
   type ListRenderItemInfo,
+  type TextStyle,
 } from 'react-native';
+import {
+  neonGlowPurple,
+  neonGlowBlue,
+  neonGlowGreen,
+  neonGlowAmber,
+  neonGlowSky,
+  neonGlowTeal,
+} from '@/lib/neon-glow';
 import { MaterialIcons } from '@expo/vector-icons';
 import { PaneIdContext } from '@/components/multi-pane/PaneSlot';
 import { useAIPaneStore } from '@/store/ai-pane-store';
@@ -74,6 +83,30 @@ const dotStyles = StyleSheet.create({
   },
 });
 
+// ─── Per-agent label colors (mock-faithful neon) ────────────────────────────
+
+const AGENT_LABEL_COLORS: Record<string, string> = {
+  claude:     '#A78BFA', // purple
+  gemini:     '#60A5FA', // blue
+  codex:      '#22C55E', // green
+  cerebras:   '#FF6B35', // brand orange
+  groq:       '#F97316', // brand orange-deep
+  perplexity: '#38BDF8', // sky
+  local:      '#E5E7EB', // neutral
+  default:    '#A78BFA',
+};
+
+const AGENT_LABEL_GLOWS: Record<string, TextStyle> = {
+  claude:     neonGlowPurple,
+  gemini:     neonGlowBlue,
+  codex:      neonGlowGreen,
+  cerebras:   neonGlowAmber,
+  groq:       neonGlowAmber,
+  perplexity: neonGlowSky,
+  local:      neonGlowTeal,
+  default:    neonGlowPurple,
+};
+
 // ─── Message Bubble (Redesigned) ────────────────────────────────────────────
 
 type BubbleProps = {
@@ -108,11 +141,18 @@ const MessageBubble = React.memo(function MessageBubble({
 
   // Assistant message
   const containsDiff = !isLastStreaming && hasDiffContent(displayText);
-  const agentLabel = (message.agent ?? 'claude').toUpperCase();
+  const agentKey = message.agent ?? 'claude';
+  const agentLabel = agentKey.toUpperCase();
+  // Per-provider neon label color so each assistant bubble reads as the
+  // agent that produced it (mock: CLAUDE purple, Cerebras orange, etc).
+  const labelColor = AGENT_LABEL_COLORS[agentKey] ?? AGENT_LABEL_COLORS.default;
+  const labelGlow = AGENT_LABEL_GLOWS[agentKey] ?? AGENT_LABEL_GLOWS.default;
 
   return (
     <View style={bubbleStyles.messageContainer}>
-      <Text style={bubbleStyles.roleLabelClaude}>{agentLabel}</Text>
+      <Text style={[bubbleStyles.roleLabelClaude, { color: labelColor }, labelGlow]}>
+        {agentLabel}
+      </Text>
       <View style={bubbleStyles.assistantContent}>
         {containsDiff ? (
           <InlineDiff content={displayText} />
@@ -135,10 +175,10 @@ const bubbleStyles = StyleSheet.create({
     fontFamily: F.family,
     fontWeight: '800',
     letterSpacing: 0.8,
-    color: C.accent,
+    color: C.accentBlue,
     marginBottom: 2,
     textTransform: 'uppercase',
-    textShadowColor: 'rgba(0, 212, 170, 0.6)',
+    textShadowColor: 'rgba(96, 165, 250, 0.6)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
   },
@@ -280,7 +320,7 @@ export default function AIPane() {
       {/* Context badge — READING TERMINAL 1 */}
       {contextBadge && (
         <View style={paneStyles.contextBadge}>
-          <View style={paneStyles.contextDot} />
+          <MaterialIcons name="visibility" size={9} color={C.accent} />
           <Text style={paneStyles.contextBadgeText}>{contextBadge}</Text>
         </View>
       )}
@@ -364,11 +404,16 @@ const paneStyles = StyleSheet.create({
   contextBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    alignSelf: 'flex-start',
+    gap: 5,
+    marginHorizontal: 10,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0,212,170,0.35)',
+    backgroundColor: 'rgba(0,212,170,0.08)',
   },
   contextDot: {
     width: 6,
@@ -382,7 +427,10 @@ const paneStyles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     fontWeight: '700',
-    color: C.text2,
+    color: C.accent,
+    textShadowColor: 'rgba(0, 212, 170, 0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 4,
   },
   emptyState: {
     flex: 1,

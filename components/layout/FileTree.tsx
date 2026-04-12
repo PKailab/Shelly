@@ -14,6 +14,55 @@ type FileEntry = {
   isDirectory: boolean;
 };
 
+/**
+ * Per-extension color palette. Matches the mock's colored file icons where
+ * .tsx / .ts / .json / .md / .py / README each read as a different hue. Keeps
+ * the default blue for unknown extensions and directories.
+ */
+function fileIconColor(name: string, isDir: boolean): string {
+  if (isDir) return C.accentBlue;
+  const lower = name.toLowerCase();
+  if (lower === 'readme.md' || lower === 'readme') return C.errorText;
+  const dot = lower.lastIndexOf('.');
+  const ext = dot === -1 ? '' : lower.slice(dot + 1);
+  switch (ext) {
+    case 'tsx':
+    case 'jsx':       return C.accentSky;       // React: sky
+    case 'ts':        return C.accentBlue;      // TypeScript: blue
+    case 'js':
+    case 'mjs':
+    case 'cjs':       return C.accentAmber;     // JavaScript: amber
+    case 'json':
+    case 'toml':
+    case 'yaml':
+    case 'yml':       return C.accentAmber;     // config: amber
+    case 'md':
+    case 'mdx':       return C.accentPurple;    // markdown: purple
+    case 'py':        return C.accentGreen;     // python: green
+    case 'go':        return C.accentSky;
+    case 'rs':        return C.errorText;       // rust: red
+    case 'sh':
+    case 'bash':
+    case 'zsh':       return C.accentGreen;
+    case 'css':
+    case 'scss':      return C.accentPink;
+    case 'html':      return C.accentAmber;
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'svg':
+    case 'webp':      return C.accentPink;
+    default:          return C.accentBlue;
+  }
+}
+
+function fileNameColor(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower === 'readme.md' || lower === 'readme') return C.errorText;
+  return C.text1;
+}
+
 export function FileTree() {
   const repoPath = useSidebarStore((s) => s.activeRepoPath);
   const [cwd, setCwd] = useState(repoPath ?? '');
@@ -99,12 +148,11 @@ export function FileTree() {
             <MaterialIcons
               name={item.isDir ? 'folder' : 'insert-drive-file'}
               size={I.fileIcon}
-              color={C.accentBlue}
+              color={fileIconColor(item.name, item.isDir)}
             />
-            <Text style={[
-              styles.fileName,
-              { color: item.special === 'red' ? C.errorText : C.text1 },
-            ]}>
+            <Text
+              style={[styles.fileName, { color: fileNameColor(item.name) }]}
+            >
               {item.name}
             </Text>
           </View>
@@ -147,17 +195,10 @@ export function FileTree() {
             <MaterialIcons
               name={item.isDirectory ? 'folder' : 'insert-drive-file'}
               size={I.fileIcon}
-              color={C.accentBlue}
+              color={fileIconColor(item.name, item.isDirectory)}
             />
             <Text
-              style={[
-                styles.fileName,
-                {
-                  color: item.name.toLowerCase() === 'readme.md'
-                    ? C.errorText
-                    : C.text1,
-                },
-              ]}
+              style={[styles.fileName, { color: fileNameColor(item.name) }]}
               numberOfLines={1}
             >
               {item.name}

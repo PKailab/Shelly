@@ -38,3 +38,23 @@ export const neonBorderGlow: ViewStyle = {
   shadowRadius: 8,
   elevation: 2,
 };
+
+// ── Per-color glows ────────────────────────────────────────────────
+// Match the mock's color-coded neon text (CLAUDE purple, YOU blue,
+// strings pink, etc). Radius trimmed to 5 because Silkscreen pixels
+// smear at higher values.
+
+const glow = (color: string, alpha: number, radius: number): TextStyle => ({
+  textShadowColor: `rgba(${color}, ${alpha})`,
+  textShadowOffset: { width: 0, height: 0 },
+  textShadowRadius: radius,
+});
+
+export const neonGlowTeal:   TextStyle = glow('0, 212, 170', 0.6, 6);
+export const neonGlowBlue:   TextStyle = glow('96, 165, 250', 0.6, 6);
+export const neonGlowSky:    TextStyle = glow('56, 189, 248', 0.55, 5);
+export const neonGlowPurple: TextStyle = glow('167, 139, 250', 0.55, 5);
+export const neonGlowPink:   TextStyle = glow('236, 72, 153', 0.5, 5);
+export const neonGlowGreen:  TextStyle = glow('34, 197, 94', 0.6, 6);
+export const neonGlowRed:    TextStyle = glow('239, 68, 68', 0.55, 5);
+export const neonGlowAmber:  TextStyle = glow('245, 158, 11', 0.55, 6);
