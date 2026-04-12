@@ -158,7 +158,7 @@ export function ShellLayout() {
   const composed = Gesture.Race(swipeRight, swipeLeft);
 
   return (
-    <View style={[styles.root, { backgroundColor: c.background, paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: c.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       {/* Agent Bar (top) */}

@@ -5,7 +5,7 @@
  * Redesigned to match mock: YOU/CLAUDE labels, inline diff, READING TERMINAL badge.
  */
 
-import React, { useContext, useCallback, useRef, useEffect } from 'react';
+import React, { useContext, useCallback, useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ import { useAIPaneDispatch } from '@/hooks/use-ai-pane-dispatch';
 import VoiceWaveform from '@/components/panes/VoiceWaveform';
 import { usePaneVoice } from '@/hooks/use-pane-voice';
 import { useSettingsStore } from '@/store/settings-store';
+import { VoiceChat } from '@/components/VoiceChat';
 import { colors as C, fonts as F, sizes as S } from '@/theme.config';
 
 // ─── Streaming Indicator ─────────────────────────────────────────────────────
@@ -203,8 +204,9 @@ export default function AIPane() {
     else startRecording();
   }, [isRecording, startRecording, stopRecording]);
 
+  const [voiceChatVisible, setVoiceChatVisible] = useState(false);
   const handleMicLongPress = useCallback(() => {
-    useSettingsStore.getState().setShowVoiceMode(true);
+    setVoiceChatVisible(true);
   }, []);
 
   const handleAttach = useCallback(() => {
@@ -343,6 +345,11 @@ export default function AIPane() {
           />
         </TouchableOpacity>
       </View>
+
+      <VoiceChat
+        visible={voiceChatVisible}
+        onClose={() => setVoiceChatVisible(false)}
+      />
     </View>
   );
 }

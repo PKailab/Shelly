@@ -418,6 +418,7 @@ const en: Record<string, string> = {
   'auth.done': 'Done',
   'auth.skip': 'Skip for now',
   'auth.error': 'Error',
+  'auth.oauth_timeout': 'Browser sign-in timed out. Please try again.',
   'auth.key_empty': 'Please enter an API key.',
   'auth.verify_failed': 'API key was saved but verification failed. Please check the key.',
   'auth.save_failed': 'Failed to save API key.',

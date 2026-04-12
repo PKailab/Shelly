@@ -148,16 +148,6 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           <View style={styles.headerCenter}>
             <MaterialIcons name="data-usage" size={10} color={C.text2} />
             <Text style={styles.tokenText}>42K / 1H</Text>
-            <Pressable style={styles.headerMiniBtn} hitSlop={4} onPress={() => {
-              import('@/hooks/use-native-exec').then((m) =>
-                m.execCommand('cd "$(pwd)" && git add -A && git commit -m "savepoint" 2>&1 | tail -3')
-              ).catch(() => {});
-            }}>
-              <MaterialIcons name="save" size={11} color={C.text2} />
-            </Pressable>
-            <Pressable style={styles.headerMiniBtn} hitSlop={4}>
-              <MaterialIcons name="push-pin" size={11} color={C.text2} />
-            </Pressable>
           </View>
         )}
 
@@ -227,32 +217,6 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
         </SafeAreaInsetsContext.Provider>
       </View>
 
-      {tab === 'terminal' && (
-        <View style={styles.fabContainer}>
-          <Pressable
-            style={styles.fab}
-            onPress={() => {
-              import('@/hooks/use-native-exec').then((m) =>
-                m.execCommand('cd "$(pwd)" && git add -A && git commit -m "savepoint" 2>&1 | tail -3')
-              ).catch(() => {});
-            }}
-            hitSlop={6}
-          >
-            <MaterialIcons name="save" size={16} color={C.btnPrimaryText} />
-          </Pressable>
-          <Pressable
-            style={styles.fab}
-            onPress={() => {
-              import('@/hooks/use-native-exec').then((m) =>
-                m.execCommand('cd "$(pwd)" && git add -A && git push 2>&1 | tail -3')
-              ).catch(() => {});
-            }}
-            hitSlop={6}
-          >
-            <MaterialIcons name="arrow-upward" size={16} color={C.btnPrimaryText} />
-          </Pressable>
-        </View>
-      )}
 
       <PaneSelector
         visible={selectorVisible}

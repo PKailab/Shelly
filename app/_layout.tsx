@@ -111,6 +111,19 @@ export default function RootLayout() {
 
 
 
+    // Wire voice-chain bridge so VoiceChat can execute terminal commands.
+    // The bridge was exported but never hooked up, leaving the voice dialogue
+    // loop unable to reach the terminal.
+    import('@/hooks/use-voice-chat').then(({ setVoiceChainBridge }) => {
+      import('@/hooks/use-native-exec').then(({ execCommand }) => {
+        setVoiceChainBridge(async (cmd) => {
+          const r = await execCommand(cmd, 30_000);
+          return { stdout: r.stdout, stderr: r.stderr };
+        });
+        logInfo('RootLayout', 'Loaded: voice-chain bridge');
+      });
+    });
+
     // Initialize reduce-motion detection for sound/animation system
     useSoundStore.getState().initReduceMotion();
 

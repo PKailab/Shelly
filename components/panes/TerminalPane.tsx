@@ -628,16 +628,6 @@ export default function TerminalScreen() {
         </View>
       )}
 
-      {/* Block History Toggle FAB */}
-      {isConnected && !showBlockHistory && (
-        <TouchableOpacity
-          onPress={() => setShowBlockHistory(true)}
-          style={[styles.blockHistoryFab, { backgroundColor: c.surface, borderColor: withAlpha(c.accent, 0.3) }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialIcons name="history" size={16} color={c.accent} />
-        </TouchableOpacity>
-      )}
 
       {/* Japanese Input Proxy removed — NativeTerminalView handles inline JP input directly */}
 
@@ -658,6 +648,7 @@ export default function TerminalScreen() {
             });
           }}
           onVoice={handleVoiceInput}
+          onVoiceLong={() => setVoiceChatVisible(true)}
         />
       )}
 

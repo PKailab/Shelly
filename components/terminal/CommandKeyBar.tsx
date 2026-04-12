@@ -27,6 +27,8 @@ type Props = {
   onAttach?: () => void;
   /** Voice input callback — called with the transcript text when recording completes */
   onVoice?: (text: string) => void;
+  /** Long-press on the mic opens the continuous voice dialogue mode */
+  onVoiceLong?: () => void;
 };
 
 type KeyConfig = {
@@ -109,7 +111,7 @@ const KEY_SETS: Record<KeySetId, { label: string; icon: string; keys: KeyConfig[
 
 const SET_ORDER: KeySetId[] = ['default', 'vim', 'git', 'repl', 'navigate'];
 
-export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAttach, onVoice }: Props) {
+export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAttach, onVoice, onVoiceLong }: Props) {
   const { colors: c } = useTheme();
   const { settings } = useTerminalStore();
   const [activeSet, setActiveSet] = useState<KeySetId>('default');
@@ -228,7 +230,13 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
           </Pressable>
         )}
         {onVoice && (
-          <Pressable onPress={handleVoicePress} hitSlop={6} style={styles.miniBtn}>
+          <Pressable
+            onPress={handleVoicePress}
+            onLongPress={onVoiceLong}
+            delayLongPress={350}
+            hitSlop={6}
+            style={styles.miniBtn}
+          >
             <MaterialIcons
               name="mic"
               size={13}

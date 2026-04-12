@@ -40,7 +40,7 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
   const theme = useTheme();
   const { background, surface, foreground, muted, accent, border } = theme.colors;
 
-  const { bookmarks: userBookmarks, addBookmark, loadBookmarks } = useBrowserStore();
+  const { bookmarks: userBookmarks, addBookmark, removeBookmark, loadBookmarks } = useBrowserStore();
   // Presets are always shown first, followed by user-added bookmarks
   const bookmarks = React.useMemo(
     () => [...PRESET_BOOKMARKS, ...userBookmarks],
@@ -151,9 +151,14 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
           returnKeyType="go"
           selectTextOnFocus
         />
-        <TouchableOpacity onPress={handleRefresh} style={styles.navBtn}>
-          <MaterialIcons name="close" size={14} color="#6B7280" />
-        </TouchableOpacity>
+        {inputUrl.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setInputUrl('')}
+            style={styles.navBtn}
+          >
+            <MaterialIcons name="close" size={14} color="#6B7280" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Bookmark tabs — tab style matching mock */}
@@ -192,7 +197,15 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
                 {bm.label.toUpperCase()}
               </Text>
               {isActive && !isPreset && (
-                <TouchableOpacity hitSlop={8} style={styles.bookmarkClose}>
+                <TouchableOpacity
+                  hitSlop={8}
+                  style={styles.bookmarkClose}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    removeBookmark(bm.url);
+                    setActiveBookmarkIdx(0);
+                  }}
+                >
                   <MaterialIcons name="close" size={10} color="#6B7280" />
                 </TouchableOpacity>
               )}

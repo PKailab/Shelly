@@ -57,13 +57,6 @@ export function ContextBar() {
 
       <View style={styles.spacer} />
 
-      {/* Tagline */}
-      <Text style={styles.tagline}>
-        BUILDING A TERMINAL IDE ON ANDROID WITH REACT NATIVE
-      </Text>
-
-      <View style={styles.spacer} />
-
       {/* Connection status */}
       <View style={styles.segment}>
         <View style={[styles.dot, {

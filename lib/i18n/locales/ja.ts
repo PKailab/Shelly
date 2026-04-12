@@ -399,6 +399,7 @@ const ja: Record<string, string> = {
   'auth.done': '完了',
   'auth.skip': 'あとで設定',
   'auth.error': 'エラー',
+  'auth.oauth_timeout': 'ブラウザ認証がタイムアウトしました。もう一度試してください。',
   'auth.key_empty': 'APIキーを入力してください。',
   'auth.verify_failed': 'APIキーは保存されましたが、検証に失敗しました。キーを確認してください。',
   'auth.save_failed': 'APIキーの保存に失敗しました。',

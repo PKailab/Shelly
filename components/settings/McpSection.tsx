@@ -118,11 +118,11 @@ export function McpSection({ isConnected, onRunCommand }: McpSectionProps) {
             t('mcp.applied_msg', { count: String(enabledCount) }),
           );
         } else {
-          Alert.alert(t('mcp.error_title'), t('mcp.write_error'));
+          Alert.alert(t('mcp.write_error_title'), t('mcp.write_error_msg'));
         }
       } catch {
         setIsApplying(false);
-        Alert.alert(t('mcp.error_title'), t('mcp.apply_error'));
+        Alert.alert(t('mcp.apply_error_title'), t('mcp.apply_error_msg'));
       }
     } else {
       // 未接続時: クリップボードに設定JSONをコピー
