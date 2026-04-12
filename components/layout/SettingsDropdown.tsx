@@ -142,7 +142,41 @@ function DisplaySection() {
           })}
         </View>
       </Row>
+
+      {/* UI font family */}
+      <FontFamilyRow />
     </Section>
+  );
+}
+
+function FontFamilyRow() {
+  const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'silkscreen');
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const options: Array<{ value: 'silkscreen' | 'pixel' | 'mono'; label: string }> = [
+    { value: 'silkscreen', label: 'Silk' },
+    { value: 'pixel',      label: '8bit' },
+    { value: 'mono',       label: 'Mono' },
+  ];
+  return (
+    <Row label="Font">
+      <View style={styles.segGroup}>
+        {options.map((opt) => {
+          const active = uiFont === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              style={[styles.segBtn, active && styles.segBtnActive]}
+              onPress={() => updateSettings({ uiFont: opt.value })}
+              hitSlop={4}
+            >
+              <Text style={[styles.segLabel, active && styles.segLabelActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Row>
   );
 }
 

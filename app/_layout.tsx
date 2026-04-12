@@ -49,13 +49,20 @@ export default function RootLayout() {
     'PixelMplus12': require('@/assets/fonts/PixelMplus12-Regular.ttf'),
     'GeistPixel-Square': require('@/assets/fonts/GeistPixel-Square.ttf'),
     'PressStart2P': require('@/assets/fonts/PressStart2P_400Regular.ttf'),
+    // Silkscreen — closer to the mock's readable pixel aesthetic than
+    // PressStart2P (which is a pure 8×8 grid). Provided via
+    // @expo-google-fonts/silkscreen.
+    'Silkscreen': require('@expo-google-fonts/silkscreen/Silkscreen_400Regular.ttf'),
   });
-  const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'pixel');
+  const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'silkscreen');
   const loadSettings = useTerminalStore((s) => s.loadSettings);
 
   // Override default Text fontFamily globally
   useEffect(() => {
-    const fontFamily = uiFont === 'pixel' ? 'PressStart2P' : 'monospace';
+    const fontFamily =
+      uiFont === 'silkscreen' ? 'Silkscreen' :
+      uiFont === 'pixel' ? 'PressStart2P' :
+      'monospace';
     const defaultStyle = (Text as any).render;
     if (defaultStyle) {
       // Wrap Text.render to inject fontFamily

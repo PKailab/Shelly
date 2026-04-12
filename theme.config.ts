@@ -13,6 +13,8 @@ export const colors = {
   // Accent
   accent: '#00D4AA',        // primary accent (cyan)
   accentGreen: '#22C55E',   // running dot green
+  accentBlue: '#60A5FA',    // file/folder icon blue (mock)
+  accentCode: '#60A5FA',    // code ls-dir color
   warning: '#F59E0B',       // ⚠ warning amber
 
   // Text
@@ -61,7 +63,9 @@ export const colors = {
 // ─── Fonts ──────────────────────────────────────────────────────────────────
 
 export const fonts = {
-  family: 'PressStart2P',
+  // Default UI font — matches the mock's pixel aesthetic while staying
+  // readable at small sizes. Users can override via Settings → Display → Font.
+  family: 'Silkscreen',
 
   // PressStart2P is an 8x8 pixel font, so each unit reads about 1.4× a normal
   // monospace pixel. These sizes were tuned down from 10/9/8 because the
@@ -84,11 +88,12 @@ export const sizes = {
   paneHeaderHeight: 24,
   layoutBarHeight: 32,
   sidebarWidth: 156,
-  sidebarItemHeight: 20,
-  sidebarSectionHeaderHeight: 22,
+  // Tightened rows — mock renders much denser than the original 20/22 px.
+  sidebarItemHeight: 16,
+  sidebarSectionHeaderHeight: 18,
   agentDotSize: 5,
   borderWidth: 1,
-  contextBarHeight: 20,
+  contextBarHeight: 18,
 } as const;
 
 // ─── Padding ────────────────────────────────────────────────────────────────
@@ -97,7 +102,8 @@ export const padding = {
   agentBar:     { px: 5 },
   agentTab:     { px: 8, py: 4 },
   paneHeader:   { px: 6 },
-  sidebarItem:  { px: 10, py: 3 },
+  // Tighter sidebar rows — py dropped from 3 to 1 for denser stacking.
+  sidebarItem:  { px: 10, py: 1 },
   layoutButton: { px: 10, py: 4, gap: 5 },
   statusBadge:  { px: 5, py: 2 },
 } as const;

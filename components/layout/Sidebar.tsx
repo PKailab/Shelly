@@ -219,7 +219,7 @@ export function Sidebar() {
                   style={[styles.repoRow, repo.active && styles.repoRowActive]}
                 >
                   <View style={[styles.repoIcon, { backgroundColor: repo.active ? C.accent : C.btnSecondaryBg }]}>
-                    <MaterialIcons name="folder" size={10} color={repo.active ? C.btnPrimaryText : C.text2} />
+                    <MaterialIcons name="folder" size={10} color={repo.active ? C.btnPrimaryText : C.accentBlue} />
                   </View>
                   <Text style={[styles.repoName, { color: repo.active ? C.accent : C.text1 }]} numberOfLines={1}>
                     {repo.name}
@@ -242,7 +242,7 @@ export function Sidebar() {
                     <MaterialIcons
                       name="folder"
                       size={10}
-                      color={isActive ? C.btnPrimaryText : C.text2}
+                      color={isActive ? C.btnPrimaryText : C.accentBlue}
                     />
                   </View>
                   <Text

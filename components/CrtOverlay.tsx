@@ -6,13 +6,18 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 
 // ── CRT constants ────────────────────────────────────────────────────────────
-// Scanline: 1px black + 3px gap, fixed 0.15 opacity (not scaled by intensity)
-const SCANLINE_OPACITY = 0.15;
-// Phosphor green: rgba(0,255,68,0.03) × intensity
-const PHOSPHOR_BASE_ALPHA = 0.03;
-// Vignette: outer 20% dimmed to 0.85 brightness → overlay black at 0.15
+// Scanline / phosphor / vignette caps. The `intensity` slider (0..1) blends
+// between a floor and these caps so dragging the slider has a visible effect
+// across the full range — previously phosphor capped at 3% opacity and
+// scanlines ignored the slider entirely, which is why users thought the
+// slider did nothing.
+const SCANLINE_OPACITY_MIN = 0.05;
+const SCANLINE_OPACITY_MAX = 0.28;
+const PHOSPHOR_ALPHA_MIN = 0.005;
+const PHOSPHOR_ALPHA_MAX = 0.09;
 const VIGNETTE_BAND_RATIO = 0.20;
-const VIGNETTE_OPACITY = 0.15;
+const VIGNETTE_OPACITY_MIN = 0.05;
+const VIGNETTE_OPACITY_MAX = 0.35;
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -58,49 +63,50 @@ export function CrtOverlay() {
 
   if (!crtEnabled) return null;
 
-  // Scale all effect opacities by crtIntensity (0-100 → 0-1)
-  const intensity = crtIntensity / 100;
+  // Lerp from floor to ceiling so every slider position is visibly different.
+  const t = Math.max(0, Math.min(1, crtIntensity / 100));
+  const lerp = (a: number, b: number) => a + (b - a) * t;
+  const scanlineOpacity = lerp(SCANLINE_OPACITY_MIN, SCANLINE_OPACITY_MAX);
+  const phosphorOpacity = lerp(PHOSPHOR_ALPHA_MIN, PHOSPHOR_ALPHA_MAX);
+  const vignetteOpacity = lerp(VIGNETTE_OPACITY_MIN, VIGNETTE_OPACITY_MAX);
 
   return (
     <Animated.View
       style={[styles.container, flickerStyle]}
       pointerEvents="none"
     >
-      {/* ── Scanlines (fixed 0.15 opacity, not scaled) ── */}
+      {/* ── Scanlines (opacity scales with intensity) ── */}
       <View style={styles.scanlineContainer} pointerEvents="none">
         {SCANLINES.map((_, i) => (
           <View
             key={i}
-            style={[styles.scanline, { opacity: SCANLINE_OPACITY }]}
+            style={[styles.scanline, { opacity: scanlineOpacity }]}
           />
         ))}
       </View>
 
-      {/* ── Phosphor green tint: rgba(0,255,68,0.03) × intensity ── */}
+      {/* ── Phosphor green tint ── */}
       <View
-        style={[
-          styles.phosphorTint,
-          { opacity: PHOSPHOR_BASE_ALPHA * intensity },
-        ]}
+        style={[styles.phosphorTint, { opacity: phosphorOpacity }]}
         pointerEvents="none"
       />
 
-      {/* ── Vignette: outer 20% dimmed to 0.85 brightness ── */}
+      {/* ── Vignette: outer 20% dimmed ── */}
       <View style={styles.vignetteContainer} pointerEvents="none">
         <View
-          style={[styles.vignetteTop, { height: VIGNETTE_V_BAND, opacity: VIGNETTE_OPACITY }]}
+          style={[styles.vignetteTop, { height: VIGNETTE_V_BAND, opacity: vignetteOpacity }]}
           pointerEvents="none"
         />
         <View
-          style={[styles.vignetteBottom, { height: VIGNETTE_V_BAND, opacity: VIGNETTE_OPACITY }]}
+          style={[styles.vignetteBottom, { height: VIGNETTE_V_BAND, opacity: vignetteOpacity }]}
           pointerEvents="none"
         />
         <View
-          style={[styles.vignetteLeft, { width: VIGNETTE_H_BAND, opacity: VIGNETTE_OPACITY }]}
+          style={[styles.vignetteLeft, { width: VIGNETTE_H_BAND, opacity: vignetteOpacity }]}
           pointerEvents="none"
         />
         <View
-          style={[styles.vignetteRight, { width: VIGNETTE_H_BAND, opacity: VIGNETTE_OPACITY }]}
+          style={[styles.vignetteRight, { width: VIGNETTE_H_BAND, opacity: vignetteOpacity }]}
           pointerEvents="none"
         />
       </View>

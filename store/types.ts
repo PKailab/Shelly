@@ -408,8 +408,9 @@ export type AppSettings = {
   terminalTheme: string;
   /** Enable OpenGL ES 3.0 GPU hardware acceleration for terminal rendering */
   gpuRendering?: boolean;
-  /** UI font family: 'pixel' (8-bit dot) or 'mono' (system monospace) */
-  uiFont?: 'pixel' | 'mono';
+  /** UI font family: 'silkscreen' (mock default, readable pixel),
+   *  'pixel' (PressStart2P 8×8 grid), or 'mono' (system monospace) */
+  uiFont?: 'silkscreen' | 'pixel' | 'mono';
 };
 
 // ─── Background Agents ──────────────────────────────────────────────────────

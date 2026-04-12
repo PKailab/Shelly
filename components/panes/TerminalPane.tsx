@@ -432,12 +432,12 @@ export default function TerminalScreen() {
   // settings store hasn't loaded yet. Compact screens (Z Fold6 cover ~ 373dp)
   // shave one extra step.
   const termFontSize = (() => {
-    const base = settings.fontSize ?? 10;
-    // settings.fontSize comes in as 12/14/16 from the S/M/L preset; map down
-    // to the smaller scale the terminal renderer needs (PressStart2P-style 8x8
-    // glyphs make sp values read about 1.4x larger than a normal monospace).
-    const mapped = base <= 12 ? 8 : base <= 14 ? 10 : 12;
-    return layout.isCompact ? Math.max(7, mapped - 1) : mapped;
+    const base = settings.fontSize ?? 12;
+    // settings.fontSize comes in as 12/14/16 from the S/M/L preset.
+    // Widened from the previous 8/10/12 mapping (users said fontSize
+    // button had no visible effect) so each step is clearly distinct.
+    const mapped = base <= 12 ? 7 : base <= 14 ? 11 : 15;
+    return layout.isCompact ? Math.max(6, mapped - 1) : mapped;
   })();
 
   // Send text to terminal via native PTY

@@ -99,7 +99,7 @@ export function FileTree() {
             <MaterialIcons
               name={item.isDir ? 'folder' : 'insert-drive-file'}
               size={I.fileIcon}
-              color={item.isDir ? C.text3 : C.text3}
+              color={C.accentBlue}
             />
             <Text style={[
               styles.fileName,
@@ -147,7 +147,7 @@ export function FileTree() {
             <MaterialIcons
               name={item.isDirectory ? 'folder' : 'insert-drive-file'}
               size={I.fileIcon}
-              color={item.isDirectory ? C.text2 : C.text3}
+              color={C.accentBlue}
             />
             <Text
               style={[
@@ -180,14 +180,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
     marginBottom: 3,
     paddingHorizontal: 5,
-    height: 20,
+    height: 18,
     gap: 4,
     borderBottomWidth: S.borderWidth,
     borderBottomColor: C.border,
   },
   search: {
     flex: 1,
-    height: 20,
+    height: 18,
     fontSize: F.fileName.size,
     fontFamily: F.family,
     fontWeight: F.fileName.weight,
