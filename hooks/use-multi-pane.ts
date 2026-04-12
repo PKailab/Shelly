@@ -132,6 +132,8 @@ type MultiPaneState = {
   root: PaneNode | null;
   /** Max total leaf panes allowed */
   maxPanes: number;
+  /** When non-null, only this leaf is rendered full-screen */
+  maximizedPaneId: string | null;
 };
 
 type MultiPaneActions = {
@@ -146,10 +148,14 @@ type MultiPaneActions = {
   removePane: (leafId: string) => void;
   /** Update split ratio by split node id */
   setSplitRatio: (splitId: string, ratio: number) => void;
+  /** Reset a split to 50/50 (double-tap handle) */
+  resetSplitRatio: (splitId: string) => void;
   /** Update maxPanes */
   setMaxPanes: (max: number) => void;
   /** Initialize for shell layout — always on, starts with 1 terminal pane */
   initShell: () => void;
+  /** Toggle fullscreen for one leaf (null = restore) */
+  toggleMaximize: (leafId: string) => void;
 
   // ── Backwards compat (used by TerminalHeader, etc.) ──
   /** @deprecated Use root tree instead */
@@ -165,6 +171,7 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
     isMultiPane: false,
     root: null,
     maxPanes: 4,
+    maximizedPaneId: null,
 
     // Backwards compat getter
     get panes() {
@@ -262,6 +269,22 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
         found.node.ratio = Math.max(0.15, Math.min(0.85, ratio));
         set({ root: newRoot });
       }
+    },
+
+    resetSplitRatio: (splitId) => {
+      const { root } = get();
+      if (!root) return;
+      const newRoot = cloneTree(root);
+      const found = findNode(newRoot, splitId);
+      if (found && found.node.type === 'split') {
+        found.node.ratio = 0.5;
+        set({ root: newRoot });
+      }
+    },
+
+    toggleMaximize: (leafId) => {
+      const { maximizedPaneId } = get();
+      set({ maximizedPaneId: maximizedPaneId === leafId ? null : leafId });
     },
 
     setMaxPanes: (max) => {

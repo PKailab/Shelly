@@ -5,6 +5,7 @@ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PANE_REGISTRY } from './pane-registry';
 import { PaneSelector } from './PaneSelector';
 import type { PaneTab } from '@/hooks/use-multi-pane';
+import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { usePaneStore, getAgentColor, AGENT_COLORS } from '@/store/pane-store';
 import { useSettingsStore } from '@/store/settings-store';
 import { onCommandComplete } from '@/lib/cli-notification';
@@ -51,6 +52,7 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
   const [notification, setNotification] = useState<{ status: 'done' | 'error' } | null>(null);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasBrowserRef = useRef(tab === 'browser');
+  const isMaximized = useMultiPaneStore((s) => s.maximizedPaneId === leafId);
   const entry = PANE_REGISTRY[tab];
   const agentColor = usePaneStore((s) => getAgentColor(s.paneAgents, leafId));
   const boundAgent = usePaneStore((s) => s.paneAgents[leafId] ?? null);
@@ -155,27 +157,32 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
 
         <View style={styles.headerActions}>
           {canSplit && (
-            <>
-              <Pressable
-                style={styles.actionBtn}
-                onPress={() => onSplitH('terminal')}
-                hitSlop={6}
-              >
-                <MaterialIcons name="view-column" size={13} color={C.text2} />
-              </Pressable>
-              <Pressable
-                style={styles.actionBtn}
-                onPress={() => setSplitMenuVisible(true)}
-                hitSlop={6}
-              >
-                <MaterialIcons name="grid-view" size={13} color={C.text2} />
-              </Pressable>
-            </>
+            <Pressable
+              style={styles.actionBtn}
+              onPress={() => setSplitMenuVisible(true)}
+              hitSlop={6}
+              accessibilityLabel="Split pane"
+            >
+              <MaterialIcons name="call-split" size={13} color={C.text2} />
+            </Pressable>
           )}
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() => useMultiPaneStore.getState().toggleMaximize(leafId)}
+            hitSlop={6}
+            accessibilityLabel="Maximize pane"
+          >
+            <MaterialIcons
+              name={isMaximized ? 'fullscreen-exit' : 'fullscreen'}
+              size={14}
+              color={isMaximized ? C.accent : C.text2}
+            />
+          </Pressable>
           <Pressable
             style={styles.actionBtn}
             onPress={onRemove}
             hitSlop={6}
+            accessibilityLabel="Close pane"
           >
             <MaterialIcons name="close" size={13} color={C.text2} />
           </Pressable>

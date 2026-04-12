@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useMultiPaneStore, type PaneNode, type PaneSplit } from '@/hooks/use-multi-pane';
+import { useMultiPaneStore, type PaneNode, type PaneSplit, type PaneLeaf } from '@/hooks/use-multi-pane';
 import { PaneSlot } from './PaneSlot';
 import { colors as C } from '@/theme.config';
 
@@ -95,10 +95,28 @@ function countLeavesQuick(node: PaneNode): number {
   return countLeavesQuick(node.children[0]) + countLeavesQuick(node.children[1]);
 }
 
+/** Find a leaf by id in the tree */
+function findLeafById(node: PaneNode, id: string): PaneLeaf | null {
+  if (node.type === 'leaf') return node.id === id ? node : null;
+  return findLeafById(node.children[0], id) ?? findLeafById(node.children[1], id);
+}
+
 export function MultiPaneContainer() {
-  const { root } = useMultiPaneStore();
+  const { root, maximizedPaneId } = useMultiPaneStore();
 
   if (!root) return null;
+
+  // Fullscreen mode: render only the maximized leaf
+  if (maximizedPaneId) {
+    const leaf = findLeafById(root, maximizedPaneId);
+    if (leaf) {
+      return (
+        <View style={styles.root}>
+          <PaneTreeNode node={leaf} />
+        </View>
+      );
+    }
+  }
 
   return (
     <View style={styles.root}>
