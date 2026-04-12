@@ -12,6 +12,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import * as Haptics from 'expo-haptics';
 import { useSettingsStore } from '@/store/settings-store';
 import { useTerminalStore } from '@/store/terminal-store';
+import TerminalEmulator from '@/modules/terminal-emulator/src/TerminalEmulatorModule';
 import { usePreviewStore } from '@/store/preview-store';
 import { ConnectionMode } from '@/store/types';
 import { useDeviceLayout } from '@/hooks/use-device-layout';
@@ -168,7 +169,17 @@ export function TerminalHeader() {
                 buttons.push({
                   text: 'Close',
                   style: 'destructive',
-                  onPress: () => removeSession(session.id),
+                  onPress: async () => {
+                    // Destroy the native PTY first. Skipping this left the
+                    // JNI emulator alive after the JS store removed the tab,
+                    // which crashed TerminalView on the next render because
+                    // it tried to reach a session id that no longer existed
+                    // in JS but still had a live native counterpart.
+                    try {
+                      await TerminalEmulator.destroySession(session.nativeSessionId);
+                    } catch {}
+                    removeSession(session.id);
+                  },
                 });
               }
               Alert.alert(

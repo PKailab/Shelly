@@ -202,7 +202,6 @@ const rowStyles = StyleSheet.create({
   },
   gutter: {
     width: 30,
-    fontFamily: 'monospace',
     fontSize: 11,
     color: '#555',
     marginRight: 6,
@@ -210,7 +209,6 @@ const rowStyles = StyleSheet.create({
   },
   code: {
     flex: 1,
-    fontFamily: 'monospace',
     fontSize: 12,
     lineHeight: 17,
   },
@@ -302,7 +300,6 @@ const hunkStyles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   headerText: {
-    fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -320,7 +317,6 @@ const hunkStyles = StyleSheet.create({
     borderWidth: 1,
   },
   pillText: {
-    fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -356,7 +352,6 @@ const hunkStyles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   rejectedBadge: {
-    fontFamily: 'monospace',
     fontSize: 10,
     color: '#666',
     letterSpacing: 0.5,
@@ -471,7 +466,6 @@ const diffBlockStyles = StyleSheet.create({
     marginBottom: 4,
   },
   stickyLabel: {
-    fontFamily: 'monospace',
     fontSize: 11,
     color: '#888',
   },
@@ -536,7 +530,6 @@ const inlineStyles = StyleSheet.create({
     flex: 1,
   },
   plainText: {
-    fontFamily: 'monospace',
     fontSize: 13,
     color: '#cccccc',
     lineHeight: 18,

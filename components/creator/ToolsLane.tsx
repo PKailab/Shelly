@@ -654,7 +654,6 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#6B7280',
     marginBottom: 6,
     letterSpacing: 0.5,
@@ -678,7 +677,6 @@ const styles = StyleSheet.create({
   },
   toolBtnText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#6B7280',
     fontWeight: '600',
   },
@@ -687,7 +685,6 @@ const styles = StyleSheet.create({
   },
   toolBtnDesc: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#374151',
     marginTop: 2,
     textAlign: 'center',
@@ -705,7 +702,6 @@ const styles = StyleSheet.create({
   targetBtnText: {
     flex: 1,
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
   },
   targetBtnChevron: {
@@ -731,12 +727,10 @@ const styles = StyleSheet.create({
   },
   projectPickerItemText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
   },
   projectPickerItemTags: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#4B5563',
     marginTop: 2,
   },
@@ -748,7 +742,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 13,
-    fontFamily: 'monospace',
     color: '#E5E7EB',
     minHeight: 60,
     textAlignVertical: 'top',
@@ -789,13 +782,11 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#E5E7EB',
     fontWeight: '600',
   },
   resetBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#6B7280',
   },
   statusRow: {
@@ -806,7 +797,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
   },
   logContainer: {
@@ -820,7 +810,6 @@ const styles = StyleSheet.create({
   },
   logHeader: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#4B5563',
     marginBottom: 4,
   },
@@ -829,7 +818,6 @@ const styles = StyleSheet.create({
   },
   logLine: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
     lineHeight: 16,
   },
@@ -857,14 +845,12 @@ const styles = StyleSheet.create({
   },
   resultTitle: {
     fontSize: 13,
-    fontFamily: 'monospace',
     color: '#00D4AA',
     fontWeight: '700',
     marginBottom: 6,
   },
   resultSummary: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#D1FAE5',
     lineHeight: 18,
     marginBottom: 8,
@@ -874,13 +860,11 @@ const styles = StyleSheet.create({
   },
   resultFilesLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#6B7280',
     marginBottom: 2,
   },
   resultFileItem: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
     lineHeight: 16,
   },
@@ -889,13 +873,11 @@ const styles = StyleSheet.create({
   },
   resultNextLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#6B7280',
     marginBottom: 2,
   },
   resultNextItem: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
     lineHeight: 16,
   },
@@ -911,7 +893,6 @@ const styles = StyleSheet.create({
   },
   terminalBtnText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
   },
   warningBox: {
@@ -924,7 +905,6 @@ const styles = StyleSheet.create({
   },
   warningText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#FCD34D',
     lineHeight: 16,
   },
@@ -965,7 +945,6 @@ const styles = StyleSheet.create({
   },
   connectionBannerText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   connectionBannerTextOk: {
@@ -984,7 +963,6 @@ const styles = StyleSheet.create({
   },
   bridgeCheckBtnText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#FCD34D',
     fontWeight: '600',
   },
@@ -1000,14 +978,12 @@ const styles = StyleSheet.create({
   },
   setupGuideTitle: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#E8E8E8',
     fontWeight: '700',
     marginBottom: 4,
   },
   setupGuideStep: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9CA3AF',
   },
   setupGuideCmd: {
@@ -1018,13 +994,11 @@ const styles = StyleSheet.create({
   },
   setupGuideCmdText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#00D4AA',
     lineHeight: 16,
   },
   setupGuideNote: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#6B7280',
     lineHeight: 15,
     marginTop: 2,
@@ -1056,7 +1030,6 @@ const styles = StyleSheet.create({
   llmBannerText: {
     flex: 1,
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#A78BFA',
   },
   llmClearBtn: {
@@ -1069,7 +1042,6 @@ const styles = StyleSheet.create({
   },
   llmClearBtnText: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#A78BFA',
   },
 });

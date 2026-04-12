@@ -38,7 +38,6 @@ export function UsageIndicator() {
 const styles = StyleSheet.create({
   badge: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
 });

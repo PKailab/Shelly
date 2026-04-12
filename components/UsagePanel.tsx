@@ -128,7 +128,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 11,
     color: C.accent,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   cards: {

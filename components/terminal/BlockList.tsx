@@ -339,17 +339,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   welcomeAscii: {
-    fontFamily: 'monospace',
     fontSize: 10,
     lineHeight: 15,
   },
   welcomeSubtitle: {
-    fontFamily: 'monospace',
     fontSize: 11,
     marginTop: 8,
   },
   welcomeHint: {
-    fontFamily: 'monospace',
     fontSize: 10,
     marginTop: 2,
   },
@@ -368,20 +365,16 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   promptDir: {
-    fontFamily: 'monospace',
     flexShrink: 1,
   },
   promptSymbol: {
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   promptAi: {
-    fontFamily: 'monospace',
     fontWeight: '700',
     marginRight: 6,
   },
   promptNatural: {
-    fontFamily: 'monospace',
     flex: 1,
   },
   scrollBtnWrapper: {
@@ -392,7 +385,6 @@ const styles = StyleSheet.create({
   },
   scrollBtn: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '700',
     paddingHorizontal: 14,
     paddingVertical: 6,

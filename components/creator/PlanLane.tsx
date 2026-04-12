@@ -142,7 +142,6 @@ const styles = StyleSheet.create({
   },
   laneLabel: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#4B5563',
     letterSpacing: 1.5,
   },
@@ -162,13 +161,11 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#374151',
     fontStyle: 'italic',
   },
   thinking: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#6B7280',
   },
   planContent: {
@@ -189,13 +186,11 @@ const styles = StyleSheet.create({
   },
   stepNum: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#00D4AA',
     width: 16,
   },
   stepText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9BA1A6',
     flex: 1,
   },
@@ -206,7 +201,6 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#4B5563',
   },
   actions: {
@@ -224,7 +218,6 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#6B7280',
   },
   confirmBtn: {
@@ -237,7 +230,6 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#00D4AA',
     fontWeight: '600',
   },

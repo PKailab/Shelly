@@ -176,7 +176,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#888',
     fontSize: 11,
-    fontFamily: 'monospace',
   },
   divider: {
     height: 1,

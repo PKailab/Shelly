@@ -110,12 +110,10 @@ const styles = StyleSheet.create({
   },
   trigger: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   desc: {
     fontSize: 11,
-    fontFamily: 'monospace',
     flex: 1,
   },
 });

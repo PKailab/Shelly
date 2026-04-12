@@ -221,12 +221,10 @@ const styles = StyleSheet.create({
   },
   entryMessage: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '500',
   },
   entryTime: {
     fontSize: 10,
-    fontFamily: 'monospace',
     marginTop: 1,
   },
   showMoreRow: {
@@ -235,7 +233,6 @@ const styles = StyleSheet.create({
   },
   showMoreText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   loadingRow: {
@@ -250,7 +247,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
 });

@@ -422,12 +422,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#60A5FA',
-    fontFamily: 'monospace',
   },
   enabledLabel: {
     fontSize: 12,
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   applyBtn: {
     flexDirection: 'row',
@@ -445,7 +443,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#0A0A0A',
-    fontFamily: 'monospace',
   },
   applyBtnTextDisabled: {
     color: '#4B5563',
@@ -486,7 +483,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   cardNameEnabled: {
     color: '#E5E7EB',
@@ -494,7 +490,6 @@ const styles = StyleSheet.create({
   cardDesc: {
     fontSize: 11,
     color: '#6B7280',
-    fontFamily: 'monospace',
     marginTop: 2,
   },
   recBadge: {
@@ -507,7 +502,6 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     color: '#FBBF24',
-    fontFamily: 'monospace',
   },
   typeBadge: {
     paddingHorizontal: 5,
@@ -517,7 +511,6 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: 9,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   toggleBtn: {
     paddingHorizontal: 10,
@@ -533,7 +526,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   toggleTextOn: {
     color: '#0A0A0A',
@@ -554,7 +546,6 @@ const styles = StyleSheet.create({
   noteText: {
     fontSize: 11,
     color: '#D1D5DB',
-    fontFamily: 'monospace',
     flex: 1,
   },
   tagRow: {
@@ -571,7 +562,6 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 10,
     color: '#9CA3AF',
-    fontFamily: 'monospace',
   },
   actionRow: {
     flexDirection: 'row',
@@ -601,12 +591,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#0A0A0A',
-    fontFamily: 'monospace',
   },
   actionBtnStatusText: {
     fontSize: 11,
     color: '#9CA3AF',
-    fontFamily: 'monospace',
   },
   remoteStatus: {
     flexDirection: 'row',
@@ -617,7 +605,6 @@ const styles = StyleSheet.create({
   remoteStatusText: {
     fontSize: 11,
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   statusDot: {
     width: 8,
@@ -632,12 +619,10 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 10,
     color: '#F87171',
-    fontFamily: 'monospace',
   },
   footer: {
     fontSize: 11,
     color: '#4B5563',
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 16,

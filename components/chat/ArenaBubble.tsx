@@ -193,16 +193,13 @@ const styles = StyleSheet.create({
   arenaTitle: {
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   resultLabel: {
     fontSize: 11,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   prompt: {
     fontSize: 12,
-    fontFamily: 'monospace',
     paddingHorizontal: 12,
     paddingBottom: 8,
   },
@@ -231,7 +228,6 @@ const styles = StyleSheet.create({
   labelText: {
     fontSize: 12,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   revealRow: {
     flexDirection: 'row',
@@ -241,7 +237,6 @@ const styles = StyleSheet.create({
   agentName: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   responseScroll: {
     maxHeight: 200,
@@ -254,11 +249,9 @@ const styles = StyleSheet.create({
   },
   streamingText: {
     fontSize: 11,
-    fontFamily: 'monospace',
   },
   errorText: {
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   voteButton: {
     flexDirection: 'row',
@@ -272,7 +265,6 @@ const styles = StyleSheet.create({
   voteText: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   switchRow: {
     flexDirection: 'row',
@@ -294,11 +286,9 @@ const styles = StyleSheet.create({
   resultText: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   hint: {
     fontSize: 10,
-    fontFamily: 'monospace',
     textAlign: 'center',
     paddingVertical: 6,
   },

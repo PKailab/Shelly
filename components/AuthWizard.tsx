@@ -576,7 +576,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '800',
-    fontFamily: 'monospace',
     color: '#60A5FA',
     textAlign: 'center',
     marginBottom: 8,
@@ -584,7 +583,6 @@ const styles = StyleSheet.create({
   description: {
     color: '#9CA3AF',
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 16,
@@ -604,7 +602,6 @@ const styles = StyleSheet.create({
   warningText: {
     color: '#FBBF24',
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   summaryRow: {
@@ -618,7 +615,6 @@ const styles = StyleSheet.create({
   summaryText: {
     color: '#6B7280',
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   // ── Tool card ──────────────────────────────────────────────────────
   toolCard: {
@@ -649,7 +645,6 @@ const styles = StyleSheet.create({
   toolName: {
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -658,7 +653,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontFamily: 'monospace',
   },
   // ── Auth options ──────────────────────────────────────────────────
   authOptions: {
@@ -683,12 +677,10 @@ const styles = StyleSheet.create({
   authMethodTitle: {
     fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   authMethodDesc: {
     color: '#6B7280',
     fontSize: 11,
-    fontFamily: 'monospace',
     marginTop: 2,
   },
   // ── API key input ─────────────────────────────────────────────────
@@ -698,7 +690,6 @@ const styles = StyleSheet.create({
   apiKeyLabel: {
     color: '#9CA3AF',
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   apiKeyInputRow: {
     flexDirection: 'row',
@@ -714,7 +705,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: '#E5E7EB',
     fontSize: 13,
-    fontFamily: 'monospace',
   },
   saveBtn: {
     paddingHorizontal: 16,
@@ -728,12 +718,10 @@ const styles = StyleSheet.create({
   saveBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   getKeyLink: {
     color: '#60A5FA',
     fontSize: 11,
-    fontFamily: 'monospace',
     textDecorationLine: 'underline',
     marginTop: 2,
   },
@@ -752,7 +740,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: '#000',
     fontSize: 15,
-    fontFamily: 'monospace',
     fontWeight: '800',
   },
 });

@@ -278,7 +278,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   contentArea: {
@@ -292,33 +291,27 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '700',
     textTransform: 'uppercase',
   },
   transcript: {
     fontSize: 16,
-    fontFamily: 'monospace',
     lineHeight: 24,
   },
   commandText: {
     fontSize: 14,
-    fontFamily: 'monospace',
     lineHeight: 20,
   },
   response: {
     fontSize: 15,
-    fontFamily: 'monospace',
     lineHeight: 23,
   },
   error: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#F87171',
   },
   statusText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     marginBottom: 20,
   },
   micArea: {
@@ -352,7 +345,6 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
 });

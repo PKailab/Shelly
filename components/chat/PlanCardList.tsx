@@ -222,12 +222,10 @@ const styles = StyleSheet.create({
   planTitle: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
     flex: 1,
   },
   progress: {
     fontSize: 11,
-    fontFamily: 'monospace',
   },
   progressBar: {
     height: 3,
@@ -257,11 +255,9 @@ const styles = StyleSheet.create({
   stepNumber: {
     fontSize: 12,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   stepTitle: {
     fontSize: 13,
-    fontFamily: 'monospace',
     flex: 1,
     lineHeight: 18,
   },
@@ -274,7 +270,6 @@ const styles = StyleSheet.create({
   },
   substepText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   commandBlock: {
@@ -285,7 +280,6 @@ const styles = StyleSheet.create({
   },
   commandText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   outputBlock: {
@@ -296,7 +290,6 @@ const styles = StyleSheet.create({
   },
   outputText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   buttonRow: {
@@ -316,7 +309,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 11,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   completionBanner: {
     alignItems: 'center',
@@ -327,7 +319,6 @@ const styles = StyleSheet.create({
   completionText: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
     color: '#22C55E',
   },
 });

@@ -564,7 +564,6 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 8,
     fontWeight: '800',
-    fontFamily: 'monospace',
   },
   assistantBubble: {
     flex: 1,
@@ -592,12 +591,10 @@ const styles = StyleSheet.create({
   },
   agentLabel: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   llmModelLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '400',
     marginLeft: 6,
   },
@@ -609,14 +606,12 @@ const styles = StyleSheet.create({
   },
   // Shared
   messageText: {
-    fontFamily: 'monospace',
     lineHeight: 19,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   timestamp: {
     fontSize: 9,
-    fontFamily: 'monospace',
     textAlign: 'right',
   },
   bottomRow: {
@@ -660,13 +655,11 @@ const styles = StyleSheet.create({
   execPrompt: {
     color: C.accent,
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   execCommand: {
     color: '#E8E8E8',
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   exitBadge: {
@@ -676,13 +669,11 @@ const styles = StyleSheet.create({
   },
   exitText: {
     fontSize: 9,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   execOutput: {
     color: '#9CA3AF',
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
     paddingHorizontal: 10,
     paddingBottom: 8,
@@ -701,7 +692,6 @@ const styles = StyleSheet.create({
   },
   openInTerminalText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
 
@@ -713,13 +703,11 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   citationsTitle: {
-    fontFamily: 'monospace',
     fontSize: 10,
     fontWeight: '600',
     marginBottom: 2,
   },
   citationItem: {
-    fontFamily: 'monospace',
     fontSize: 10,
     marginBottom: 1,
   },
@@ -733,7 +721,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   errorText: {
-    fontFamily: 'monospace',
     fontSize: 11,
     color: '#F87171',
     flex: 1,

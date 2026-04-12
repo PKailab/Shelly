@@ -282,61 +282,50 @@ const styles = StyleSheet.create({
   key: {
     color: C.key,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   colon: {
     color: C.colon,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   comma: {
     color: C.comma,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   string: {
     color: C.string,
     fontSize: 12,
-    fontFamily: 'monospace',
     flexShrink: 1,
     flexWrap: 'wrap',
   },
   number: {
     color: C.number,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   boolean: {
     color: C.boolean,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   null: {
     color: C.null,
     fontSize: 12,
-    fontFamily: 'monospace',
     fontStyle: 'italic',
   },
   bracket: {
     color: C.bracket,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   ellipsis: {
     color: C.null,
     fontSize: 12,
-    fontFamily: 'monospace',
     fontStyle: 'italic',
   },
   plain: {
     color: C.plain,
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   raw: {
     color: C.plain,
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
 });

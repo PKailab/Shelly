@@ -345,7 +345,6 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   setLabel: {
-    fontFamily: 'monospace',
     fontSize: 8,
     marginLeft: 4,
   },
@@ -368,6 +367,5 @@ const styles = StyleSheet.create({
   keyText: {
     fontSize: 11,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
 });

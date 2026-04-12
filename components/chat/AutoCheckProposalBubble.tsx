@@ -147,12 +147,10 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   bodyText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   btnRow: {
@@ -172,7 +170,6 @@ const styles = StyleSheet.create({
   enableText: {
     color: '#000',
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   laterBtn: {
@@ -183,7 +180,6 @@ const styles = StyleSheet.create({
   },
   laterText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   iconRow: {
@@ -193,7 +189,6 @@ const styles = StyleSheet.create({
   },
   doneText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 18,
     flex: 1,
   },

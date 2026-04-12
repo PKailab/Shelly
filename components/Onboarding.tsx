@@ -225,14 +225,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
-    fontFamily: 'monospace',
     marginBottom: 12,
     textAlign: 'center',
   },
   description: {
     color: '#9CA3AF',
     fontSize: 14,
-    fontFamily: 'monospace',
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 32,
@@ -258,7 +256,6 @@ const styles = StyleSheet.create({
   navBtnTextSecondary: {
     color: '#6B7280',
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   navBtnPrimary: {
@@ -274,7 +271,6 @@ const styles = StyleSheet.create({
   navBtnTextPrimary: {
     color: '#000',
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '800',
   },
 });

@@ -218,12 +218,10 @@ const tagModalStyles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#E5E7EB',
-    fontFamily: 'monospace',
   },
   hint: {
     fontSize: 11,
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   input: {
     backgroundColor: '#0D0D0D',
@@ -233,7 +231,6 @@ const tagModalStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: '#E5E7EB',
-    fontFamily: 'monospace',
     fontSize: 13,
   },
   actions: {
@@ -252,7 +249,6 @@ const tagModalStyles = StyleSheet.create({
   cancelText: {
     fontSize: 13,
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   saveBtn: {
     flex: 1,
@@ -266,7 +262,6 @@ const tagModalStyles = StyleSheet.create({
   saveText: {
     fontSize: 13,
     color: '#00D4AA',
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
 });
@@ -409,12 +404,10 @@ const cardStyles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#E5E7EB',
-    fontFamily: 'monospace',
   },
   date: {
     fontSize: 10,
     color: '#4B5563',
-    fontFamily: 'monospace',
     marginTop: 1,
   },
   statusBadge: {
@@ -434,7 +427,6 @@ const cardStyles = StyleSheet.create({
   },
   statusText: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#6EE7B7',
   },
   menuBtn: {
@@ -444,12 +436,10 @@ const cardStyles = StyleSheet.create({
   menuBtnText: {
     fontSize: 16,
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   path: {
     fontSize: 10,
     color: '#374151',
-    fontFamily: 'monospace',
     marginBottom: 8,
     marginLeft: 28,
   },
@@ -471,7 +461,6 @@ const cardStyles = StyleSheet.create({
   tagText: {
     fontSize: 10,
     color: '#60A5FA',
-    fontFamily: 'monospace',
   },
   tagChipMore: {
     backgroundColor: '#1A1A1A',
@@ -484,7 +473,6 @@ const cardStyles = StyleSheet.create({
   tagTextMore: {
     fontSize: 10,
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   actions: {
     flexDirection: 'row',
@@ -559,7 +547,6 @@ const sortStyles = StyleSheet.create({
   },
   chipText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#4B5563',
   },
   chipTextActive: {
@@ -634,7 +621,6 @@ const tagFilterStyles = StyleSheet.create({
   },
   chipText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#4B5563',
   },
   chipTextActive: {
@@ -832,7 +818,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     color: '#E5E7EB',
-    fontFamily: 'monospace',
     fontSize: 13,
     padding: 0,
   },
@@ -842,7 +827,6 @@ const styles = StyleSheet.create({
   clearBtnText: {
     fontSize: 12,
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   resultRow: {
     paddingHorizontal: 14,
@@ -851,7 +835,6 @@ const styles = StyleSheet.create({
   resultCount: {
     fontSize: 10,
     color: '#374151',
-    fontFamily: 'monospace',
   },
   list: {
     padding: 12,
@@ -870,12 +853,10 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   emptyHint: {
     fontSize: 11,
     color: '#374151',
-    fontFamily: 'monospace',
   },
   historyHeader: {
     flexDirection: 'row',
@@ -889,7 +870,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#9BA1A6',
-    fontFamily: 'monospace',
   },
   menuBtn: {
     paddingHorizontal: 10,
@@ -898,6 +878,5 @@ const styles = StyleSheet.create({
   menuBtnText: {
     fontSize: 18,
     color: '#9BA1A6',
-    fontFamily: 'monospace',
   },
 });

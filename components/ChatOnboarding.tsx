@@ -203,7 +203,6 @@ const styles = StyleSheet.create({
   message: {
     color: '#D1D5DB',
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 20,
   },
   primaryBtn: {
@@ -219,7 +218,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: '#000',
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   linkBtn: {
@@ -231,7 +229,6 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#A78BFA',
     fontSize: 12,
-    fontFamily: 'monospace',
     textDecorationLine: 'underline',
   },
   input: {
@@ -242,7 +239,6 @@ const styles = StyleSheet.create({
     padding: 10,
     color: '#E5E7EB',
     fontSize: 13,
-    fontFamily: 'monospace',
   },
   skipBtn: {
     alignItems: 'center',
@@ -251,6 +247,5 @@ const styles = StyleSheet.create({
   skipText: {
     color: '#6B7280',
     fontSize: 11,
-    fontFamily: 'monospace',
   },
 });

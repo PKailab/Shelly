@@ -245,7 +245,6 @@ const styles = StyleSheet.create({
   inlineCode: {
     color: C.accent,
     fontSize: 12,
-    fontFamily: 'monospace',
     backgroundColor: CODE_BG,
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -292,7 +291,6 @@ const styles = StyleSheet.create({
   codeBlockText: {
     color: TEXT,
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   blank: {

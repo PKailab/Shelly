@@ -65,12 +65,10 @@ const styles = StyleSheet.create({
   chipLabel: {
     color: C.accent,
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   chipDetail: {
     color: C.text3,
     fontSize: 10,
-    fontFamily: 'monospace',
   },
 });

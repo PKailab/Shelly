@@ -196,7 +196,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
     flex: 1,
   },
@@ -217,7 +216,6 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     fontSize: 12,
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginTop: 20,
   },
@@ -226,11 +224,9 @@ const styles = StyleSheet.create({
   },
   historyCmd: {
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   historyOutput: {
     fontSize: 11,
-    fontFamily: 'monospace',
     marginLeft: 16,
   },
   inputRow: {
@@ -243,13 +239,11 @@ const styles = StyleSheet.create({
   },
   promptChar: {
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   input: {
     flex: 1,
     fontSize: 14,
-    fontFamily: 'monospace',
     paddingVertical: 6,
   },
   sendBtn: {

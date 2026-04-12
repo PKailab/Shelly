@@ -194,11 +194,9 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 24,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   emptySubtitle: {
     fontSize: 13,
-    fontFamily: 'monospace',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -220,13 +218,11 @@ const styles = StyleSheet.create({
   },
   sampleLabel: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
     marginBottom: 2,
   },
   sampleDesc: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   stopRow: {
     alignItems: 'center',
@@ -248,7 +244,6 @@ const styles = StyleSheet.create({
   },
   stopText: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   scrollToBottomFab: {

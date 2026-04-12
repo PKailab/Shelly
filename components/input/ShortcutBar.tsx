@@ -315,11 +315,9 @@ const styles = StyleSheet.create({
   keyLabel: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   keySubLabel: {
     fontSize: 7,
-    fontFamily: 'monospace',
     position: 'absolute',
     bottom: 1,
     right: 2,
@@ -336,6 +334,5 @@ const styles = StyleSheet.create({
   },
   toastText: {
     fontSize: 11,
-    fontFamily: 'monospace',
   },
 });

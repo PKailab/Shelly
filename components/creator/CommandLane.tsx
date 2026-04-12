@@ -172,7 +172,6 @@ const styles = StyleSheet.create({
   },
   laneLabel: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#4B5563',
     letterSpacing: 1.5,
   },
@@ -190,13 +189,11 @@ const styles = StyleSheet.create({
   promptSymbol: {
     fontSize: 14,
     color: '#00D4AA',
-    fontFamily: 'monospace',
     width: 16,
   },
   input: {
     flex: 1,
     fontSize: 14,
-    fontFamily: 'monospace',
     color: '#ECEDEE',
     paddingVertical: 6,
     paddingHorizontal: 0,
@@ -222,7 +219,6 @@ const styles = StyleSheet.create({
   },
   sendBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#00D4AA',
   },
   examples: {
@@ -235,7 +231,6 @@ const styles = StyleSheet.create({
   examplesLabel: {
     fontSize: 10,
     color: '#4B5563',
-    fontFamily: 'monospace',
     paddingTop: 3,
   },
   chips: {
@@ -257,7 +252,6 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#9BA1A6',
   },
   templates: {
@@ -282,7 +276,6 @@ const styles = StyleSheet.create({
   },
   templateLabel: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
 });

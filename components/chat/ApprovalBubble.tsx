@@ -141,16 +141,13 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   translation: {
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 19,
   },
   command: {
     fontSize: 11,
-    fontFamily: 'monospace',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -174,7 +171,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   respondedRow: {
     flexDirection: 'row',
@@ -184,6 +180,5 @@ const styles = StyleSheet.create({
   },
   respondedText: {
     fontSize: 12,
-    fontFamily: 'monospace',
   },
 });

@@ -40,7 +40,6 @@ export function ContextHint({ hintId, onDismiss }: ContextHintProps) {
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 2 }}>
         <Text
           style={{
-            fontFamily: 'monospace',
             fontSize: 10,
             color: '#666',
             flexShrink: 1,

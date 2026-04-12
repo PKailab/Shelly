@@ -224,7 +224,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   grid: {
     flexDirection: 'row',
@@ -242,11 +241,9 @@ const styles = StyleSheet.create({
   templateLabel: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   orText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
   freeInputRow: {
@@ -257,7 +254,6 @@ const styles = StyleSheet.create({
   freeInput: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'monospace',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
@@ -279,16 +275,13 @@ const styles = StyleSheet.create({
   wizardTitle: {
     fontSize: 14,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   question: {
     fontSize: 15,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   textInput: {
     fontSize: 14,
-    fontFamily: 'monospace',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
@@ -308,7 +301,6 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   navRow: {
     flexDirection: 'row',
@@ -329,6 +321,5 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
 });

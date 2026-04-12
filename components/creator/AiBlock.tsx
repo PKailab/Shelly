@@ -297,22 +297,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   targetBadgeText: {
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   summaryText: {
     flex: 1,
     color: '#6B7280',
-    fontFamily: 'monospace',
   },
   tokensPerSec: {
     color: '#00D4AA',
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   tokensTotal: {
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   // ── 詳細展開 ──────────────────────────────────────────────────────────────
   detailBox: {
@@ -327,7 +323,6 @@ const styles = StyleSheet.create({
   },
   detailText: {
     color: '#6B7280',
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   // ── AI応答 ────────────────────────────────────────────────────────────────
@@ -357,18 +352,15 @@ const styles = StyleSheet.create({
   },
   streamingLabel: {
     color: '#00D4AA',
-    fontFamily: 'monospace',
     fontWeight: '700',
     letterSpacing: 1,
   },
   elapsedTime: {
     color: '#4B5563',
-    fontFamily: 'monospace',
   },
   // ── テキスト本体 ──────────────────────────────────────────────────────────
   responseText: {
     color: '#D1D5DB',
-    fontFamily: 'monospace',
     lineHeight: 20,
   },
   cursor: {
@@ -388,11 +380,9 @@ const styles = StyleSheet.create({
   },
   streamingMeta: {
     color: '#374151',
-    fontFamily: 'monospace',
   },
   streamingMetaHighlight: {
     color: '#00D4AA',
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   // ── ツール提案 ────────────────────────────────────────────────────────────
@@ -403,7 +393,6 @@ const styles = StyleSheet.create({
   },
   suggestLabel: {
     color: '#6B7280',
-    fontFamily: 'monospace',
     marginBottom: 2,
   },
   suggestionCard: {
@@ -425,22 +414,18 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   suggestionBadgeText: {
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   confidenceText: {
     color: '#6B7280',
-    fontFamily: 'monospace',
     marginLeft: 'auto',
   },
   suggestionReason: {
     color: '#9CA3AF',
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   suggestionExample: {
     color: '#4B5563',
-    fontFamily: 'monospace',
     marginTop: 2,
   },
   // ── ヒント ────────────────────────────────────────────────────────────────
@@ -462,12 +447,10 @@ const styles = StyleSheet.create({
   },
   hintText: {
     color: '#6B7280',
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   hintExample: {
     color: '#4B5563',
-    fontFamily: 'monospace',
     marginTop: 2,
   },
   // ── Perplexity 引用 ────────────────────────────────────────────────────────
@@ -484,14 +467,12 @@ const styles = StyleSheet.create({
   },
   citationsHeader: {
     color: '#20B2AA',
-    fontFamily: 'monospace',
     fontWeight: '700',
     letterSpacing: 1,
     marginBottom: 4,
   },
   citationItem: {
     color: '#4B8B8B',
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
 });

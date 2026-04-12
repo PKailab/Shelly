@@ -209,7 +209,6 @@ const styles = StyleSheet.create({
     color: '#ECEDEE',
     fontSize: 15,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   closeBtn: {
     padding: 4,
@@ -225,7 +224,6 @@ const styles = StyleSheet.create({
   label: {
     color: '#9BA1A6',
     fontSize: 11,
-    fontFamily: 'monospace',
     marginBottom: 6,
     marginTop: 12,
     textTransform: 'uppercase',
@@ -245,7 +243,6 @@ const styles = StyleSheet.create({
     borderColor: '#2D2D2D',
     borderRadius: 8,
     color: '#ECEDEE',
-    fontFamily: 'monospace',
     fontSize: 13,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -274,7 +271,6 @@ const styles = StyleSheet.create({
   scopeText: {
     color: '#6B7280',
     fontSize: 12,
-    fontFamily: 'monospace',
   },
   scopeTextActive: {
     color: '#00D4AA',
@@ -293,7 +289,6 @@ const styles = StyleSheet.create({
   deleteBtnText: {
     color: '#F87171',
     fontSize: 13,
-    fontFamily: 'monospace',
   },
   saveBtn: {
     margin: 16,
@@ -306,6 +301,5 @@ const styles = StyleSheet.create({
     color: '#0A0A0A',
     fontSize: 15,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
 });

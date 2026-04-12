@@ -139,13 +139,11 @@ const styles = StyleSheet.create({
   },
   langLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '600',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
   code: {
-    fontFamily: 'monospace',
     fontSize: 12,
     lineHeight: 18,
   },
@@ -162,7 +160,6 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   resultContainer: {
@@ -178,12 +175,10 @@ const styles = StyleSheet.create({
   },
   resultLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   resultText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
 });

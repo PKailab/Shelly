@@ -74,20 +74,17 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '800',
     color: C.text1,
     letterSpacing: 0.5,
   },
   version: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
     color: C.text2,
   },
   modelLine: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '500',
     color: C.text2,
     marginTop: 2,
@@ -117,7 +114,6 @@ const styles = StyleSheet.create({
   },
   tokenLine: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '600',
     color: C.text2,
     marginTop: 6,

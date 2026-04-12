@@ -129,7 +129,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   separator: {

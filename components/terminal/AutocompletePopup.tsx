@@ -200,12 +200,10 @@ const styles = StyleSheet.create({
     flex:       1,
     color:      ACCENT,
     fontSize:   13,
-    fontFamily: 'monospace',
   },
   detailText: {
     color:      MUTED,
     fontSize:   11,
-    fontFamily: 'monospace',
     marginLeft: 8,
     flexShrink: 1,
   },
@@ -247,7 +245,6 @@ const styles = StyleSheet.create({
   chipLabel: {
     color:      ACCENT,
     fontSize:   12,
-    fontFamily: 'monospace',
     maxWidth:   120,
   },
 });

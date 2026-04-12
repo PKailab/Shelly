@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   text: {
-    fontFamily: 'monospace',
     fontSize: 11,
   },
   actions: {
@@ -113,7 +112,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   btnText: {
-    fontFamily: 'monospace',
     fontSize: 10,
     fontWeight: '600',
   },

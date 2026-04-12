@@ -347,7 +347,6 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 10,
     fontWeight: '800',
-    fontFamily: 'monospace',
   },
   container: {
     flex: 1,
@@ -373,7 +372,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   summaryText: {
-    fontFamily: 'monospace',
     flex: 1,
   },
   spinner: {
@@ -386,7 +384,6 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   detailText: {
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   hintBox: {
@@ -397,11 +394,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   hintText: {
-    fontFamily: 'monospace',
     fontSize: 11,
   },
   hintExample: {
-    fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -423,17 +418,14 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   suggestionLabel: {
-    fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '700',
     flex: 1,
   },
   suggestionConf: {
-    fontFamily: 'monospace',
     fontSize: 11,
   },
   suggestionReason: {
-    fontFamily: 'monospace',
     fontSize: 11,
     marginLeft: 14,
   },
@@ -443,11 +435,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   responseText: {
-    fontFamily: 'monospace',
     lineHeight: 21,
   },
   statsText: {
-    fontFamily: 'monospace',
     fontSize: 10,
     marginTop: 4,
     textAlign: 'right',
@@ -459,13 +449,11 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   citationsTitle: {
-    fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 2,
   },
   citationItem: {
-    fontFamily: 'monospace',
     fontSize: 10,
     marginBottom: 1,
   },
@@ -485,7 +473,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionBtnText: {
-    fontFamily: 'monospace',
     fontSize: 11,
   },
   errorBox: {
@@ -500,7 +487,6 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   errorText: {
-    fontFamily: 'monospace',
     fontSize: 11,
     color: '#F87171',
     flex: 1,
@@ -519,12 +505,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   errorBtnText: {
-    fontFamily: 'monospace',
     fontSize: 11,
   },
   bubbleTime: {
     fontSize: 9,
-    fontFamily: 'monospace',
     textAlign: 'right',
     paddingHorizontal: 12,
     paddingBottom: 6,

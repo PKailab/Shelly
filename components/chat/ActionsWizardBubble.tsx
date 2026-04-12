@@ -325,7 +325,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '700',
     flex: 1,
   },
@@ -344,12 +343,10 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   stepDesc: {
     fontSize: 11,
-    fontFamily: 'monospace',
   },
   optionGrid: {
     flexDirection: 'row',
@@ -368,7 +365,6 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   radioDot: {
@@ -401,7 +397,6 @@ const styles = StyleSheet.create({
   nextBtnText: {
     color: '#FFF',
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   backBtn: {
@@ -415,7 +410,6 @@ const styles = StyleSheet.create({
   },
   backBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   confirmBox: {
@@ -431,12 +425,10 @@ const styles = StyleSheet.create({
   },
   confirmText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   doneText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     padding: 12,
   },
 });

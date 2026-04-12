@@ -183,7 +183,6 @@ const styles = StyleSheet.create({
   },
   headerUrl: {
     flex: 1,
-    fontFamily: 'monospace',
     fontSize: 11,
   },
   headerActions: {
@@ -199,7 +198,6 @@ const styles = StyleSheet.create({
   },
   editBannerText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   webview: {
@@ -224,7 +222,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   errorText: {
-    fontFamily: 'monospace',
     fontSize: 13,
   },
   retryBtn: {
@@ -234,7 +231,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   retryText: {
-    fontFamily: 'monospace',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -245,7 +241,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   placeholderText: {
-    fontFamily: 'monospace',
     fontSize: 13,
   },
 });

@@ -175,7 +175,6 @@ const styles = StyleSheet.create({
     color: '#ECEDEE',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'monospace',
     flex: 1,
   },
   headerActions: {
@@ -217,17 +216,14 @@ const styles = StyleSheet.create({
     color: '#ECEDEE',
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   toolVersion: {
     color: '#4B5563',
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   toolMissing: {
     color: '#F87171',
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   guidanceBox: {
     flexDirection: 'row',
@@ -247,19 +243,16 @@ const styles = StyleSheet.create({
   guidanceTitle: {
     color: '#9BA1A6',
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '700',
     marginBottom: 4,
   },
   guidanceBody: {
     color: '#6B7280',
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 18,
   },
   codeSnippet: {
     color: C.accent,
-    fontFamily: 'monospace',
     fontSize: 11,
   },
 });

@@ -191,7 +191,6 @@ const styles = StyleSheet.create({
     borderRightColor: '#2A2A2A',
   },
   cellText: {
-    fontFamily: 'monospace',
     fontSize: 12,
     color: '#BBBBBB',
     textAlign: 'left',

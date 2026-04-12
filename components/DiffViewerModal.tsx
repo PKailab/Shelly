@@ -89,7 +89,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   scroll: {
@@ -97,7 +96,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   line: {
-    fontFamily: 'monospace',
     fontSize: 11,
     lineHeight: 16,
     paddingHorizontal: 4,

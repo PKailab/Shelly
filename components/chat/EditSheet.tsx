@@ -184,7 +184,6 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   stylePreview: {
@@ -207,7 +206,6 @@ const styles = StyleSheet.create({
   presetText: {
     fontSize: 11,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   inputRow: {
     flexDirection: 'row',
@@ -217,7 +215,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'monospace',
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,

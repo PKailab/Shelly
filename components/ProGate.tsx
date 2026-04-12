@@ -52,14 +52,12 @@ const styles = StyleSheet.create({
     color: '#C9D1D9',
     fontSize: 20,
     fontWeight: '700',
-    fontFamily: 'monospace',
     marginTop: 16,
     marginBottom: 8,
   },
   message: {
     color: '#8B949E',
     fontSize: 14,
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
@@ -74,6 +72,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
 });

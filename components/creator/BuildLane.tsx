@@ -129,7 +129,6 @@ const styles = StyleSheet.create({
   },
   laneLabel: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#4B5563',
     letterSpacing: 1.5,
   },
@@ -149,7 +148,6 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#374151',
     fontStyle: 'italic',
   },
@@ -171,7 +169,6 @@ const stepStyles = StyleSheet.create({
   icon: {
     width: 16,
     fontSize: 11,
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
   iconDone: {
@@ -185,7 +182,6 @@ const stepStyles = StyleSheet.create({
   },
   message: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#FBBF24',
     flex: 1,
   },

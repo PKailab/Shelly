@@ -80,7 +80,6 @@ export default function MarkdownPane() {
     body: {
       backgroundColor: '#0A0A0A',
       color: theme.colors.foreground,
-      fontFamily: 'monospace',
       fontSize: 14,
       lineHeight: 22,
     },
@@ -138,7 +137,6 @@ export default function MarkdownPane() {
     code_inline: {
       backgroundColor: '#1A1A1A',
       color: theme.colors.ansiCyan,
-      fontFamily: 'monospace',
       fontSize: 13,
       paddingHorizontal: 4,
       paddingVertical: 1,
@@ -153,7 +151,6 @@ export default function MarkdownPane() {
     code_block: {
       backgroundColor: '#1A1A1A',
       color: '#ECEDEE',
-      fontFamily: 'monospace',
       fontSize: 13,
       lineHeight: 20,
       padding: 12,
@@ -281,7 +278,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'monospace',
   },
   editButton: {
     borderWidth: 1,
@@ -302,7 +298,6 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#555',
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   scrollView: {
     flex: 1,

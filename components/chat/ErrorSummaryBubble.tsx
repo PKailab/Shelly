@@ -150,21 +150,17 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'monospace',
     flex: 1,
   },
   providerLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   translation: {
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 19,
   },
   errorText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
@@ -182,13 +178,11 @@ const styles = StyleSheet.create({
   fixCommand: {
     flex: 1,
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   fixLabel: {
     fontSize: 11,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -206,6 +200,5 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
 });

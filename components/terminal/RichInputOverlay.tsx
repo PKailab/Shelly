@@ -71,7 +71,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   text: {
-    fontFamily: 'monospace',
     // backgroundColor must stay transparent so the TextInput background shows through.
     backgroundColor: 'transparent',
     // Allow text to wrap exactly like the TextInput (multiline).

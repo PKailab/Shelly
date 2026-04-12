@@ -269,13 +269,11 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 10,
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   profileHost: {
     fontSize: 9,
-    fontFamily: 'monospace',
     marginTop: 1,
   },
   actionBtn: {

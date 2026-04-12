@@ -125,19 +125,16 @@ const styles = StyleSheet.create({
   summaryText: {
     color: '#9BA1A6',
     fontSize: 11,
-    fontFamily: 'monospace',
     flex: 1,
   },
   addCount: {
     color: '#86EFAC',
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   delCount: {
     color: '#FCA5A5',
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   aiSummary: {
@@ -150,7 +147,6 @@ const styles = StyleSheet.create({
   aiLabel: {
     color: '#A78BFA',
     fontSize: 9,
-    fontFamily: 'monospace',
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 4,
@@ -158,7 +154,6 @@ const styles = StyleSheet.create({
   aiText: {
     color: '#C4B5FD',
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   fileBlock: {
@@ -176,12 +171,10 @@ const styles = StyleSheet.create({
   filename: {
     color: '#60A5FA',
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   fileStats: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   diffLines: {
     minWidth: '100%',
@@ -195,12 +188,10 @@ const styles = StyleSheet.create({
     width: 14,
     color: C.text3,
     fontSize: 11,
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
   lineText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     flex: 1,
   },
 });

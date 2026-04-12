@@ -394,7 +394,6 @@ const styles = StyleSheet.create({
     color: '#00D4AA',
     fontSize: 11,
     fontWeight: '700',
-    fontFamily: 'monospace',
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 8,
@@ -438,7 +437,6 @@ const styles = StyleSheet.create({
   storageSummary: {
     color: '#6B7280',
     fontSize: 10,
-    fontFamily: 'monospace',
     textAlign: 'right',
     marginBottom: 12,
     marginTop: 2,

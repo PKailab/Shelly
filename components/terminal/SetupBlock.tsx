@@ -344,11 +344,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   description: {
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 18,
     marginTop: 2,
   },
@@ -381,11 +379,9 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 14,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   optionDesc: {
     fontSize: 11,
-    fontFamily: 'monospace',
     marginTop: 1,
   },
   badge: {
@@ -398,7 +394,6 @@ const styles = StyleSheet.create({
     color: '#4ADE80',
     fontSize: 8,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   // Inputs
   inputList: {
@@ -409,7 +404,6 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   textInput: {
@@ -418,7 +412,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   // Log
   logContainer: {
@@ -431,7 +424,6 @@ const styles = StyleSheet.create({
   },
   logLine: {
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   // Error
@@ -446,7 +438,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#F87171',
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   // Actions
@@ -467,7 +458,6 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   primaryBtn: {
@@ -483,7 +473,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: '#000',
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '800',
   },
 });

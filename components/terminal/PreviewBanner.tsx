@@ -78,11 +78,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    fontFamily: 'monospace',
     fontSize: 12,
   },
   url: {
-    fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '600',
     flexShrink: 1,
@@ -93,7 +91,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   openBtnText: {
-    fontFamily: 'monospace',
     fontSize: 12,
     fontWeight: '700',
   },

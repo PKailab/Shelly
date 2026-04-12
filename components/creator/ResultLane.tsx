@@ -235,7 +235,6 @@ const styles = StyleSheet.create({
   },
   laneLabel: {
     fontSize: 9,
-    fontFamily: 'monospace',
     color: '#4B5563',
     letterSpacing: 1.5,
   },
@@ -252,7 +251,6 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#374151',
     fontStyle: 'italic',
   },
@@ -261,7 +259,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#F87171',
   },
   scroll: {
@@ -299,7 +296,6 @@ const styles = StyleSheet.create({
   },
   filePath: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#6B7280',
   },
   suggestions: {
@@ -310,7 +306,6 @@ const styles = StyleSheet.create({
   },
   suggestionsLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#4B5563',
     letterSpacing: 1,
     marginBottom: 2,
@@ -321,13 +316,11 @@ const styles = StyleSheet.create({
   },
   suggestionNum: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#00D4AA',
     width: 14,
   },
   suggestionText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     color: '#9BA1A6',
     flex: 1,
   },
@@ -345,7 +338,6 @@ const styles = StyleSheet.create({
   },
   runBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#00D4AA',
     fontWeight: '600',
   },
@@ -363,7 +355,6 @@ const styles = StyleSheet.create({
   },
   recipeBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#6B7280',
   },
   recipeBtnTextSaved: {
@@ -379,7 +370,6 @@ const styles = StyleSheet.create({
   },
   newBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#6B7280',
   },
   btnPressed: {
@@ -395,7 +385,6 @@ const styles = StyleSheet.create({
   },
   openBtnText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     color: '#60A5FA',
     fontWeight: '600',
   },
@@ -409,13 +398,11 @@ const infoStyles = StyleSheet.create({
   },
   label: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#4B5563',
     width: 60,
   },
   value: {
     fontSize: 10,
-    fontFamily: 'monospace',
     color: '#9BA1A6',
     flex: 1,
     textAlign: 'right',

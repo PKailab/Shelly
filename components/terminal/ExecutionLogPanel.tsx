@@ -177,13 +177,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 11,
     fontWeight: '700',
-    fontFamily: 'monospace',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   headerCount: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   scrollArea: {
     paddingHorizontal: 8,
@@ -209,15 +207,12 @@ const styles = StyleSheet.create({
   sourceText: {
     fontSize: 9,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   timeText: {
     fontSize: 9,
-    fontFamily: 'monospace',
   },
   userInput: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontStyle: 'italic',
     marginBottom: 2,
   },
@@ -233,26 +228,21 @@ const styles = StyleSheet.create({
   prompt: {
     fontSize: 11,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   commandText: {
     fontSize: 11,
-    fontFamily: 'monospace',
     flex: 1,
   },
   outputText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     lineHeight: 14,
   },
   aiText: {
     fontSize: 10,
-    fontFamily: 'monospace',
     lineHeight: 14,
   },
   streamingText: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
   unreadBadge: {
     backgroundColor: '#4ADE80',
@@ -266,7 +256,6 @@ const styles = StyleSheet.create({
   unreadText: {
     fontSize: 9,
     fontWeight: '700' as const,
-    fontFamily: 'monospace',
     color: '#000',
   },
 });

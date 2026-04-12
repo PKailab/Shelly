@@ -181,11 +181,9 @@ const styles = StyleSheet.create({
   },
   menuText: {
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '500',
   },
   statusText: {
     fontSize: 10,
-    fontFamily: 'monospace',
   },
 });

@@ -337,7 +337,6 @@ const styles = StyleSheet.create({
     color: '#ECEDEE',
     fontSize: 16,
     fontWeight: '600',
-    fontFamily: 'monospace',
   },
   closeBtn: {
     padding: 4,
@@ -364,12 +363,10 @@ const styles = StyleSheet.create({
     color: '#9BA1A6',
     fontSize: 14,
     lineHeight: 20,
-    fontFamily: 'monospace',
   },
   loadingText: {
     color: '#9BA1A6',
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   countRow: {
     flexDirection: 'row',
@@ -388,18 +385,15 @@ const styles = StyleSheet.create({
     color: '#ECEDEE',
     fontSize: 24,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   countLabel: {
     color: '#9BA1A6',
     fontSize: 11,
-    fontFamily: 'monospace',
     marginTop: 2,
   },
   sectionLabel: {
     color: '#9BA1A6',
     fontSize: 11,
-    fontFamily: 'monospace',
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginTop: 4,
@@ -439,7 +433,6 @@ const styles = StyleSheet.create({
   strategyLabel: {
     color: '#9BA1A6',
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   strategyLabelActive: {
     color: '#00FF88',
@@ -447,7 +440,6 @@ const styles = StyleSheet.create({
   strategyDesc: {
     color: '#687076',
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   primaryBtn: {
@@ -460,7 +452,6 @@ const styles = StyleSheet.create({
     color: '#0D0D0D',
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   secondaryBtn: {
     borderWidth: 1,
@@ -472,13 +463,11 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     color: '#9BA1A6',
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   successTitle: {
     color: '#00FF88',
     fontSize: 18,
     fontWeight: '700',
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
   summaryGrid: {
@@ -500,24 +489,20 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: '#9BA1A6',
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   summaryValue: {
     fontSize: 20,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   errorTitle: {
     color: '#F87171',
     fontSize: 16,
     fontWeight: '700',
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
   errorMsg: {
     color: '#9BA1A6',
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 20,
     textAlign: 'center',
   },

@@ -693,14 +693,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '800',
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginBottom: 8,
   },
   subtitle: {
     color: '#9CA3AF',
     fontSize: 14,
-    fontFamily: 'monospace',
     lineHeight: 22,
     textAlign: 'center',
     marginBottom: 24,
@@ -734,13 +732,11 @@ const styles = StyleSheet.create({
   featureName: {
     fontSize: 13,
     fontWeight: '700',
-    fontFamily: 'monospace',
     marginBottom: 2,
   },
   featureDesc: {
     color: '#6B7280',
     fontSize: 11,
-    fontFamily: 'monospace',
   },
   // ── CLI Select ────────────────────────────────────────────────────
   cliList: {
@@ -773,14 +769,12 @@ const styles = StyleSheet.create({
     color: '#ECEDEE',
     fontSize: 20,
     fontWeight: '700',
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginTop: 12,
   },
   stepDesc: {
     color: '#9BA1A6',
     fontSize: 13,
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginTop: 4,
     paddingHorizontal: 16,
@@ -788,12 +782,10 @@ const styles = StyleSheet.create({
   cliName: {
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   cliDesc: {
     color: '#6B7280',
     fontSize: 11,
-    fontFamily: 'monospace',
     lineHeight: 16,
   },
   freeBadge: {
@@ -806,7 +798,6 @@ const styles = StyleSheet.create({
     color: '#4ADE80',
     fontSize: 8,
     fontWeight: '700',
-    fontFamily: 'monospace',
   },
   checkbox: {
     width: 22,
@@ -820,7 +811,6 @@ const styles = StyleSheet.create({
   hint: {
     color: '#6B7280',
     fontSize: 11,
-    fontFamily: 'monospace',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -838,7 +828,6 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: '#9CA3AF',
     fontSize: 11,
-    fontFamily: 'monospace',
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -850,7 +839,6 @@ const styles = StyleSheet.create({
   summaryName: {
     color: '#E5E7EB',
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   // ── Auth step placeholder ─────────────────────────────────────────
@@ -861,7 +849,6 @@ const styles = StyleSheet.create({
   authStepHint: {
     color: '#6B7280',
     fontSize: 12,
-    fontFamily: 'monospace',
     textAlign: 'center',
   },
   // ── Nav ────────────────────────────────────────────────────────────
@@ -883,7 +870,6 @@ const styles = StyleSheet.create({
   skipText: {
     color: '#6B7280',
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   backBtn: {
@@ -900,7 +886,6 @@ const styles = StyleSheet.create({
   backText: {
     color: '#6B7280',
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   primaryBtn: {
@@ -916,7 +901,6 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: '#000',
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '800',
   },
 });

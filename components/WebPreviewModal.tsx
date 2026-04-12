@@ -86,7 +86,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 14,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   webview: {

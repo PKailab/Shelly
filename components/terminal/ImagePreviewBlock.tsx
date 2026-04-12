@@ -111,7 +111,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.border,
   },
   caption: {
-    fontFamily: 'monospace',
     fontSize: 10,
     color: '#666666',
     maxWidth: 240,

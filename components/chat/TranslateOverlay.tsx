@@ -115,12 +115,10 @@ const styles = StyleSheet.create({
   },
   providerLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '600',
   },
   text: {
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 19,
   },
 });

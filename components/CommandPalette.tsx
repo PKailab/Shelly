@@ -343,7 +343,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#ECEDEE',
     fontSize: 15,
-    fontFamily: 'monospace',
     paddingVertical: 4,
   },
   list: {
@@ -364,12 +363,10 @@ const styles = StyleSheet.create({
   itemLabel: {
     color: '#ECEDEE',
     fontSize: 14,
-    fontFamily: 'monospace',
   },
   itemHint: {
     color: '#4B5563',
     fontSize: 11,
-    fontFamily: 'monospace',
     marginTop: 2,
   },
   categoryBadge: {
@@ -383,14 +380,12 @@ const styles = StyleSheet.create({
   categoryText: {
     color: '#6B7280',
     fontSize: 9,
-    fontFamily: 'monospace',
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   emptyText: {
     color: '#4B5563',
     fontSize: 13,
-    fontFamily: 'monospace',
     textAlign: 'center',
     paddingVertical: 24,
   },
@@ -402,7 +397,6 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     color: '#374151',
     fontSize: 9,
-    fontFamily: 'monospace',
     fontWeight: '700',
     letterSpacing: 1.2,
   },
@@ -415,6 +409,5 @@ const styles = StyleSheet.create({
   footerText: {
     color: '#333',
     fontSize: 10,
-    fontFamily: 'monospace',
   },
 });

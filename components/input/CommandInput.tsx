@@ -765,7 +765,6 @@ const styles = StyleSheet.create({
   },
   modeLabel: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   thumbnailStrip: {
@@ -811,7 +810,6 @@ const styles = StyleSheet.create({
     minHeight: 52,
   },
   promptText: {
-    fontFamily: 'monospace',
     fontWeight: '700',
     paddingBottom: 10,
     width: 20,
@@ -823,7 +821,6 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontFamily: 'monospace',
     borderRadius: 7,
     paddingHorizontal: 10,
     paddingTop: 8,
@@ -850,7 +847,6 @@ const styles = StyleSheet.create({
   },
   attachMenuLabel: {
     fontSize: 13,
-    fontFamily: 'monospace',
     fontWeight: '500',
   },
   actionButtons: {
@@ -892,7 +888,6 @@ const styles = StyleSheet.create({
   },
   recordingText: {
     color: '#FF4444',
-    fontFamily: 'monospace',
     fontSize: 11,
     fontWeight: '600',
   },
@@ -908,11 +903,9 @@ const styles = StyleSheet.create({
   },
   fileChipName: {
     fontSize: 11,
-    fontFamily: 'monospace',
     flex: 1,
   },
   fileChipSize: {
     fontSize: 9,
-    fontFamily: 'monospace',
   },
 });

@@ -127,7 +127,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: '#ECEDEE',
     fontSize: 15,
-    fontFamily: 'monospace',
     fontWeight: '700',
     flex: 1,
   },
@@ -142,7 +141,6 @@ const styles = StyleSheet.create({
   gitBadgeText: {
     color: C.accent,
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   overviewBox: {
@@ -154,7 +152,6 @@ const styles = StyleSheet.create({
   overviewText: {
     color: '#C8D0D8',
     fontSize: 13,
-    fontFamily: 'monospace',
     lineHeight: 20,
   },
   stepsArea: {
@@ -176,7 +173,6 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     fontSize: 10,
-    fontFamily: 'monospace',
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -184,7 +180,6 @@ const styles = StyleSheet.create({
   stepExplanation: {
     color: '#B0B8C0',
     fontSize: 12,
-    fontFamily: 'monospace',
     lineHeight: 18,
     marginBottom: 4,
   },
@@ -207,13 +202,11 @@ const styles = StyleSheet.create({
   commandPrompt: {
     color: C.accent,
     fontSize: 12,
-    fontFamily: 'monospace',
     fontWeight: '700',
   },
   commandText: {
     color: '#ECEDEE',
     fontSize: 12,
-    fontFamily: 'monospace',
     flex: 1,
   },
   runBtn: {
@@ -241,6 +234,5 @@ const styles = StyleSheet.create({
   footerText: {
     color: C.text3,
     fontSize: 10,
-    fontFamily: 'monospace',
   },
 });
