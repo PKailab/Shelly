@@ -1,12 +1,11 @@
 // components/layout/AgentBar.tsx
-import React, { useState, useRef } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, PanResponder } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { usePaneStore, AGENT_COLORS } from '@/store/pane-store';
 import { useSettingsStore } from '@/store/settings-store';
 import { useCommandPaletteStore } from '@/hooks/use-command-palette';
-import { useCosmeticStore } from '@/store/cosmetic-store';
-import { useI18n, type Locale } from '@/lib/i18n';
+import { SettingsDropdown } from './SettingsDropdown';
 import { neonTextGlow, neonDotGlow } from '@/lib/neon-glow';
 import { colors as C, fonts as F, sizes as S, padding as P, radii as R } from '@/theme.config';
 
@@ -27,6 +26,7 @@ export function AgentBar() {
   const { focusedPaneId, paneAgents, bindAgent } = usePaneStore();
   const settings = useSettingsStore((s) => s.settings);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const agents = BUILT_IN_AGENTS.filter(
     (a) => settings.teamMembers?.[a.key as keyof typeof settings.teamMembers]
@@ -113,9 +113,7 @@ export function AgentBar() {
         </Pressable>
       )}
 
-      {/* Right-side: CRT toggle + slider + lang + search + settings */}
-      <CrtControls />
-      <LangToggle />
+      {/* Right-side: search + settings (dropdown) */}
       <View style={styles.rightBtns}>
         <Pressable
           style={styles.iconBtn}
@@ -126,82 +124,15 @@ export function AgentBar() {
         </Pressable>
         <Pressable
           style={styles.iconBtn}
-          onPress={() => useSettingsStore.getState().setShowConfigTUI(true)}
+          onPress={() => setSettingsOpen((v) => !v)}
           hitSlop={8}
         >
           <MaterialIcons name="settings" size={15} color={C.text2} />
         </Pressable>
       </View>
+
+      <SettingsDropdown visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </View>
-  );
-}
-
-// ─── CRT ON/OFF + intensity slider ──────────────────────────────────────────
-
-function CrtControls() {
-  const crtEnabled = useCosmeticStore((s) => s.crtEnabled);
-  const crtIntensity = useCosmeticStore((s) => s.crtIntensity);
-  const { setCrt, setCrtIntensity } = useCosmeticStore();
-  const trackWidth = 56;
-  const thumbSize = 10;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        const x = e.nativeEvent.locationX;
-        setCrtIntensity(Math.round(Math.max(0, Math.min(100, (x / trackWidth) * 100))));
-      },
-      onPanResponderMove: (e) => {
-        const x = e.nativeEvent.locationX;
-        setCrtIntensity(Math.round(Math.max(0, Math.min(100, (x / trackWidth) * 100))));
-      },
-    })
-  ).current;
-
-  const fillWidth = (crtIntensity / 100) * trackWidth;
-
-  return (
-    <View style={styles.crtGroup}>
-      <Pressable
-        style={[styles.crtBadge, crtEnabled && styles.crtBadgeOn]}
-        onPress={() => setCrt(!crtEnabled)}
-        hitSlop={6}
-      >
-        <Text style={[styles.crtBadgeText, crtEnabled && styles.crtBadgeTextOn]}>
-          CRT: {crtEnabled ? 'ON' : 'OFF'}
-        </Text>
-      </Pressable>
-      {crtEnabled && (
-        <>
-          <View style={styles.crtSliderWrap} {...panResponder.panHandlers}>
-            <View style={styles.crtTrack}>
-              <View style={[styles.crtTrackFill, { width: fillWidth }]} />
-              <View style={[styles.crtThumb, { left: fillWidth - thumbSize / 2 }]} />
-            </View>
-          </View>
-          <Text style={styles.crtPercent}>{crtIntensity}%</Text>
-        </>
-      )}
-    </View>
-  );
-}
-
-// ─── EN / JA language toggle ────────────────────────────────────────────────
-
-function LangToggle() {
-  const locale = useI18n((s) => s.locale);
-  const { setLocale } = useI18n();
-
-  const toggle = () => setLocale(locale === 'en' ? 'ja' : 'en');
-
-  return (
-    <Pressable style={styles.langToggle} onPress={toggle} hitSlop={6}>
-      <Text style={[styles.langText, locale === 'en' && styles.langTextActive]}>EN</Text>
-      <Text style={styles.langSep}>/</Text>
-      <Text style={[styles.langText, locale === 'ja' && styles.langTextActive]}>JA</Text>
-    </Pressable>
   );
 }
 
@@ -269,92 +200,6 @@ const styles = StyleSheet.create({
   iconBtn: {
     padding: 4,
     borderRadius: R.agentTab,
-  },
-  // CRT controls
-  crtGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginRight: 6,
-  },
-  crtBadge: {
-    paddingHorizontal: P.statusBadge.px,
-    paddingVertical: P.statusBadge.py,
-    borderRadius: R.badge,
-    backgroundColor: C.crtBadgeBg,
-    borderWidth: S.borderWidth,
-    borderColor: C.border,
-  },
-  crtBadgeOn: {
-    backgroundColor: 'rgba(0,212,170,0.15)',
-    borderColor: 'rgba(0,212,170,0.4)',
-  },
-  crtBadgeText: {
-    fontSize: F.badge.size,
-    fontFamily: F.family,
-    fontWeight: F.badge.weight,
-    color: C.text2,
-    letterSpacing: 0.5,
-  },
-  crtBadgeTextOn: {
-    color: C.crtBadgeText,
-    textShadowColor: 'rgba(0, 212, 170, 0.6)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-  },
-  crtSliderWrap: {
-    width: 56,
-    height: 20,
-    justifyContent: 'center',
-  },
-  crtTrack: {
-    width: 56,
-    height: 4,
-    backgroundColor: C.border,
-    borderRadius: 2,
-    position: 'relative',
-  },
-  crtTrackFill: {
-    height: 4,
-    backgroundColor: C.accent,
-    borderRadius: 2,
-  },
-  crtThumb: {
-    position: 'absolute',
-    top: -3,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: C.accent,
-  },
-  crtPercent: {
-    fontSize: F.badge.size,
-    fontFamily: F.family,
-    fontWeight: F.badge.weight,
-    color: C.text2,
-    minWidth: 22,
-    textAlign: 'right',
-  },
-  // Language toggle
-  langToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 4,
-    gap: 2,
-  },
-  langText: {
-    fontSize: F.contextBar.size,
-    fontFamily: F.family,
-    fontWeight: F.contextBar.weight,
-    color: C.text2,
-  },
-  langTextActive: {
-    color: C.text1,
-  },
-  langSep: {
-    fontSize: F.contextBar.size,
-    fontFamily: F.family,
-    color: C.text3,
   },
   // Add agent modal
   addModalBackdrop: {
