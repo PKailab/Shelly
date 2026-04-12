@@ -5,7 +5,7 @@
 // LayoutPresetBar at the bottom of the screen.
 
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMultiPaneStore, makeLeaf, makeSplit } from '@/hooks/use-multi-pane';
 import type { PaneNode } from '@/hooks/use-multi-pane';
@@ -120,8 +120,6 @@ function detectPreset(root: PaneNode | null): string | null {
 }
 
 export function LayoutPresetSheet({ visible, onClose }: Props) {
-  if (!visible) return null;
-
   const root = useMultiPaneStore.getState().root;
   const current = detectPreset(root);
 
@@ -131,33 +129,41 @@ export function LayoutPresetSheet({ visible, onClose }: Props) {
   };
 
   return (
-    <Pressable style={styles.backdrop} onPress={onClose}>
-      <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-        <View style={styles.handle} />
-        <Text style={styles.title}>LAYOUT</Text>
-        <View style={styles.grid}>
-          {LAYOUT_PRESETS.map((p) => {
-            const isActive = current === p.id;
-            return (
-              <Pressable
-                key={p.id}
-                style={[styles.tile, isActive && styles.tileActive]}
-                onPress={() => handleSelect(p.id)}
-              >
-                <MaterialIcons
-                  name={p.icon as any}
-                  size={22}
-                  color={isActive ? C.accent : C.text2}
-                />
-                <Text style={[styles.tileLabel, isActive && styles.tileLabelActive]}>
-                  {p.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.handle} />
+          <Text style={styles.title}>LAYOUT</Text>
+          <View style={styles.grid}>
+            {LAYOUT_PRESETS.map((p) => {
+              const isActive = current === p.id;
+              return (
+                <Pressable
+                  key={p.id}
+                  style={[styles.tile, isActive && styles.tileActive]}
+                  onPress={() => handleSelect(p.id)}
+                >
+                  <MaterialIcons
+                    name={p.icon as any}
+                    size={22}
+                    color={isActive ? C.accent : C.text2}
+                  />
+                  <Text style={[styles.tileLabel, isActive && styles.tileLabelActive]}>
+                    {p.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 

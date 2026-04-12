@@ -4,7 +4,7 @@
 // Triggered by the "+" button in AgentBar.
 
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMultiPaneStore, type PaneTab } from '@/hooks/use-multi-pane';
 import { usePaneStore } from '@/store/pane-store';
@@ -28,8 +28,6 @@ const OPTIONS: SheetOption[] = [
 ];
 
 export function AddPaneSheet({ visible, onClose }: Props) {
-  if (!visible) return null;
-
   const handleSelect = (opt: SheetOption) => {
     if (opt.kind === 'sidebar') {
       // Open the sidebar expanded; the File Tree section is open by default.
@@ -61,25 +59,33 @@ export function AddPaneSheet({ visible, onClose }: Props) {
   };
 
   return (
-    <Pressable style={styles.backdrop} onPress={onClose}>
-      <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-        <View style={styles.handle} />
-        <Text style={styles.title}>ADD PANE</Text>
-        {OPTIONS.map((opt) => (
-          <Pressable
-            key={`${opt.kind}-${opt.id}`}
-            style={styles.option}
-            onPress={() => handleSelect(opt)}
-          >
-            <View style={styles.optionIcon}>
-              <MaterialIcons name={opt.icon as any} size={18} color={C.accent} />
-            </View>
-            <Text style={styles.optionLabel}>{opt.label}</Text>
-            <MaterialIcons name="chevron-right" size={16} color={C.text3} />
-          </Pressable>
-        ))}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.handle} />
+          <Text style={styles.title}>ADD PANE</Text>
+          {OPTIONS.map((opt) => (
+            <Pressable
+              key={`${opt.kind}-${opt.id}`}
+              style={styles.option}
+              onPress={() => handleSelect(opt)}
+            >
+              <View style={styles.optionIcon}>
+                <MaterialIcons name={opt.icon as any} size={18} color={C.accent} />
+              </View>
+              <Text style={styles.optionLabel}>{opt.label}</Text>
+              <MaterialIcons name="chevron-right" size={16} color={C.text3} />
+            </Pressable>
+          ))}
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 

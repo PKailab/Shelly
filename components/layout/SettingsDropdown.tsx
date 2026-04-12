@@ -12,6 +12,7 @@ import {
   StyleSheet,
   ScrollView,
   PanResponder,
+  Modal,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useCosmeticStore } from '@/store/cosmetic-store';
@@ -32,27 +33,34 @@ const FONT_SIZE_PRESETS: FontSizePreset[] = [
 ];
 
 export function SettingsDropdown({ visible, onClose }: Props) {
-  if (!visible) return null;
   return (
-    <Pressable style={styles.backdrop} onPress={onClose}>
-      <Pressable style={styles.panel} onPress={(e) => e.stopPropagation()}>
-        <View style={styles.header}>
-          <MaterialIcons name="settings" size={13} color={C.text2} />
-          <Text style={styles.headerTitle}>SETTINGS</Text>
-          <View style={{ flex: 1 }} />
-          <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
-            <MaterialIcons name="close" size={13} color={C.text2} />
-          </Pressable>
-        </View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.panel} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.header}>
+            <MaterialIcons name="settings" size={13} color={C.text2} />
+            <Text style={styles.headerTitle}>SETTINGS</Text>
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
+              <MaterialIcons name="close" size={13} color={C.text2} />
+            </Pressable>
+          </View>
 
-        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-          <DisplaySection />
-          <LanguageSection />
-          <AgentsSection />
-          <ApiKeysSection />
-        </ScrollView>
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+            <DisplaySection />
+            <LanguageSection />
+            <AgentsSection />
+            <ApiKeysSection />
+          </ScrollView>
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 
