@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useContext } from 'react';
 import {
   View,
   TextInput,
@@ -9,12 +9,39 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import WebView, { WebViewNavigation } from 'react-native-webview';
+import WebView, { WebViewNavigation, WebViewMessageEvent } from 'react-native-webview';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/lib/theme-engine';
 import { useBrowserStore, PRESET_BOOKMARKS } from '@/store/browser-store';
 import PaneInputBar from '@/components/panes/PaneInputBar';
+import { PaneIdContext } from '@/components/multi-pane/PaneSlot';
+import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { colors as C, fonts as F, sizes as S } from '@/theme.config';
+
+// JS injected into every loaded page so pinch-to-fullscreen inside the
+// WebView bubbles up to a Shelly pane-maximize. react-native-webview
+// doesn't hook WebChromeClient.onShowCustomView on Android, so YouTube's
+// fullscreen button is otherwise dead. We listen for the standard
+// fullscreenchange event and post a message that BrowserPane turns into
+// useMultiPaneStore.toggleMaximize(paneId).
+const FULLSCREEN_BRIDGE_JS = `
+(function() {
+  if (window.__shellyFullscreenInstalled) return;
+  window.__shellyFullscreenInstalled = true;
+  var post = function(kind) {
+    try {
+      window.ReactNativeWebView.postMessage('shelly:fs:' + kind);
+    } catch (e) {}
+  };
+  document.addEventListener('fullscreenchange', function() {
+    post(document.fullscreenElement ? 'on' : 'off');
+  });
+  document.addEventListener('webkitfullscreenchange', function() {
+    post(document.webkitFullscreenElement ? 'on' : 'off');
+  });
+})();
+true;
+`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,6 +66,29 @@ export interface BrowserPaneProps {
 export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneProps) {
   const theme = useTheme();
   const { background, surface, foreground, muted, accent, border } = theme.colors;
+  const paneId = useContext(PaneIdContext);
+
+  // Fullscreen bridge: when the WebView posts 'shelly:fs:on' we maximize
+  // this pane so the video fills the whole screen; 'off' restores.
+  const wasMaximizedBeforeFs = useRef(false);
+  const handleMessage = useCallback(
+    (e: WebViewMessageEvent) => {
+      const data = e.nativeEvent.data;
+      if (!paneId) return;
+      const store = useMultiPaneStore.getState();
+      if (data === 'shelly:fs:on') {
+        wasMaximizedBeforeFs.current = store.maximizedPaneId === paneId;
+        if (!wasMaximizedBeforeFs.current) {
+          store.toggleMaximize(paneId);
+        }
+      } else if (data === 'shelly:fs:off') {
+        if (!wasMaximizedBeforeFs.current && useMultiPaneStore.getState().maximizedPaneId === paneId) {
+          store.toggleMaximize(paneId);
+        }
+      }
+    },
+    [paneId],
+  );
 
   const { bookmarks: userBookmarks, addBookmark, removeBookmark, loadBookmarks } = useBrowserStore();
   // Presets are always shown first, followed by user-added bookmarks
@@ -225,6 +275,8 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
           source={{ uri: currentUrl }}
           style={styles.webview}
           onNavigationStateChange={handleNavigationStateChange}
+          onMessage={handleMessage}
+          injectedJavaScript={FULLSCREEN_BRIDGE_JS}
           javaScriptEnabled
           domStorageEnabled
           mediaPlaybackRequiresUserAction={false}
