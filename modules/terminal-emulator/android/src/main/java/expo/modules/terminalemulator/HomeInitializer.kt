@@ -19,8 +19,14 @@ object HomeInitializer {
         "wc", "who", "whoami", "yes"
     )
 
-    /** Version counter — increment to force .bashrc regeneration */
-    private const val BASHRC_VERSION = 13
+    /** Version counter — increment to force .bashrc regeneration.
+     *  History:
+     *    13: pre-OSC133 era
+     *    14: drop OSC 133 from PS1 (0dff463b) — was forgotten to bump,
+     *        which left users stuck on the broken phantom-prompt PS1 even
+     *        after the code was fixed. Bumping now so the next launch
+     *        regenerates .bashrc with the simple green-cwd-$ prompt. */
+    private const val BASHRC_VERSION = 14
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }

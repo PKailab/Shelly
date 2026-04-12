@@ -177,18 +177,22 @@ function LanguageSection() {
 
 // ─── AI Agents ───────────────────────────────────────────────────────────────
 
+const DEFAULT_AGENT_OPTIONS: Array<{ value: 'cerebras' | 'groq' | 'gemini-cli' | 'claude-code' | 'codex'; label: string }> = [
+  { value: 'cerebras',    label: 'Cerebras' },
+  { value: 'groq',        label: 'Groq' },
+  { value: 'gemini-cli',  label: 'Gemini' },
+  { value: 'claude-code', label: 'Claude' },
+  { value: 'codex',       label: 'Codex' },
+];
+
 function AgentsSection() {
   const defaultAgent = useSettingsStore((s) => s.settings.defaultAgent);
   const autoApproveLevel = useSettingsStore((s) => s.settings.autoApproveLevel);
   const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
 
-  const agentLabel = (() => {
-    switch (defaultAgent) {
-      case 'claude-code': return 'Claude';
-      case 'gemini-cli': return 'Gemini';
-      default: return String(defaultAgent ?? '—');
-    }
-  })();
+  const currentLabel =
+    DEFAULT_AGENT_OPTIONS.find((o) => o.value === defaultAgent)?.label ?? 'Gemini';
 
   const toggleAutoApprove = () => {
     const next = autoApproveLevel === 'none' ? 'safe' : 'none';
@@ -200,8 +204,41 @@ function AgentsSection() {
   return (
     <Section title="AI AGENTS">
       <Row label="Default">
-        <Text style={styles.rowValue}>{agentLabel}</Text>
+        <Pressable
+          style={styles.defaultAgentBtn}
+          onPress={() => setPickerOpen((v) => !v)}
+          hitSlop={4}
+        >
+          <Text style={styles.defaultAgentLabel}>{currentLabel}</Text>
+          <MaterialIcons
+            name={pickerOpen ? 'arrow-drop-up' : 'arrow-drop-down'}
+            size={14}
+            color={C.text2}
+          />
+        </Pressable>
       </Row>
+      {pickerOpen && (
+        <View style={styles.defaultAgentPicker}>
+          {DEFAULT_AGENT_OPTIONS.map((opt) => {
+            const active = opt.value === defaultAgent;
+            return (
+              <Pressable
+                key={opt.value}
+                style={[styles.pickerRow, active && styles.pickerRowActive]}
+                onPress={() => {
+                  updateSettings({ defaultAgent: opt.value });
+                  setPickerOpen(false);
+                }}
+              >
+                <Text style={[styles.pickerLabel, active && styles.pickerLabelActive]}>
+                  {opt.label}
+                </Text>
+                {active && <MaterialIcons name="check" size={11} color={C.accent} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <Row label="Auto-approve">
         <Pressable
           style={[styles.switchTrack, autoOn && styles.switchTrackOn]}
@@ -358,6 +395,52 @@ const styles = StyleSheet.create({
     color: C.text2,
     fontSize: F.sidebarItem.size,
     fontFamily: F.family,
+  },
+  // Default agent dropdown
+  defaultAgentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,212,170,0.25)',
+    backgroundColor: 'rgba(0,212,170,0.06)',
+  },
+  defaultAgentLabel: {
+    color: C.text1,
+    fontSize: F.sidebarItem.size,
+    fontFamily: F.family,
+    fontWeight: '700',
+  },
+  defaultAgentPicker: {
+    marginHorizontal: 4,
+    marginBottom: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.bgDeep,
+    overflow: 'hidden',
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  pickerRowActive: {
+    backgroundColor: 'rgba(0,212,170,0.10)',
+  },
+  pickerLabel: {
+    color: C.text2,
+    fontSize: F.sidebarItem.size,
+    fontFamily: F.family,
+  },
+  pickerLabelActive: {
+    color: C.accent,
+    fontWeight: '700',
   },
   // Switch
   switchTrack: {

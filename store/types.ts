@@ -392,8 +392,11 @@ export type AppSettings = {
   /** Chatタブ経由でのCLI自動承認レベル (default: 'safe') */
   autoApproveLevel: 'none' | 'safe' | 'all';
   // ─── Default Agent ─────────────────────────────────────────────────────────
-  /** ローカルLLM無効時のデフォルトエージェント (default: 'gemini-cli') */
-  defaultAgent: 'gemini-cli' | 'claude-code' | 'codex';
+  /** Default agent for chat / AI pane. Cerebras Qwen3-235B was the
+   *  decision settled in 2ba65f3a (best free quota + frontier model);
+   *  the older CLI options (gemini-cli/claude-code/codex) are kept for
+   *  users who prefer routing chat through their bundled CLI. */
+  defaultAgent: 'cerebras' | 'groq' | 'gemini-cli' | 'claude-code' | 'codex';
   /** リアルタイム翻訳ON/OFF（デフォルト: false） */
   realtimeTranslateEnabled?: boolean;
   /** LLM出力通訳（学習モード）ON/OFF（デフォルト: false） */
