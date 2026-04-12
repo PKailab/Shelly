@@ -69,8 +69,48 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
   const paneId = useContext(PaneIdContext);
 
   // Fullscreen bridge: when the WebView posts 'shelly:fs:on' we maximize
-  // this pane so the video fills the whole screen; 'off' restores.
+  // this pane, force landscape orientation, and hide the system chrome so
+  // the video takes over the whole screen like a native player. 'off'
+  // reverses everything. The "was already" flags let the unmount path
+  // restore only what we actually changed.
   const wasMaximizedBeforeFs = useRef(false);
+  const isFullscreen = useRef(false);
+
+  const enterFullscreen = useCallback(async () => {
+    if (isFullscreen.current) return;
+    isFullscreen.current = true;
+    try {
+      const orient = await import('expo-screen-orientation');
+      await orient.lockAsync(orient.OrientationLock.LANDSCAPE);
+    } catch {}
+    try {
+      const navBar = await import('expo-navigation-bar');
+      await navBar.setVisibilityAsync('hidden');
+      await navBar.setBehaviorAsync('overlay-swipe');
+    } catch {}
+  }, []);
+
+  const exitFullscreen = useCallback(async () => {
+    if (!isFullscreen.current) return;
+    isFullscreen.current = false;
+    try {
+      const orient = await import('expo-screen-orientation');
+      await orient.unlockAsync();
+    } catch {}
+    try {
+      const navBar = await import('expo-navigation-bar');
+      await navBar.setVisibilityAsync('visible');
+    } catch {}
+  }, []);
+
+  // Ensure we exit cleanly when the pane unmounts (user closes the
+  // browser pane in the middle of a fullscreen video).
+  useEffect(() => {
+    return () => {
+      exitFullscreen();
+    };
+  }, [exitFullscreen]);
+
   const handleMessage = useCallback(
     (e: WebViewMessageEvent) => {
       const data = e.nativeEvent.data;
@@ -81,13 +121,15 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
         if (!wasMaximizedBeforeFs.current) {
           store.toggleMaximize(paneId);
         }
+        enterFullscreen();
       } else if (data === 'shelly:fs:off') {
         if (!wasMaximizedBeforeFs.current && useMultiPaneStore.getState().maximizedPaneId === paneId) {
           store.toggleMaximize(paneId);
         }
+        exitFullscreen();
       }
     },
-    [paneId],
+    [paneId, enterFullscreen, exitFullscreen],
   );
 
   const { bookmarks: userBookmarks, addBookmark, removeBookmark, loadBookmarks } = useBrowserStore();
