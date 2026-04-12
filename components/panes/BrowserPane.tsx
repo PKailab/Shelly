@@ -63,10 +63,20 @@ export interface BrowserPaneProps {
   initialUrl?: string;
 }
 
+// User-Agent strings. Mobile is the react-native-webview default, so when
+// the user picks "Desktop" we send a current Chrome UA instead. Desktop UA
+// is useful on sites like YouTube where the mobile layout has giant tiles
+// and is painful to scroll through looking for a video.
+const MOBILE_UA = undefined; // let the WebView pick its default
+const DESKTOP_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
+  'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
 export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneProps) {
   const theme = useTheme();
   const { background, surface, foreground, muted, accent, border } = theme.colors;
   const paneId = useContext(PaneIdContext);
+  const [desktopMode, setDesktopMode] = useState(false);
 
   // Fullscreen bridge: when the WebView posts 'shelly:fs:on' we maximize
   // this pane, force landscape orientation, and hide the system chrome so
@@ -251,6 +261,20 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
             <MaterialIcons name="close" size={14} color="#6B7280" />
           </TouchableOpacity>
         )}
+        <TouchableOpacity
+          onPress={() => setDesktopMode((v) => !v)}
+          style={[
+            styles.navBtn,
+            desktopMode && { backgroundColor: 'rgba(0,212,170,0.12)' },
+          ]}
+          accessibilityLabel={desktopMode ? 'Switch to mobile view' : 'Switch to desktop view'}
+        >
+          <MaterialIcons
+            name={desktopMode ? 'desktop-windows' : 'smartphone'}
+            size={14}
+            color={desktopMode ? C.accent : C.text2}
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Bookmark tabs — tab style matching mock */}
@@ -313,9 +337,14 @@ export default function BrowserPane({ initialUrl = 'about:blank' }: BrowserPaneP
         </View>
       ) : (
         <WebView
+          // `key` forces a remount when desktopMode flips so the new UA
+          // takes effect immediately — react-native-webview otherwise
+          // caches the UA per instance.
+          key={desktopMode ? 'desktop' : 'mobile'}
           ref={webviewRef}
           source={{ uri: currentUrl }}
           style={styles.webview}
+          userAgent={desktopMode ? DESKTOP_UA : MOBILE_UA}
           onNavigationStateChange={handleNavigationStateChange}
           onMessage={handleMessage}
           injectedJavaScript={FULLSCREEN_BRIDGE_JS}
