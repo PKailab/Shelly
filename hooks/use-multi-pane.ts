@@ -248,17 +248,20 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
     },
 
     removePane: (leafId) => {
-      logInfo('MultiPane', 'Remove pane: ' + leafId);
       const { root } = get();
       if (!root) return;
-      const result = removeLeaf(root, leafId);
-      if (!result || (result.type === 'leaf' && countLeaves(result) <= 1)) {
-        // Last pane remaining or removed — exit multi-pane (two-phase)
-        set({ isMultiPane: false });
-        setTimeout(() => set({ root: null }), 0);
-      } else {
-        set({ root: result });
+      // Never let the user close the last pane. They ended up with an
+      // empty screen whose only recovery path was the Layout preset
+      // button, which is too obscure for daily use. If there is only
+      // one leaf left, ignore the close request outright.
+      if (countLeaves(root) <= 1) {
+        logInfo('MultiPane', 'Remove pane ignored — last pane: ' + leafId);
+        return;
       }
+      logInfo('MultiPane', 'Remove pane: ' + leafId);
+      const result = removeLeaf(root, leafId);
+      if (!result) return;
+      set({ root: result });
     },
 
     setSplitRatio: (splitId, ratio) => {
@@ -322,7 +325,12 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
 
     addPane: (tab) => {
       const { root, maxPanes } = get();
-      if (!root) return;
+      // Empty state — no root yet — just create a single leaf of the
+      // requested type so the EmptyState CTA can recover.
+      if (!root) {
+        set({ isMultiPane: true, root: makeLeaf(tab) });
+        return;
+      }
       if (countLeaves(root) >= maxPanes) return;
       // Find the last leaf and split it horizontally
       const findLastLeaf = (node: PaneNode): string => {

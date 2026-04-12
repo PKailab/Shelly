@@ -1,9 +1,87 @@
 import React, { useCallback, useRef } from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, Text, Pressable, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMultiPaneStore, type PaneNode, type PaneSplit, type PaneLeaf } from '@/hooks/use-multi-pane';
 import { PaneSlot } from './PaneSlot';
-import { colors as C } from '@/theme.config';
+import { colors as C, fonts as F } from '@/theme.config';
+
+/** Fallback when the user somehow closes every pane — shouldn't normally
+ *  happen because removePane now refuses to close the last leaf, but we
+ *  keep this for corrupted stores / migrations / manual clear. */
+function EmptyState() {
+  const addPane = useMultiPaneStore((s) => s.addPane);
+  const options = [
+    { tab: 'terminal' as const, label: 'Terminal', icon: 'terminal' },
+    { tab: 'ai' as const,       label: 'AI Chat',  icon: 'auto-awesome' },
+    { tab: 'browser' as const,  label: 'Browser',  icon: 'language' },
+  ];
+  return (
+    <View style={emptyStyles.root}>
+      <Text style={emptyStyles.title}>NO PANES OPEN</Text>
+      <Text style={emptyStyles.subtitle}>Add a pane to get started</Text>
+      <View style={emptyStyles.row}>
+        {options.map((opt) => (
+          <Pressable
+            key={opt.tab}
+            style={emptyStyles.btn}
+            onPress={() => addPane(opt.tab)}
+          >
+            <MaterialIcons name={opt.icon as any} size={18} color={C.accent} />
+            <Text style={emptyStyles.btnLabel}>{opt.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const emptyStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.bgDeep,
+    gap: 12,
+  },
+  title: {
+    color: C.accent,
+    fontFamily: F.family,
+    fontSize: 10,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,212,170,0.9)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  subtitle: {
+    color: C.text2,
+    fontFamily: F.family,
+    fontSize: 7,
+    marginBottom: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  btn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0,212,170,0.45)',
+    backgroundColor: 'rgba(0,212,170,0.08)',
+  },
+  btnLabel: {
+    color: C.accent,
+    fontFamily: F.family,
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+});
 
 /** Draggable divider between two panes (12px invisible hit area) */
 function Divider({
@@ -115,7 +193,13 @@ function findLeafById(node: PaneNode, id: string): PaneLeaf | null {
 export function MultiPaneContainer() {
   const { root, maximizedPaneId } = useMultiPaneStore();
 
-  if (!root) return null;
+  if (!root) {
+    return (
+      <View style={styles.root}>
+        <EmptyState />
+      </View>
+    );
+  }
 
   // Fullscreen mode: render only the maximized leaf
   if (maximizedPaneId) {
