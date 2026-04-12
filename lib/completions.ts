@@ -1,6 +1,6 @@
 /**
  * Static command completion database for Smart Autocomplete.
- * Covers common CLI tools used in Termux/Linux development.
+ * Covers common CLI tools used in Linux/mobile development.
  */
 
 type CompletionEntry = {
@@ -35,8 +35,6 @@ const TOP_COMMANDS: CompletionEntry[] = [
   { label: 'wget', detail: 'Download files', insertText: 'wget ' },
   { label: 'ssh', detail: 'Secure shell', insertText: 'ssh ' },
   { label: 'tar', detail: 'Archive tool', insertText: 'tar ' },
-  { label: 'pkg', detail: 'Termux packages', insertText: 'pkg ' },
-  { label: 'apt', detail: 'Package manager', insertText: 'apt ' },
   { label: 'tmux', detail: 'Terminal multiplexer', insertText: 'tmux ' },
   { label: 'vim', detail: 'Text editor', insertText: 'vim ' },
   { label: 'nano', detail: 'Text editor', insertText: 'nano ' },
@@ -110,14 +108,6 @@ const SUBCOMMANDS: Record<string, CompletionEntry[]> = {
     { label: 'fmt', detail: 'Format code', insertText: 'fmt' },
     { label: 'clippy', detail: 'Lint code', insertText: 'clippy' },
   ],
-  pkg: [
-    { label: 'install', detail: 'Install package', insertText: 'install ' },
-    { label: 'uninstall', detail: 'Remove package', insertText: 'uninstall ' },
-    { label: 'update', detail: 'Update packages', insertText: 'update' },
-    { label: 'upgrade', detail: 'Upgrade packages', insertText: 'upgrade' },
-    { label: 'search', detail: 'Search packages', insertText: 'search ' },
-    { label: 'list-installed', detail: 'List installed', insertText: 'list-installed' },
-  ],
   tmux: [
     { label: 'new-session', detail: 'Create session', insertText: 'new-session -s ' },
     { label: 'attach', detail: 'Attach to session', insertText: 'attach -t ' },
@@ -150,15 +140,6 @@ const SUBCOMMANDS: Record<string, CompletionEntry[]> = {
     { label: 'freeze', detail: 'Output requirements', insertText: 'freeze' },
     { label: 'show', detail: 'Package info', insertText: 'show ' },
     { label: 'search', detail: 'Search PyPI', insertText: 'search ' },
-  ],
-  apt: [
-    { label: 'install', detail: 'Install package', insertText: 'install ' },
-    { label: 'remove', detail: 'Remove package', insertText: 'remove ' },
-    { label: 'update', detail: 'Update list', insertText: 'update' },
-    { label: 'upgrade', detail: 'Upgrade packages', insertText: 'upgrade' },
-    { label: 'search', detail: 'Search packages', insertText: 'search ' },
-    { label: 'list', detail: 'List packages', insertText: 'list --installed' },
-    { label: 'autoremove', detail: 'Remove unused', insertText: 'autoremove' },
   ],
 };
 

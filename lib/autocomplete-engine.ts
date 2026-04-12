@@ -257,8 +257,6 @@ function getTopCommandLabels(): Array<{
     { label: 'wget', detail: 'Download files', insertText: 'wget ' },
     { label: 'ssh', detail: 'Secure shell', insertText: 'ssh ' },
     { label: 'tar', detail: 'Archive tool', insertText: 'tar ' },
-    { label: 'pkg', detail: 'Termux packages', insertText: 'pkg ' },
-    { label: 'apt', detail: 'Package manager', insertText: 'apt ' },
     { label: 'tmux', detail: 'Terminal multiplexer', insertText: 'tmux ' },
     { label: 'vim', detail: 'Text editor', insertText: 'vim ' },
     { label: 'nano', detail: 'Text editor', insertText: 'nano ' },
