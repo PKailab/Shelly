@@ -1,5 +1,5 @@
 // components/layout/ShellLayout.tsx
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { logInfo, logLifecycle } from '@/lib/debug-logger';
 import { View, Platform, StyleSheet, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { Sidebar } from './Sidebar';
 import { AgentBar } from './AgentBar';
 import { ContextBar } from './ContextBar';
 import { MultiPaneContainer } from '@/components/multi-pane/MultiPaneContainer';
+import { applyLayoutPreset } from '@/components/multi-pane/LayoutPresetSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 // WelcomeWizard kept as import for potential fallback — replaced by shelly setup
 // import { WelcomeWizard, isWizardComplete } from '@/components/WelcomeWizard';
@@ -61,6 +62,30 @@ export function ShellLayout() {
   useEffect(() => {
     setMaxPanes(layout.isLandscape && layout.isWide ? 4 : layout.isWide ? 2 : 1);
   }, [layout.isWide, layout.isLandscape]);
+
+  // Z Fold6 auto-switch: unfold (isFoldInner becomes true) → 1+2 Split,
+  // fold (isFoldInner becomes false) → Single. Only fires on transitions
+  // so a user's manual preset choice is preserved between fold events.
+  const prevFoldInnerRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const prev = prevFoldInnerRef.current;
+    const curr = layout.isFoldInner;
+    if (prev === null) {
+      // First observation — skip auto-switch to respect existing layout
+      prevFoldInnerRef.current = curr;
+      return;
+    }
+    if (prev !== curr) {
+      if (curr) {
+        logInfo('ShellLayout', 'Fold transition: unfolded → 1+2 Split');
+        applyLayoutPreset('1+2');
+      } else {
+        logInfo('ShellLayout', 'Fold transition: folded → Single');
+        applyLayoutPreset('single');
+      }
+      prevFoldInnerRef.current = curr;
+    }
+  }, [layout.isFoldInner]);
 
   // Full-screen voice mode — triggered by `shelly voice` or long-press mic
   const showVoice = useSettingsStore((s) => s.showVoiceMode);
