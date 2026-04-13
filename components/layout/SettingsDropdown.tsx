@@ -20,6 +20,7 @@ import { useCosmeticStore } from '@/store/cosmetic-store';
 import { useSettingsStore } from '@/store/settings-store';
 import { useI18n } from '@/lib/i18n';
 import { colors as C, fonts as F, sizes as S, radii as R } from '@/theme.config';
+import { McpSectionWrapper } from '@/components/settings/McpSectionWrapper';
 
 type Props = {
   visible: boolean;
@@ -34,6 +35,8 @@ const FONT_SIZE_PRESETS: FontSizePreset[] = [
 ];
 
 export function SettingsDropdown({ visible, onClose }: Props) {
+  const [mcpOpen, setMcpOpen] = useState(false);
+
   return (
     <Modal
       visible={visible}
@@ -58,10 +61,32 @@ export function SettingsDropdown({ visible, onClose }: Props) {
             <LanguageSection />
             <AgentsSection />
             <ApiKeysSection />
+            <IntegrationsSection onOpenMcp={() => setMcpOpen(true)} />
           </ScrollView>
         </Pressable>
       </Pressable>
+
+      <Modal
+        visible={mcpOpen}
+        animationType="slide"
+        onRequestClose={() => setMcpOpen(false)}
+      >
+        <McpSectionWrapper onClose={() => setMcpOpen(false)} />
+      </Modal>
     </Modal>
+  );
+}
+
+function IntegrationsSection({ onOpenMcp }: { onOpenMcp: () => void }) {
+  return (
+    <Section title="INTEGRATIONS">
+      <Pressable style={styles.integrationRow} onPress={onOpenMcp}>
+        <MaterialIcons name="extension" size={13} color={C.text2} />
+        <Text style={styles.integrationLabel}>MCP Servers</Text>
+        <View style={{ flex: 1 }} />
+        <MaterialIcons name="chevron-right" size={14} color={C.text3} />
+      </Pressable>
+    </Section>
   );
 }
 
@@ -724,6 +749,25 @@ const styles = StyleSheet.create({
   },
   segLabelActive: {
     color: C.accent,
+  },
+  // Integrations
+  integrationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: R.badge,
+    backgroundColor: C.bgSurface,
+  },
+  integrationLabel: {
+    fontFamily: F.family,
+    fontSize: F.sidebarItem.size,
+    fontWeight: '700',
+    color: C.text1,
+    letterSpacing: 0.4,
   },
   // Language
   langRow: {
