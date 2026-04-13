@@ -4,6 +4,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { PANE_REGISTRY } from './pane-registry';
 import { PaneSelector } from './PaneSelector';
+import PaneCliTabs from './PaneCliTabs';
 import type { PaneTab } from '@/hooks/use-multi-pane';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { usePaneStore, getAgentColor, AGENT_COLORS } from '@/store/pane-store';
@@ -11,7 +12,6 @@ import { useSettingsStore } from '@/store/settings-store';
 import { onCommandComplete } from '@/lib/cli-notification';
 import { useSidebarStore } from '@/store/sidebar-store';
 import { useBrowserStore } from '@/store/browser-store';
-import { SessionInfoBar } from './SessionInfoBar';
 import { neonTextGlow } from '@/lib/neon-glow';
 import { colors as C, fonts as F, sizes as S, padding as P, radii as R } from '@/theme.config';
 
@@ -154,11 +154,8 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
             </Text>
             <MaterialIcons name="arrow-drop-down" size={12} color={C.text2} />
           </Pressable>
-        ) : !isNarrow ? (
-          <View style={styles.headerCenter}>
-            <MaterialIcons name="data-usage" size={10} color={C.text2} />
-            <Text style={styles.tokenText}>42K / 1H</Text>
-          </View>
+        ) : tab === 'terminal' ? (
+          <PaneCliTabs />
         ) : null}
 
         {notification && (
@@ -207,10 +204,6 @@ const PaneSlotInner = ({ leafId, tab, onChangeTab, onRemove, onSplitH, onSplitV,
           </Pressable>
         </View>
       </View>
-
-      {(tab === 'terminal' || tab === 'ai') && (
-        <SessionInfoBar leafId={leafId} />
-      )}
 
       <View style={styles.content}>
         <SafeAreaInsetsContext.Provider value={ZERO_INSETS}>

@@ -34,8 +34,6 @@ import { useDeviceLayout } from '@/hooks/use-device-layout';
 import { useActiveSession, useTerminalStore } from '@/store/terminal-store';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
 import { MultiPaneContext } from '@/components/multi-pane/PaneSlot';
-import { TerminalHeader } from '@/components/terminal/TerminalHeader';
-import { UsagePanel } from '@/components/UsagePanel';
 import { useUsageStore } from '@/store/usage-store';
 import type { ReadFileFn, ListFilesFn } from '@/lib/usage-parser';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -500,11 +498,7 @@ export default function TerminalScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: keyboardHeight, backgroundColor: c.background }]}>
-      {/* Session Tab Header */}
-      <TerminalHeader />
-      <UsagePanel readFile={readFileAdapter} listFiles={listFilesAdapter} />
-
-      {/* quickBar removed — JP input + reload now integrated into TerminalHeader */}
+      {/* Headers moved into PaneSlot so each pane only pays for one header row */}
 
       {/* Preview Banner — slides in when localhost URL detected */}
       {bannerVisible && bannerUrl && isConnected && (

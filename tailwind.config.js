@@ -21,7 +21,11 @@ module.exports = {
     extend: {
       colors: tailwindColors,
       fontFamily: {
-        mono: ['monospace'],
+        // Ship all UI on Silkscreen (the mock's pixel font). The name
+        // MUST match useFonts() in app/_layout.tsx.
+        mono: ['Silkscreen'],
+        sans: ['Silkscreen'],
+        pixel: ['Silkscreen'],
       },
     },
   },
