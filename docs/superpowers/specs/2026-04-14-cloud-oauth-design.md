@@ -1,4 +1,4 @@
-# Cloud Integration — Google Drive OAuth + Dropbox/OneDrive 直リンク (v2)
+# Cloud Integration — Google Drive OAuth + Dropbox/OneDrive 直リンク (v3)
 
 **日付**: 2026-04-14
 **親 spec**: `docs/superpowers/specs/2026-04-14-coming-soon-design.md` 機能 6
@@ -6,15 +6,22 @@
 
 ---
 
-## v1 からの変更
+## v1 → v2 → v3 の変更
 
-- **scheme は `shelly`** (`app.config.ts:4` の `schemeFromBundleId = "shelly"`)、`dev.shelly.terminal` ではない。redirect_uri を修正
-- `AuthSession.makeRedirectUri({ scheme: 'shelly', path: 'oauth/callback' })` で動的生成 (hardcode 禁止)
-- **Sidebar Cloud section に既存の `handleCloudConnect` + `Alert.alert` stub あり**、これを**削除して置き換える**ことを明示
-- file DL は `blob() + base64` ではなく `FileSystem.createDownloadResumable` (with Authorization header)
-- Google Docs (`application/vnd.google-apps.*`) を `files.list` の `q` から**除外**
-- `expo-auth-session` / `expo-crypto` は**未インストール**、pnpm add + prebuild/rebuild 必要と明示
-- refresh 失敗 (revoked) 時に SecureStore 全消し + sign-out 状態に戻す経路を追加
+### v1 → v2
+- scheme を `shelly` に修正 (`app.config.ts:4` 確認)
+- `AuthSession.makeRedirectUri` で動的生成
+- Sidebar Cloud section `handleCloudConnect` stub を置き換え
+- file DL を `FileSystem.createDownloadResumable` に
+- Google Docs を `files.list` から除外
+- `expo-auth-session` / `expo-crypto` は未インストール、追加必要
+- refresh 失敗時の sign-out 経路
+
+### v2 → v3 (この版、2 つ重要修正)
+
+- **OAuth client type を "Web application" → "iOS" に変更**。Google の Web application 型は PKCE 使用時でも `client_secret` 必須で、OSS プロジェクトは `client_secret` を同梱できない。**iOS 型は PKCE public client として `client_secret` 不要**で custom scheme redirect に対応、Expo auth-session コミュニティの標準パターン。Android 型は SHA-1 pin 登録が必要で Expo の動的ビルドと相性が悪い
+- **`file://` prefix strip を mandatory に**。`FileSystem.documentDirectory` は `file:///data/data/.../` 形式を返すが、`openFile()` → `execCommand("cat '<path>'")` は bare 絶対パスしか受け付けない。DL 後のパスを `openFile` に渡す前に **`.replace('file://', '')`** 必須
+- **`handleCloudConnect` は `Alert.alert` stub ではなく既に `CLOUD_OAUTH_URLS` 参照の browser open 実装済** (Sidebar.tsx:124)。spec の説明文を訂正、削除指示は維持
 
 ---
 
@@ -86,7 +93,7 @@ export function hasClientId(): boolean {
 
 空文字 / `REPLACE_ME` 両方を未設定とみなす (v1 では片方しか見てなかった)。
 
-README 追記内容 (正確版):
+README 追記内容 (正確版、v3 で修正):
 
 ````markdown
 ## Google Drive integration (optional)
@@ -96,8 +103,8 @@ To enable Google Drive browsing in the Cloud sidebar section:
 1. Go to https://console.cloud.google.com/apis/credentials
 2. Create a new project (or use an existing one)
 3. Configure OAuth consent screen → External → add your email as a test user
-4. Create credentials → OAuth client ID → **Web application** type (not Android, because Expo auth-session goes through the web redirect flow on Android)
-5. Authorized redirect URIs: add `shelly://oauth/callback`
+4. Create credentials → OAuth client ID → **iOS** type
+5. Bundle ID: `dev.shelly.terminal`
 6. Copy the Client ID into `.env.local`:
 
    ```
@@ -110,7 +117,19 @@ Without a Client ID, the Cloud sidebar hides the Drive section and
 only shows Dropbox / OneDrive direct browser links.
 ````
 
-注意: Google の OAuth client type は「Android」を選ぶ人が多いが、**Android 型は client_secret を要求しない PKCE 専用フローで、package name + SHA-1 証明書指紋の事前登録が必要**で Expo/Shelly の動的ビルドと相性が悪い。**Web application 型で redirect URI に custom scheme を直接登録する**のが Expo auth-session の標準。
+### なぜ iOS クライアント型か (v3 修正の核心)
+
+Google の OAuth 2.0 クライアント型は 3 つある:
+
+| 型 | PKCE | client_secret | 対応環境 | Shelly での可否 |
+|---|---|---|---|---|
+| **Web application** | ◯ | **必須** | サーバーサイド | ❌ OSS に secret 同梱不可 |
+| **Android** | ◯ | 不要 | package name + SHA-1 固定 | ❌ Expo 動的ビルドで SHA-1 が変わる |
+| **iOS** | ◯ | **不要** | bundle ID + custom scheme | ✅ |
+
+iOS 型は PKCE public client として設計されており、Android の Expo auth-session からも**そのまま動く** (Google 側は iOS/Android を区別せず OAuth 2.0 standard に従うだけ)。これは `expo-auth-session` コミュニティで広く使われているパターン。
+
+注意: Google Cloud Console は iOS 型作成時に "App Store ID" や "Team ID" を入力させる場合があるが、これらは optional で空欄で作成可能。必須なのは **Bundle ID** のみ、これを `dev.shelly.terminal` にする。
 
 ---
 
@@ -140,7 +159,7 @@ only shows Dropbox / OneDrive direct browser links.
    ```
    client_id + code + code_verifier + redirect_uri + grant_type=authorization_code
    ```
-   (Web application 型は client_secret 必要だが、PKCE 使用時は不要とみなされる場合が多い。**実装時に Google の公式ドキュメントで再確認**、必要なら .env に secret 追加)
+   iOS クライアント型は PKCE public client なので **`client_secret` は送らない**。
 6. レスポンスから `access_token` / `refresh_token` / `expires_in` / `id_token` 取得
 7. SecureStore に保存:
    - `gdrive.access_token`
@@ -256,8 +275,16 @@ export async function downloadFile(fileId: string, name: string): Promise<string
 
 DL 後 `openFile(localPath)` で Preview pane に表示。
 
-### `openFile` の引数形式
-`lib/open-file.ts` は bare 絶対パスを受け付けるはず (`~/Shelly/...` みたいな path)。`FileSystem.documentDirectory` が返す `file://...` prefix を受け取れるか、**実装時に `lib/open-file.ts` を確認**して必要なら `.replace('file://', '')` で変換。
+### `openFile` の引数形式 (v3 で確定)
+`lib/open-file.ts` → `openMarkdownFile` → `execCommand("cat '<path>'")` というパスで **JNI fork+exec 経由で bare 絶対パスを `cat` に渡す**。`FileSystem.documentDirectory` は `file:///data/data/dev.shelly.terminal/files/` 形式を返すので、**`file://` prefix を必ず strip する**:
+
+```ts
+const uri = result.uri;  // 'file:///data/data/.../shelly-gdrive/my-doc.md'
+const localPath = uri.replace(/^file:\/\//, '');
+await openFile(localPath);
+```
+
+JNI fork+exec は app process 内で走るので `/data/data/dev.shelly.terminal/files/` は `cat` で読める (SELinux ポリシーで許可されている)。
 
 ---
 
@@ -299,11 +326,11 @@ token 本体は store に入れず SecureStore。store が持つのは UI 状態
 
 ## Sidebar Cloud section 書き換え
 
-### 現状把握
-`components/layout/Sidebar.tsx` の Cloud section は以下のような構造:
-- `handleCloudConnect(svcLabel)` 関数が定義されている (line 77 付近)
-- Tap で `Alert.alert` が出る "coming soon" stub
-- Google Drive / Dropbox / OneDrive の 3 行がハードコード
+### 現状把握 (v3 で訂正)
+`components/layout/Sidebar.tsx` の Cloud section:
+- `handleCloudConnect(svcLabel)` 関数が `useCallback` で定義 (L124 付近)
+- **Alert.alert ではなく、`CLOUD_OAUTH_URLS[label]` を lookup して browser open する既存実装**
+- `CLOUD_SERVICES.map()` で Google Drive / Dropbox / OneDrive の 3 行をハードコード render (L358 付近)
 
 ### 置き換え方針
 

@@ -1,4 +1,4 @@
-# llama.cpp UI Wiring — Design (v2)
+# llama.cpp UI Wiring — Design (v3)
 
 **日付**: 2026-04-14
 **親 spec**: `docs/superpowers/specs/2026-04-14-coming-soon-design.md` 機能 5
@@ -6,11 +6,19 @@
 
 ---
 
-## v1 からの変更
+## v1 → v2 → v3 の変更
 
-- **`lib/llamacpp-setup.ts` は既に 386 行で存在**。v1 は "新規 `lib/llama-setup.ts`" と書いていたが誤り。lib 層はほぼ既存利用、**UI とランタイム状態 store だけ**新規で足す
-- `$HOME` パスの扱い、`unzip` 有無、`--log-disable` 矛盾、`pkill -f` 誤爆を **実装前検証ステップ** として明記
-- llama-server PID 管理を PID ファイル方式に
+### v1 → v2
+- `lib/llamacpp-setup.ts` が既に 386 行で存在することを認識、UI + state store だけ新規に
+- `$HOME` / `unzip` pre-flight チェックを明記
+- PID ファイル方式への移行を宣言
+
+### v2 → v3 (この版)
+- **`buildDaemonStartScript` / `buildStartAllScript` は既に PID ファイル (`echo $! > "${pidFile}"`) を書いている** — v2 の `buildServerStartCommandWithPid` 新規追加は不要、既存関数を再利用する
+- **パスは `$HOME/models/`** (既存 `MODELS_DIR` 定数) を採用、v2 の `~/.shelly/llama/` は廃止
+- `--log-disable` は既存 `buildServerStartCommand` (L222) に存在、削除 edit が `buildRecommendedStartCommand` → `buildDaemonStartScript` → `buildStartAllScript` に cascade することを明示
+- `buildStartAllScript` は既に `curl /health` のヘルスチェックループを含む — v2 の JS 側 polling は冗長、既存スクリプト内の health check に一任する
+- polling / health-check タイムアウトを 20s → 60s に延長 (Snapdragon 8 Gen3 の 1.6GB Q4 mmap warmup は 15-40s)
 
 ---
 
@@ -139,65 +147,48 @@ persist: AsyncStorage (テキストのみ)。
 
 ---
 
-## Ports monitor 連携
+## 起動と readiness 判定
 
-現状 `store/ports-store.ts` は Sidebar が mount されたときにポーラーを起動する設計 (Sidebar.tsx 側の useEffect)。
+### v3 方針: `buildStartAllScript` の既存 health-check ループに任せる
 
-**問題**: Settings Modal を全画面表示すると Sidebar が unmount → ポーラー停止 → `:8080` 検出が止まる。
+v2 は JS 側で 20 秒 polling を書いていたが、**既存 `buildStartAllScript` (L337 付近) には `curl /health` のヘルスチェックループが既に組み込まれている**。JS 側の polling と重複するので削除し、以下のフローに統一:
 
-**対応**: Settings 画面で llama-server 起動するとき、`llama-setup-store.stage === 'starting'` の間だけ **LocalLlmSection 側でも独立した poller を起動** する。最大 20 秒の polling、見つかれば `setStage('running')`、タイムアウトで `setStage('error')`。
+1. UI の `[Start]` tap → `buildStartAllScript(model)` を `execCommand` に送信 (this is a long-running call — blocks until the script exits)
+2. スクリプト内部で llama-server を nohup 起動 → PID ファイル書き込み → `curl http://127.0.0.1:8080/health` を 60 秒まで retry
+3. スクリプトが exit 0 なら `setStage('running')`、exit != 0 なら `setStage('error')` + errorMessage に `tail -n 20 $HOME/logs/llama-server.log`
+4. UI 側は `execCommand` の結果を await するだけ、独自の `setInterval` 不要
 
-```ts
-// LocalLlmSection 内の useEffect
-useEffect(() => {
-  if (stage !== 'starting') return;
-  let attempts = 0;
-  const iv = setInterval(async () => {
-    attempts++;
-    const r = await execCommand('ss -tlnp 2>/dev/null | grep :8080', 3_000);
-    if (r.stdout.includes(':8080')) {
-      setStage('running');
-      clearInterval(iv);
-    } else if (attempts >= 20) {
-      setError('llama-server failed to start. Check server.log');
-      setStage('error');
-      clearInterval(iv);
-    }
-  }, 1_000);
-  return () => clearInterval(iv);
-}, [stage]);
-```
+### 実装上の注意
+
+- `execCommand` のタイムアウトは **最大 90 秒** に設定 (スクリプト内部の 60 秒 health check + buffer)
+- UI は "Starting..." スピナー表示を出したまま blocking await
+- ユーザーが Cancel したい場合は `execCommand` を abort する経路が必要 (`pkill -f curl && kill $(cat $HOME/models/llama-server.pid)` を別コマンドで送る)
+
+### `buildStartAllScript` の readiness timeout 調整
+
+既存のスクリプトの retry 回数が 20 秒相当 (1秒 × 20回) の場合、**60 秒 (1秒 × 60回)** に延長する。理由: Snapdragon 8 Gen3 での 1.6 GB Gemma-2-2B Q4_K_M cold start (mmap + warmup) は 15-40 秒、Qwen2.5-1.5B でも 10-25 秒かかる。20 秒タイムアウトは楽観的すぎる。
+
+実装時に `buildStartAllScript` の中身を Read して該当する retry/sleep 定数を特定 → 60 秒相当に書き換え。
 
 ---
 
 ## PID ファイル方式
 
-v1 の `pkill -f llama-server` は誤爆リスク (grep/tail/journalctl が llama-server を含むと kill される)。
+**v3 の更新**: 既存 `buildDaemonStartScript` と `buildStartAllScript` は既に `echo $! > "${pidFile}"` パターンで PID を保存している (確認済)。新規関数追加は不要。
 
-**修正**: 起動コマンドを以下に変更:
+ただし `buildStopCommand` (L269) が `pkill -f llama-server` を使っている可能性がある — 実装時に Read して確認し、`pkill -f` なら以下に差し替える 1 行 edit:
 
 ```bash
-nohup ~/.shelly/llama/llama-server \
-  -m ~/.shelly/llama/models/<selected>.gguf \
-  --port 8080 \
-  --host 127.0.0.1 \
-  -c 4096 \
-  > ~/.shelly/llama/server.log 2>&1 &
-echo $! > ~/.shelly/llama/server.pid
-disown
-```
-
-停止は:
-```bash
-if [ -f ~/.shelly/llama/server.pid ]; then
-  kill $(cat ~/.shelly/llama/server.pid) 2>/dev/null
+# 差し替え後
+if [ -f "$HOME/models/llama-server.pid" ]; then
+  kill $(cat "$HOME/models/llama-server.pid") 2>/dev/null || true
   sleep 3
-  kill -9 $(cat ~/.shelly/llama/server.pid) 2>/dev/null || true
-  rm -f ~/.shelly/llama/server.pid
+  kill -9 $(cat "$HOME/models/llama-server.pid") 2>/dev/null || true
+  rm -f "$HOME/models/llama-server.pid"
 fi
 ```
 
-`lib/llamacpp-setup.ts` に `buildServerStartCommandWithPid(model)` と `buildStopCommandPidBased()` を**追加**する (既存の `buildServerStartCommand` と `buildStopCommand` はそのまま残す、旧挙動の呼び出し元互換のため)。
+既に PID ファイル方式なら edit 不要。
 
 ---
 
@@ -309,9 +300,9 @@ const availableModels = MODEL_CATALOG.filter(m => checkRamRequirement(m).ok);
 ## ファイル
 
 - `store/llama-setup-store.ts` (新規, ~80 行)
-- `components/settings/LocalLlmSection.tsx` (新規, ~300 行)
+- `components/settings/LocalLlmSection.tsx` (新規, ~250 行)
 - `components/layout/SettingsDropdown.tsx` (編集 — Local LLM row 追加 ~10 行)
-- `lib/llamacpp-setup.ts` (編集 — `buildServerStartCommandWithPid` + `buildStopCommandPidBased` 追加、`--log-disable` 削除)
+- `lib/llamacpp-setup.ts` (編集 — `--log-disable` 削除 1 行、`buildStartAllScript` の readiness retry を 60 秒に延長、`buildStopCommand` が PID 方式でなければ差し替え)
 
 ---
 
