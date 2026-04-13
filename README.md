@@ -255,7 +255,7 @@ Currently registered:
 <summary><strong>Theme &amp; Fonts</strong></summary>
 
 - **"Shelly" preset** — new default. Mock-faithful palette with 8 neon accents (teal / green / blue / sky / purple / pink / amber / red) on a `#0A0A0A` background. Paired with Silkscreen.
-- **Other presets** — Silkscreen (previous greener palette), 8bit (PressStart2P), Mono (system monospace). Switch from Settings → Display → Font or from the Command Palette.
+- **Other presets** — Silkscreen (previous greener palette), 8bit (PressStart2P), Mono (system monospace), plus four classic editor palettes: **Dracula**, **Nord**, **Gruvbox**, and **Tokyo Night**. Switch from Settings → Display → Theme or from the Command Palette (`theme-dracula`, `theme-nord`, `theme-gruvbox`, `theme-tokyo-night`).
 - **Runtime swap** — presets are swapped by mutating the live `colors` object in place (identity preserved) and bumping a theme-version store that key-remounts the shell layout. PTY sessions survive the switch — your vim stays open.
 - **Single-weight rendering** — every Text is forced through Silkscreen Regular regardless of its `fontWeight`. A two-weight mix (bold section headers against regular inline buttons) read as visibly inconsistent, so Shelly commits to one pixel weight everywhere.
 - **Text.render monkey-patch** — `Text.defaultProps.style` is replaced (not merged) when a child passes its own `style`, which would otherwise let 100+ call sites escape the theme font. The patch prepends `{ fontFamily }` to every Text's style array so the preset font reaches every call site without touching them.
@@ -290,12 +290,10 @@ Currently registered:
 
 ## Coming Soon
 
-Parts of the app are scaffolded but not ready. These are on the short-term roadmap, not in the current build:
+Parts of the app are written but not finished. These are on the short-term roadmap, not in the current build:
 
-- **Additional terminal theme presets** — beyond the four Shelly / Silk / 8bit / Mono font presets, the palette is currently Shelly-only
-- **Background agent scheduler UI** — currently registered via `@agent` syntax; a proper sidebar/Settings view is planned
-- **MCP manager** — MCP server catalog exists but is experimental
-- **App icon + Play Store / F-Droid distribution** — the APK is published via GitHub Releases only
+- **App icon + Play Store / F-Droid distribution** — the APK is published via GitHub Releases only; icon brief exists, store flow does not
+- **End-to-end device validation** for voice dialogue, immortal sessions, and background agent AlarmManager scheduling — all wired but not yet smoke-tested on the target device
 
 ---
 
@@ -309,13 +307,14 @@ Parts of the app are scaffolded but not ready. These are on the short-term roadm
 | FileTree CRUD (create / rename / delete / copy path) | ✅ shipping |
 | Command Palette — tabs, terminal, git, panes, layouts, font, CRT, voice | ✅ shipping |
 | Browser fullscreen, desktop UA toggle, link capture, bookmarks | ✅ shipping |
-| Shelly theme preset + runtime swap + single-weight Text monkey-patch | ✅ shipping |
+| Theme presets — Shelly / Silkscreen / 8-bit / Mono + Dracula / Nord / Gruvbox / Tokyo Night (runtime swap, single-weight Text monkey-patch) | ✅ shipping |
 | AgentBar + Sidebar git dirty badge (single-writer poll) | ✅ shipping |
 | Voice dialogue (VoiceChat + VoiceChain + TTS) | ✅ implemented, device smoke-test pending |
 | Immortal sessions (tmux keep-alive) | ✅ implemented, device smoke-test pending |
 | Local LLM via llama.cpp `@local` (Settings · Integrations · Local LLM: catalog, download, start/stop) | ✅ shipping |
+| MCP Servers (Settings · Integrations · MCP Servers) | ✅ shipping |
 | Arena mode | ✅ wired, under-used — let us know how it feels |
-| Background agents (`@agent` + AlarmManager) | 🟡 skeleton, end-to-end validation pending |
+| Background agents — `@agent` registration, AlarmManager scheduling, Sidebar Tasks list with run-now / delete | ✅ wired, AlarmManager end-to-end smoke test pending |
 | Sidebar Ports monitor (`ss -tlnp` → tap to open in Browser pane) | ✅ shipping |
 | Sidebar SSH Profiles (key-file auth, ~/.ssh/config import, tap-to-connect) | ✅ shipping |
 | Cloud storage | 🚫 out of scope — use `rclone` from the terminal pane |
