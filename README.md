@@ -292,7 +292,6 @@ Currently registered:
 Parts of the app are scaffolded but not ready. These are on the short-term roadmap, not in the current build:
 
 - **Cloud OAuth** — Google Drive / Dropbox / OneDrive linking (section shells only for now)
-- **llama.cpp guided setup** — bundled local-LLM install wizard; today you start the server yourself
 - **Additional terminal theme presets** — beyond the four Shelly / Silk / 8bit / Mono font presets, the palette is currently Shelly-only
 - **Background agent scheduler UI** — currently registered via `@agent` syntax; a proper sidebar/Settings view is planned
 - **MCP manager** — MCP server catalog exists but is experimental
@@ -314,7 +313,7 @@ Parts of the app are scaffolded but not ready. These are on the short-term roadm
 | AgentBar + Sidebar git dirty badge (single-writer poll) | ✅ shipping |
 | Voice dialogue (VoiceChat + VoiceChain + TTS) | ✅ implemented, device smoke-test pending |
 | Immortal sessions (tmux keep-alive) | ✅ implemented, device smoke-test pending |
-| Local LLM via llama.cpp `@local` | ✅ routing wired, manual server start required |
+| Local LLM via llama.cpp `@local` (Settings · Integrations · Local LLM: catalog, download, start/stop) | ✅ shipping |
 | Arena mode | ✅ wired, under-used — let us know how it feels |
 | Background agents (`@agent` + AlarmManager) | 🟡 skeleton, end-to-end validation pending |
 | Sidebar Ports monitor (`ss -tlnp` → tap to open in Browser pane) | ✅ shipping |

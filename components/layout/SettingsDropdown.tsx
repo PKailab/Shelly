@@ -21,6 +21,7 @@ import { useSettingsStore } from '@/store/settings-store';
 import { useI18n } from '@/lib/i18n';
 import { colors as C, fonts as F, sizes as S, radii as R } from '@/theme.config';
 import { McpSectionWrapper } from '@/components/settings/McpSectionWrapper';
+import { LlamaCppSectionWrapper } from '@/components/settings/LlamaCppSectionWrapper';
 
 type Props = {
   visible: boolean;
@@ -36,6 +37,7 @@ const FONT_SIZE_PRESETS: FontSizePreset[] = [
 
 export function SettingsDropdown({ visible, onClose }: Props) {
   const [mcpOpen, setMcpOpen] = useState(false);
+  const [llamaOpen, setLlamaOpen] = useState(false);
 
   return (
     <Modal
@@ -61,7 +63,10 @@ export function SettingsDropdown({ visible, onClose }: Props) {
             <LanguageSection />
             <AgentsSection />
             <ApiKeysSection />
-            <IntegrationsSection onOpenMcp={() => setMcpOpen(true)} />
+            <IntegrationsSection
+              onOpenMcp={() => setMcpOpen(true)}
+              onOpenLlama={() => setLlamaOpen(true)}
+            />
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -73,16 +78,36 @@ export function SettingsDropdown({ visible, onClose }: Props) {
       >
         <McpSectionWrapper onClose={() => setMcpOpen(false)} />
       </Modal>
+
+      <Modal
+        visible={llamaOpen}
+        animationType="slide"
+        onRequestClose={() => setLlamaOpen(false)}
+      >
+        <LlamaCppSectionWrapper onClose={() => setLlamaOpen(false)} />
+      </Modal>
     </Modal>
   );
 }
 
-function IntegrationsSection({ onOpenMcp }: { onOpenMcp: () => void }) {
+function IntegrationsSection({
+  onOpenMcp,
+  onOpenLlama,
+}: {
+  onOpenMcp: () => void;
+  onOpenLlama: () => void;
+}) {
   return (
     <Section title="INTEGRATIONS">
       <Pressable style={styles.integrationRow} onPress={onOpenMcp}>
         <MaterialIcons name="extension" size={13} color={C.text2} />
         <Text style={styles.integrationLabel}>MCP Servers</Text>
+        <View style={{ flex: 1 }} />
+        <MaterialIcons name="chevron-right" size={14} color={C.text3} />
+      </Pressable>
+      <Pressable style={styles.integrationRow} onPress={onOpenLlama}>
+        <MaterialIcons name="memory" size={13} color={C.text2} />
+        <Text style={styles.integrationLabel}>Local LLM · llama.cpp</Text>
         <View style={{ flex: 1 }} />
         <MaterialIcons name="chevron-right" size={14} color={C.text3} />
       </Pressable>
