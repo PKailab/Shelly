@@ -410,7 +410,7 @@ export type AppSettings = {
   gpuRendering?: boolean;
   /** UI font family: 'silkscreen' (mock default, readable pixel),
    *  'pixel' (PressStart2P 8×8 grid), or 'mono' (system monospace) */
-  uiFont?: 'shelly' | 'silkscreen' | 'pixel' | 'mono';
+  uiFont?: 'shelly' | 'silkscreen' | 'pixel' | 'mono' | 'dracula' | 'nord' | 'gruvbox' | 'tokyo-night';
 };
 
 // ─── Background Agents ──────────────────────────────────────────────────────

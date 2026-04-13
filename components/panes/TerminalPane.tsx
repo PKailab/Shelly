@@ -513,7 +513,12 @@ export default function TerminalScreen() {
             ref={terminalViewRef}
             sessionId={activeSession.nativeSessionId}
             fontFamily={
-              settings.uiFont === 'shelly' || settings.uiFont === 'silkscreen'
+              settings.uiFont === 'shelly' ||
+              settings.uiFont === 'silkscreen' ||
+              settings.uiFont === 'dracula' ||
+              settings.uiFont === 'nord' ||
+              settings.uiFont === 'gruvbox' ||
+              settings.uiFont === 'tokyo-night'
                 ? 'silkscreen'
                 : settings.uiFont === 'pixel'
                 ? 'pixel-mplus'

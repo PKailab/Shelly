@@ -145,14 +145,25 @@ function DisplaySection() {
 
       {/* UI font family */}
       <FontFamilyRow />
+      <ThemeRow />
     </Section>
   );
 }
 
+type UiFontId =
+  | 'shelly'
+  | 'silkscreen'
+  | 'pixel'
+  | 'mono'
+  | 'dracula'
+  | 'nord'
+  | 'gruvbox'
+  | 'tokyo-night';
+
 function FontFamilyRow() {
   const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'shelly');
   const updateSettings = useSettingsStore((s) => s.updateSettings);
-  const options: Array<{ value: 'shelly' | 'silkscreen' | 'pixel' | 'mono'; label: string }> = [
+  const options: Array<{ value: UiFontId; label: string }> = [
     { value: 'shelly',     label: 'Shelly' },
     { value: 'silkscreen', label: 'Silk' },
     { value: 'pixel',      label: '8bit' },
@@ -160,6 +171,38 @@ function FontFamilyRow() {
   ];
   return (
     <Row label="Font">
+      <View style={styles.segGroup}>
+        {options.map((opt) => {
+          const active = uiFont === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              style={[styles.segBtn, active && styles.segBtnActive]}
+              onPress={() => updateSettings({ uiFont: opt.value })}
+              hitSlop={4}
+            >
+              <Text style={[styles.segLabel, active && styles.segLabelActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Row>
+  );
+}
+
+function ThemeRow() {
+  const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'shelly');
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
+  const options: Array<{ value: UiFontId; label: string }> = [
+    { value: 'dracula',     label: 'Dracula' },
+    { value: 'nord',        label: 'Nord' },
+    { value: 'gruvbox',     label: 'Gruvbox' },
+    { value: 'tokyo-night', label: 'Tokyo' },
+  ];
+  return (
+    <Row label="Theme">
       <View style={styles.segGroup}>
         {options.map((opt) => {
           const active = uiFont === opt.value;

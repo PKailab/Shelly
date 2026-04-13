@@ -155,6 +155,16 @@ export function CommandPalette() {
       { id: 'font-mono', label: 'Font: Mono', hint: 'system monospace', icon: 'palette', category: 'action',
         onExecute: () => { useSettingsStore.getState().updateSettings({ uiFont: 'mono' }); close(); } },
 
+      // Theme presets — color swaps that keep Silkscreen as the font
+      { id: 'theme-dracula', label: 'Theme: Dracula', hint: 'purple accent', icon: 'palette', category: 'action',
+        onExecute: () => { useSettingsStore.getState().updateSettings({ uiFont: 'dracula' }); close(); } },
+      { id: 'theme-nord', label: 'Theme: Nord', hint: 'arctic blue', icon: 'palette', category: 'action',
+        onExecute: () => { useSettingsStore.getState().updateSettings({ uiFont: 'nord' }); close(); } },
+      { id: 'theme-gruvbox', label: 'Theme: Gruvbox', hint: 'retro amber', icon: 'palette', category: 'action',
+        onExecute: () => { useSettingsStore.getState().updateSettings({ uiFont: 'gruvbox' }); close(); } },
+      { id: 'theme-tokyo-night', label: 'Theme: Tokyo Night', hint: 'deep blue', icon: 'palette', category: 'action',
+        onExecute: () => { useSettingsStore.getState().updateSettings({ uiFont: 'tokyo-night' }); close(); } },
+
       // CRT toggle
       { id: 'crt-toggle', label: 'CRT: Toggle', hint: 'scanline + bloom overlay', icon: 'tv', category: 'action',
         onExecute: () => {
