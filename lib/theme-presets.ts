@@ -29,22 +29,15 @@ function patchTextRenderOnce() {
   TextAny.render = function patchedRender(...args: any[]) {
     const elem = original.apply(this, args);
     if (!elem) return elem;
-    // Flatten the caller's style to inspect fontWeight so we can pick
-    // the matching Silkscreen variant. Android's native font matcher
-    // does not synthesise bold from a regular-only TTF, so fontWeight
-    // 700 on Silkscreen silently falls back to the system font.
-    const flat = (() => {
-      const s = elem.props?.style;
-      if (!s) return {};
-      if (Array.isArray(s)) return Object.assign({}, ...s.flat(Infinity).filter(Boolean));
-      return s;
-    })() as any;
-    const w = String(flat.fontWeight ?? '');
-    const isBold = w === 'bold' || (parseInt(w, 10) || 0) >= 600;
-    const family =
-      currentFontFamily === 'Silkscreen' && isBold ? 'Silkscreen-Bold' : currentFontFamily;
+    // Force every Text through the active preset font regardless of
+    // fontWeight. We previously swapped in Silkscreen-Bold for weight
+    // >= 600 so native Android wouldn't fall back to system sans, but
+    // the Bold variant reads as visibly chunkier than the Regular
+    // variant, and mixing them across the UI looks inconsistent. The
+    // trailing { fontFamily } override ensures caller-set font styles
+    // can't escape the preset.
     return React.cloneElement(elem, {
-      style: [{ fontFamily: family }, elem.props?.style, { fontFamily: family }],
+      style: [{ fontFamily: currentFontFamily }, elem.props?.style, { fontFamily: currentFontFamily }],
     });
   };
   textRenderPatched = true;
