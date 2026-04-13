@@ -225,7 +225,8 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 - **Tasks** — recent background-agent runs with duration and status
 - **Device** — quick-access folders (`~`, `/sdcard/Download`, …) that re-bind the file tree in one tap
 - **Ports** — every 20 seconds Shelly scans `ss -tlnp` and lists each loopback / wildcard listener; tap a row to open `http://localhost:<port>` in the Browser pane. Well-known ports get friendly labels (`:3000 NEXT.JS`, `:5173 VITE`, `:8081 EXPO`, `:8888 JUPYTER`, …).
-- **Cloud / Profiles** — section shells in place for future Google Drive / Dropbox OAuth and SSH / workspace profile management. *Not yet wired; see [Coming Soon](#coming-soon).*
+- **Profiles** — saved SSH connections. Tap to insert `ssh -i KEY user@host -p PORT` into the active terminal pane; long-press to edit or delete; `Import from ~/.ssh/config` bulk-adds hosts. Key-file auth only — no passwords or passphrases are persisted.
+- **Cloud** — section shell in place for future Google Drive / Dropbox / OneDrive OAuth. *Not yet wired; see [Coming Soon](#coming-soon).*
 
 </details>
 
@@ -291,7 +292,6 @@ Currently registered:
 Parts of the app are scaffolded but not ready. These are on the short-term roadmap, not in the current build:
 
 - **Cloud OAuth** — Google Drive / Dropbox / OneDrive linking (section shells only for now)
-- **SSH Profiles UI** — named connections with key or password auth
 - **llama.cpp guided setup** — bundled local-LLM install wizard; today you start the server yourself
 - **Additional terminal theme presets** — beyond the four Shelly / Silk / 8bit / Mono font presets, the palette is currently Shelly-only
 - **Background agent scheduler UI** — currently registered via `@agent` syntax; a proper sidebar/Settings view is planned
@@ -318,7 +318,8 @@ Parts of the app are scaffolded but not ready. These are on the short-term roadm
 | Arena mode | ✅ wired, under-used — let us know how it feels |
 | Background agents (`@agent` + AlarmManager) | 🟡 skeleton, end-to-end validation pending |
 | Sidebar Ports monitor (`ss -tlnp` → tap to open in Browser pane) | ✅ shipping |
-| Sidebar Cloud / SSH Profiles | 🟡 section shells, logic not yet wired |
+| Sidebar SSH Profiles (key-file auth, ~/.ssh/config import, tap-to-connect) | ✅ shipping |
+| Sidebar Cloud (Drive / Dropbox / OneDrive) | 🟡 section shell, OAuth not yet wired |
 | App icon + distribution channels | 🟡 brief written, image + store flow not done |
 
 Full validation checklist: [`docs/superpowers/specs/2026-04-13-validation-checklist.md`](docs/superpowers/specs/2026-04-13-validation-checklist.md)
