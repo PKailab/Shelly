@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { execCommand } from '@/hooks/use-native-exec';
 import { useGitStatusStore } from '@/store/git-status-store';
+import { usePortsStore, parseSsOutput, portLabel } from '@/store/ports-store';
 import {
   View,
   Text,
@@ -74,6 +75,25 @@ export function Sidebar() {
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const setLeafTab = useMultiPaneStore((s) => s.setLeafTab);
   const openUrl = useBrowserStore((s) => s.openUrl);
+
+  // Poll active localhost listeners every 20s. Single-writer pattern
+  // (Sidebar owns the interval, usePortsStore is the one state source)
+  // so the list stays stable across renders without duplicate work.
+  // `ss -tlnp` is the modern iproute2 replacement for netstat and is
+  // present in the bundled toolbox.
+  const portEntries = usePortsStore((s) => s.entries);
+  useEffect(() => {
+    const setEntries = usePortsStore.getState().setEntries;
+    let cancelled = false;
+    const refresh = async () => {
+      const r = await execCommand('ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null', 5_000);
+      if (cancelled) return;
+      setEntries(parseSsOutput(r.stdout || ''));
+    };
+    refresh();
+    const iv = setInterval(refresh, 20_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
 
   // Count uncommitted changes in the active repo. Sidebar owns the
   // single 20-second poller; results go into useGitStatusStore so the
@@ -359,7 +379,7 @@ export function Sidebar() {
           ))}
         </SidebarSection>
 
-        {/* PORTS */}
+        {/* PORTS — live `ss -tlnp` scan every 20s (see useEffect above) */}
         <SidebarSection
           title="PORTS"
           icon="lan"
@@ -367,20 +387,29 @@ export function Sidebar() {
           onToggle={() => toggleSection('ports')}
           iconsOnly={iconsOnly}
         >
-          <View style={styles.portRow}>
-            <View style={[styles.portDot, { backgroundColor: C.accentGreen }, neonDotGlow]} />
-            <Text style={styles.portLabel}>:3000</Text>
-            <Text style={styles.portName}>NEXT.JS</Text>
-            <View style={styles.cloudSpacer} />
-            <MaterialIcons name="open-in-new" size={I.externalLink} color={C.text2} />
-          </View>
-          <View style={styles.portRow}>
-            <View style={[styles.portDot, { backgroundColor: C.accentSky }, neonDotGlow]} />
-            <Text style={styles.portLabel}>:8081</Text>
-            <Text style={styles.portName}>EXPO</Text>
-            <View style={styles.cloudSpacer} />
-            <MaterialIcons name="open-in-new" size={I.externalLink} color={C.text2} />
-          </View>
+          {portEntries.length === 0 ? (
+            <Text style={styles.portEmpty}>No listeners</Text>
+          ) : (
+            portEntries.map((entry) => {
+              // Color map: Expo ports go sky, everything else green.
+              const isExpo = entry.port === 8081 || (entry.port >= 19000 && entry.port <= 19002);
+              const dotColor = isExpo ? C.accentSky : C.accentGreen;
+              const label = portLabel(entry);
+              return (
+                <Pressable
+                  key={entry.port}
+                  style={styles.portRow}
+                  onPress={() => openUrl(`http://localhost:${entry.port}`)}
+                >
+                  <View style={[styles.portDot, { backgroundColor: dotColor }, neonDotGlow]} />
+                  <Text style={styles.portLabel}>{`:${entry.port}`}</Text>
+                  {label ? <Text style={styles.portName}>{label}</Text> : null}
+                  <View style={styles.cloudSpacer} />
+                  <MaterialIcons name="open-in-new" size={I.externalLink} color={C.text2} />
+                </Pressable>
+              );
+            })
+          )}
         </SidebarSection>
 
         {/* PROFILES */}
@@ -639,6 +668,14 @@ const styles = StyleSheet.create({
     fontFamily: F.family,
     fontWeight: F.sidebarItem.weight,
     color: C.text2,
+  },
+  portEmpty: {
+    fontSize: F.sidebarItem.size,
+    fontFamily: F.family,
+    color: C.text3,
+    paddingHorizontal: P.sidebarItem.px,
+    paddingVertical: 6,
+    letterSpacing: 0.3,
   },
   // Toggle
   toggleBtn: {
