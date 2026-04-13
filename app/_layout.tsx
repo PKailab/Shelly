@@ -10,7 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
-import { Silkscreen_400Regular } from "@expo-google-fonts/silkscreen";
+import { Silkscreen_400Regular, Silkscreen_700Bold } from "@expo-google-fonts/silkscreen";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useSoundStore, unloadSounds } from "@/lib/sounds";
 import { loadAgentsFromDisk } from "@/lib/agent-manager";
@@ -55,6 +55,7 @@ export default function RootLayout() {
     // @expo-google-fonts/silkscreen's named export (not a direct .ttf
     // path — Metro can't resolve that through the package subpath).
     'Silkscreen': Silkscreen_400Regular,
+    'Silkscreen-Bold': Silkscreen_700Bold,
   });
   const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'shelly');
   const loadSettings = useTerminalStore((s) => s.loadSettings);
