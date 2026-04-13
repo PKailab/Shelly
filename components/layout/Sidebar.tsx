@@ -18,6 +18,9 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/lib/theme-engine';
 import { useSidebarStore } from '@/store/sidebar-store';
 import { useAgentStore } from '@/store/agent-store';
+import { useTerminalStore } from '@/store/terminal-store';
+import { deleteAgent } from '@/lib/agent-manager';
+import { generateRunNowCommand } from '@/lib/agent-executor';
 import { useSettingsStore } from '@/store/settings-store';
 import { usePaneStore } from '@/store/pane-store';
 import { useMultiPaneStore } from '@/hooks/use-multi-pane';
@@ -196,53 +199,82 @@ export function Sidebar() {
           badge={runningAgents.length}
           iconsOnly={iconsOnly}
         >
-          {/* Mock dummy tasks (fallback when no real data) */}
-          {runningAgents.length === 0 && recentTasks.length === 0 ? (
-            <>
-              <View style={styles.taskRow}>
-                <View style={[styles.taskDot, { backgroundColor: C.accentGreen }]} />
-                <View style={styles.taskInfo}>
-                  <Text style={styles.taskName} numberOfLines={1}>NPM RUN DEV</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: C.badgeRunningBg }]}>
-                  <Text style={[styles.statusBadgeText, { color: C.badgeRunningText }]}>RUNNING</Text>
-                </View>
+          {runningAgents.map((agent) => (
+            <View key={`running-${agent.id}`} style={styles.taskRow}>
+              <View style={[styles.taskDot, { backgroundColor: C.accentGreen }]} />
+              <View style={styles.taskInfo}>
+                <Text style={styles.taskName} numberOfLines={1}>
+                  {agent.name.toUpperCase()}
+                </Text>
               </View>
-              <View style={styles.taskRow}>
-                <MaterialIcons name="check-circle" size={10} color={C.accent} />
-                <View style={styles.taskInfo}>
-                  <Text style={styles.taskName} numberOfLines={1}>GIT PUSH</Text>
-                </View>
-                <Text style={styles.taskAge}>25 AGO</Text>
+              <View style={[styles.statusBadge, { backgroundColor: C.badgeRunningBg }]}>
+                <Text style={[styles.statusBadgeText, { color: C.badgeRunningText }]}>RUNNING</Text>
               </View>
-            </>
-          ) : (
+            </View>
+          ))}
+          {recentTasks.map((task) => (
+            <View key={`recent-${task.id}`} style={styles.taskRow}>
+              <MaterialIcons name="check-circle" size={10} color={C.accent} />
+              <View style={styles.taskInfo}>
+                <Text style={styles.taskName} numberOfLines={1}>
+                  {task.name.toUpperCase()}
+                </Text>
+              </View>
+              <Text style={styles.taskAge}>{task.age}</Text>
+            </View>
+          ))}
+          {agents.length > 0 && (
             <>
-              {runningAgents.map((agent) => (
-                <View key={agent.id} style={styles.taskRow}>
-                  <View style={[styles.taskDot, { backgroundColor: C.accentGreen }]} />
+              {(runningAgents.length > 0 || recentTasks.length > 0) && (
+                <View style={styles.tasksSeparator} />
+              )}
+              <Text style={styles.tasksSubheader}>SCHEDULED</Text>
+              {agents.filter((a) => !a.enabled).map((agent) => (
+                <View key={`sched-${agent.id}`} style={styles.taskRow}>
+                  <View style={[styles.taskDot, { backgroundColor: C.text3 }]} />
                   <View style={styles.taskInfo}>
                     <Text style={styles.taskName} numberOfLines={1}>
                       {agent.name.toUpperCase()}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: C.badgeRunningBg }]}>
-                    <Text style={[styles.statusBadgeText, { color: C.badgeRunningText }]}>RUNNING</Text>
-                  </View>
-                </View>
-              ))}
-              {recentTasks.map((task) => (
-                <View key={task.id} style={styles.taskRow}>
-                  <MaterialIcons name="check-circle" size={10} color={C.accent} />
-                  <View style={styles.taskInfo}>
-                    <Text style={styles.taskName} numberOfLines={1}>
-                      {task.name.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.taskAge}>{task.age}</Text>
+                  <Pressable
+                    onPress={() => {
+                      useTerminalStore.setState({ pendingCommand: generateRunNowCommand(agent.id) });
+                    }}
+                    hitSlop={8}
+                    style={styles.tasksAction}
+                  >
+                    <MaterialIcons name="play-arrow" size={12} color={C.accentGreen} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      Alert.alert(
+                        'Delete agent',
+                        `Delete "${agent.name}"?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: async () => {
+                              await deleteAgent(agent.id);
+                              useAgentStore.getState().removeAgent(agent.id);
+                            },
+                          },
+                        ],
+                      );
+                    }}
+                    hitSlop={8}
+                    style={styles.tasksAction}
+                  >
+                    <MaterialIcons name="delete-outline" size={12} color={C.errorText} />
+                  </Pressable>
                 </View>
               ))}
             </>
+          )}
+          {runningAgents.length === 0 && recentTasks.length === 0 && agents.length === 0 && (
+            <Text style={styles.tasksEmpty}>Use @agent to create background agents</Text>
           )}
         </SidebarSection>
 
@@ -516,6 +548,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: P.sidebarItem.px,
     height: S.sidebarItemHeight,
     gap: 5,
+  },
+  tasksSeparator: {
+    height: 1,
+    backgroundColor: C.border,
+    marginHorizontal: P.sidebarItem.px,
+    marginVertical: 2,
+  },
+  tasksSubheader: {
+    fontFamily: F.family,
+    fontSize: 7,
+    color: C.text3,
+    paddingHorizontal: P.sidebarItem.px,
+    paddingVertical: 2,
+    letterSpacing: 0.5,
+  },
+  tasksAction: {
+    paddingHorizontal: 3,
+  },
+  tasksEmpty: {
+    fontFamily: F.family,
+    fontSize: 8,
+    color: C.text3,
+    paddingHorizontal: P.sidebarItem.px,
+    paddingVertical: 4,
+    letterSpacing: 0.3,
   },
   taskDot: {
     width: S.agentDotSize,
