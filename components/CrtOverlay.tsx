@@ -1,8 +1,14 @@
 // components/CrtOverlay.tsx
-// CRT display effect overlay — scanlines, phosphor tint, vignette, flicker
-// pointerEvents="none" so it never blocks touch interactions
+// CRT display effect overlay — scanlines, phosphor tint, vignette.
+// pointerEvents="none" so it never blocks touch interactions.
+//
+// The flicker animation was removed: a 10Hz opacity pulse was a
+// pure aesthetic nod to CRT electron-gun refresh, but in practice
+// it registered as distracting screen-wide blinking and wasted a
+// Reanimated frame callback every 100ms. The scanlines + phosphor
+// tint + vignette already read as "CRT" on their own.
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 
 // ── CRT constants ────────────────────────────────────────────────────────────
@@ -18,13 +24,6 @@ const PHOSPHOR_ALPHA_MAX = 0.09;
 const VIGNETTE_BAND_RATIO = 0.20;
 const VIGNETTE_OPACITY_MIN = 0.05;
 const VIGNETTE_OPACITY_MAX = 0.35;
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import { useCosmeticStore } from '@/store/cosmetic-store';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -41,26 +40,6 @@ export function CrtOverlay() {
   const crtEnabled = useCosmeticStore((s) => s.crtEnabled);
   const crtIntensity = useCosmeticStore((s) => s.crtIntensity);
 
-  // Flicker animation
-  const flickerOpacity = useSharedValue(1);
-
-  useEffect(() => {
-    if (!crtEnabled) return;
-
-    flickerOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.97, { duration: 100 }),
-        withTiming(1, { duration: 100 }),
-      ),
-      -1, // infinite
-      false,
-    );
-  }, [crtEnabled]);
-
-  const flickerStyle = useAnimatedStyle(() => ({
-    opacity: flickerOpacity.value,
-  }));
-
   if (!crtEnabled) return null;
 
   // Lerp from floor to ceiling so every slider position is visibly different.
@@ -71,8 +50,8 @@ export function CrtOverlay() {
   const vignetteOpacity = lerp(VIGNETTE_OPACITY_MIN, VIGNETTE_OPACITY_MAX);
 
   return (
-    <Animated.View
-      style={[styles.container, flickerStyle]}
+    <View
+      style={styles.container}
       pointerEvents="none"
     >
       {/* ── Scanlines (opacity scales with intensity) ── */}
@@ -110,7 +89,7 @@ export function CrtOverlay() {
           pointerEvents="none"
         />
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
