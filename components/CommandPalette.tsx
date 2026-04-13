@@ -88,6 +88,46 @@ export function CommandPalette() {
           useTerminalStore.setState({ pendingCommand: 'tmux attach' });
           close();
         } },
+
+      // Git actions — run in whichever terminal pane is active, same
+      // pendingCommand channel as the tmux shortcuts above.
+      { id: 'git-status', label: 'Git: Status', hint: 'git status -sb', icon: 'info', category: 'action',
+        onExecute: () => {
+          useTerminalStore.setState({ pendingCommand: 'git status -sb' });
+          close();
+        } },
+      { id: 'git-diff', label: 'Git: Diff', hint: 'git diff', icon: 'compare-arrows', category: 'action',
+        onExecute: () => {
+          useTerminalStore.setState({ pendingCommand: 'git diff' });
+          close();
+        } },
+      { id: 'git-log', label: 'Git: Log', hint: 'git log --oneline -10', icon: 'history', category: 'action',
+        onExecute: () => {
+          useTerminalStore.setState({ pendingCommand: 'git log --oneline -10' });
+          close();
+        } },
+      { id: 'git-add-all', label: 'Git: Add all', hint: 'git add -A', icon: 'add', category: 'action',
+        onExecute: () => {
+          useTerminalStore.setState({ pendingCommand: 'git add -A' });
+          close();
+        } },
+      { id: 'git-commit', label: 'Git: Commit', hint: 'prompts for message', icon: 'check', category: 'action',
+        onExecute: () => {
+          // Leave the quoted string open so the user can type the message
+          // and hit Enter; the shell doesn't execute until they close it.
+          useTerminalStore.setState({ pendingCommand: 'git commit -m "' });
+          close();
+        } },
+      { id: 'git-push', label: 'Git: Push', hint: 'git push', icon: 'cloud-upload', category: 'action',
+        onExecute: () => {
+          useTerminalStore.setState({ pendingCommand: 'git push' });
+          close();
+        } },
+      { id: 'git-pull', label: 'Git: Pull', hint: 'git pull --rebase', icon: 'cloud-download', category: 'action',
+        onExecute: () => {
+          useTerminalStore.setState({ pendingCommand: 'git pull --rebase' });
+          close();
+        } },
     ];
 
     // Multi-pane actions (inner screen only)

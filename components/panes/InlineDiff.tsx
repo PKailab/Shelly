@@ -146,6 +146,18 @@ function hunkPatchedContent(hunk: DiffHunk): string {
     .join('\n');
 }
 
+// Serialise a single DiffHunk back into a minimal unified-diff block so
+// acceptStagedDiff() can feed it through applyUnifiedDiff() the same way
+// a full Accept All would. Skips 'header' lines since applyUnifiedDiff
+// strips +++ / --- itself and the @@ header is preserved in hunk.header.
+function hunkToDiffBlock(hunk: DiffHunk): string {
+  const body = hunk.lines
+    .filter((l) => l.type !== 'header')
+    .map((l) => l.text)
+    .join('\n');
+  return hunk.header ? `${hunk.header}\n${body}` : body;
+}
+
 // ─── Line colours ─────────────────────────────────────────────────────────────
 
 // Mock-faithful diff palette — matches the green / red glow the AI pane's
@@ -372,6 +384,25 @@ function DiffBlock({ initialHunks, rawBlock }: DiffBlockProps) {
   const handleAccept = useCallback(async (index: number) => {
     const hunk = hunks[index];
     if (!hunk) return;
+
+    // Write-back path: if a file is staged, apply JUST this hunk to disk
+    // by re-serialising it as a single-hunk unified diff and handing it
+    // to acceptStagedDiff. This gives per-hunk Accept the same on-disk
+    // semantics as Accept All.
+    if (getStagedEdit()) {
+      const singleHunkDiff = hunkToDiffBlock(hunk);
+      const err = await acceptStagedDiff(singleHunkDiff);
+      if (err === null) {
+        ToastAndroid.show('Hunk applied to file', ToastAndroid.SHORT);
+        setHunks((prev) =>
+          prev.map((h, i) => (i === index ? { ...h, status: 'accepted' } : h)),
+        );
+        return;
+      }
+      ToastAndroid.show(err, ToastAndroid.LONG);
+      // Fall through to clipboard so the user still has an escape hatch.
+    }
+
     const patched = hunkPatchedContent(hunk);
     await Clipboard.setStringAsync(patched);
     ToastAndroid.show('Copied to clipboard', ToastAndroid.SHORT);
