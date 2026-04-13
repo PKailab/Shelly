@@ -99,7 +99,7 @@ execCommand("which unzip || busybox --list-applets 2>/dev/null | grep unzip")
 execCommand("which tar gzip")
 
 # 4. 書き込みテスト
-execCommand("mkdir -p ~/.shelly/llama/test && touch ~/.shelly/llama/test/probe && rm -rf ~/.shelly/llama/test && echo OK")
+execCommand("mkdir -p $HOME/models/test && touch $HOME/models/test/probe && rm -rf $HOME/models/test && echo OK")
 ```
 
 ### 期待される結果に応じた分岐
@@ -166,7 +166,7 @@ v2 は JS 側で 20 秒 polling を書いていたが、**既存 `buildStartAllS
 
 ### `buildStartAllScript` の readiness timeout 調整
 
-既存のスクリプトの retry 回数が 20 秒相当 (1秒 × 20回) の場合、**60 秒 (1秒 × 60回)** に延長する。理由: Snapdragon 8 Gen3 での 1.6 GB Gemma-2-2B Q4_K_M cold start (mmap + warmup) は 15-40 秒、Qwen2.5-1.5B でも 10-25 秒かかる。20 秒タイムアウトは楽観的すぎる。
+既存のスクリプトの retry 回数は現状 `seq 1 15` (15 秒相当) だが、**60 秒 (1秒 × 60回)** に延長する。理由: Snapdragon 8 Gen3 での 1.6 GB Gemma-2-2B Q4_K_M cold start (mmap + warmup) は 15-40 秒、Qwen2.5-1.5B でも 10-25 秒かかる。15-20 秒タイムアウトは楽観的すぎる。
 
 実装時に `buildStartAllScript` の中身を Read して該当する retry/sleep 定数を特定 → 60 秒相当に書き換え。
 
@@ -254,7 +254,7 @@ const availableModels = MODEL_CATALOG.filter(m => checkRamRequirement(m).ok);
 #### starting
 ```
 │ Status: Starting...              │
-│ Waiting for :8080 (max 20s)      │
+│ Waiting for :8080 (max 60s)      │
 ```
 
 #### running
@@ -278,7 +278,7 @@ const availableModels = MODEL_CATALOG.filter(m => checkRamRequirement(m).ok);
 │ [ Reset ]                        │
 ```
 
-`View log` は `cat ~/.shelly/llama/server.log | tail -30` を Modal で表示。`Reset` は stage を `installed` に戻す。
+`View log` は `cat $HOME/models/llama-server.log | tail -30` を Modal で表示。`Reset` は stage を `installed` に戻す。
 
 ---
 
@@ -290,7 +290,7 @@ const availableModels = MODEL_CATALOG.filter(m => checkRamRequirement(m).ok);
 | GitHub API rate limit | JSON に `"message": "API rate limit"` → fallback URL へ |
 | zip 破損 | `unzip -q` exit != 0 → "Download corrupted, retry" |
 | モデル DL 失敗 | バイナリ保持、モデル選択に戻す |
-| 起動後 20 秒 :8080 無し | `tail -n 20 server.log` を errorMessage に入れる |
+| 起動後 60 秒 :8080 無し | `tail -n 20 $HOME/models/llama-server.log` を errorMessage に入れる |
 | ポート競合 | `ss -tlnp \| grep :8080` で他プロセスを検出、起動前に警告 |
 | OOM kill | server.log に "killed" → "Out of memory — try Qwen (smaller model)" |
 | crash (SIGSEGV) | server.log 末尾を error message に、Retry ボタン |
@@ -319,7 +319,7 @@ const availableModels = MODEL_CATALOG.filter(m => checkRamRequirement(m).ok);
 
 - [ ] クリーンインストールから Gemma / Qwen どちらでも設置できる
 - [ ] インストール後、再起動しても Installed 状態が維持される
-- [ ] Start → 20 秒以内に Running 表示
+- [ ] Start → 60 秒以内に Running 表示
 - [ ] AI pane で `@local こんにちは` に応答
 - [ ] Stop → Ports list から :8080 が消える
 - [ ] Re-install → バイナリ/モデル両方上書き
