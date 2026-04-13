@@ -211,47 +211,12 @@ export function FileTree() {
     }
   }, [renameTarget, renameName, cwd, loadDir]);
 
-  // Mock dummy file tree matching mock screenshot (shown when no repo selected)
+  // No repo bound — prompt the user to pick one. The Sidebar's REPOSITORIES
+  // section has the + ADD REPOSITORY affordance; just hint toward it.
   if (!repoPath) {
-    const MOCK_TREE = [
-      { name: 'APP', isDir: true, depth: 0 },
-      { name: 'COMPONENTS', isDir: true, depth: 0 },
-      { name: 'CHAT', isDir: true, depth: 1 },
-      { name: 'TERMINAL', isDir: true, depth: 1 },
-      { name: 'WELCOMEWIZARD.TSX', isDir: false, depth: 1 },
-      { name: 'LIB', isDir: true, depth: 0 },
-      { name: 'INPUT-ROUTER.TS', isDir: false, depth: 1 },
-      { name: 'STORE', isDir: true, depth: 0 },
-      { name: 'APP.CONFIG.TS', isDir: false, depth: 0 },
-      { name: 'PACKAGE.JSON', isDir: false, depth: 0 },
-      { name: 'README.MD', isDir: false, depth: 0, special: 'red' },
-    ];
     return (
       <View style={styles.container}>
-        <View style={styles.searchRow}>
-          <MaterialIcons name="search" size={10} color={C.text2} />
-          <TextInput
-            style={styles.search}
-            placeholder="SEARCH FILES..."
-            placeholderTextColor={C.text2}
-            editable={false}
-          />
-          <MaterialIcons name="edit" size={9} color={C.text2} />
-        </View>
-        {MOCK_TREE.map((item, i) => (
-          <View key={i} style={[styles.row, { paddingLeft: 8 + item.depth * 12 }]}>
-            <MaterialIcons
-              name={item.isDir ? 'folder' : 'insert-drive-file'}
-              size={I.fileIcon}
-              color={fileIconColor(item.name, item.isDir)}
-            />
-            <Text
-              style={[styles.fileName, { color: fileNameColor(item.name) }]}
-            >
-              {item.name}
-            </Text>
-          </View>
-        ))}
+        <Text style={styles.emptyHint}>Add a repository above to browse files.</Text>
       </View>
     );
   }
@@ -432,7 +397,15 @@ const promptStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    maxHeight: 300,
+    minHeight: 120,
+  },
+  emptyHint: {
+    fontFamily: F.family,
+    fontSize: F.fileName.size,
+    color: C.text3,
+    paddingHorizontal: P.sidebarItem.px,
+    paddingVertical: 10,
+    letterSpacing: 0.3,
   },
   searchRow: {
     flexDirection: 'row',

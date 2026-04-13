@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, Text } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useCommandPaletteStore } from '@/hooks/use-command-palette';
+import { useGitStatusStore } from '@/store/git-status-store';
 import { SettingsDropdown } from './SettingsDropdown';
 import { AddPaneSheet } from '@/components/multi-pane/AddPaneSheet';
 import { LayoutPresetSheet } from '@/components/multi-pane/LayoutPresetSheet';
@@ -17,6 +18,7 @@ export function AgentBar() {
   const [addPaneSheetVisible, setAddPaneSheetVisible] = useState(false);
   const [layoutSheetVisible, setLayoutSheetVisible] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const dirtyCount = useGitStatusStore((s) => s.dirtyCount);
 
   return (
     <View style={styles.bar}>
@@ -42,8 +44,19 @@ export function AgentBar() {
 
       <View style={{ flex: 1 }} />
 
-      {/* Right-side: search + settings */}
+      {/* Right-side: git dirty + search + settings */}
       <View style={styles.rightBtns}>
+        {dirtyCount !== null && dirtyCount > 0 && (
+          <Pressable
+            style={styles.gitBadge}
+            onPress={() => useCommandPaletteStore.getState().open()}
+            hitSlop={6}
+            accessibilityLabel="Uncommitted changes"
+          >
+            <MaterialIcons name="fiber-manual-record" size={8} color={C.accentAmber} />
+            <Text style={styles.gitBadgeText}>{String(dirtyCount)}</Text>
+          </Pressable>
+        )}
         <Pressable
           style={styles.iconBtn}
           onPress={() => useCommandPaletteStore.getState().toggle()}
@@ -105,6 +118,24 @@ const styles = StyleSheet.create({
   iconBtn: {
     padding: 4,
     borderRadius: R.agentTab,
+  },
+  gitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: R.badge,
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.35)',
+  },
+  gitBadgeText: {
+    fontSize: F.badge.size,
+    fontFamily: F.family,
+    fontWeight: '700',
+    color: C.accentAmber,
+    letterSpacing: 0.3,
   },
   layoutBtn: {
     paddingHorizontal: 10,

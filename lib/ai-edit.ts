@@ -134,13 +134,46 @@ function parseHunks(diff: string): ParsedHunk[] {
   return hunks;
 }
 
+// Extract the first N leading context/removal lines a hunk expects to
+// find in the original file. Used by the fuzzy locator to re-anchor a
+// hunk whose @@ header is stale (the rest of the file shifted because
+// a previous hunk in the same diff was already applied to disk).
+function hunkAnchorLines(hunk: ParsedHunk, max = 3): string[] {
+  const anchor: string[] = [];
+  for (const line of hunk.lines) {
+    if (line.startsWith('+')) continue;
+    anchor.push(line.slice(1));
+    if (anchor.length >= max) break;
+  }
+  return anchor;
+}
+
+// Walk origLines from the given offset and return the index where the
+// anchor sequence next matches, or -1 if it's nowhere to be found.
+function findAnchor(origLines: string[], anchor: string[], from: number): number {
+  if (anchor.length === 0) return from;
+  outer: for (let i = from; i <= origLines.length - anchor.length; i++) {
+    for (let j = 0; j < anchor.length; j++) {
+      if (origLines[i + j] !== anchor[j]) continue outer;
+    }
+    return i;
+  }
+  return -1;
+}
+
 /**
  * Apply a unified diff to the original content. Returns the patched
  * content or null on any apply failure (line count mismatch, context
  * drift, etc). Callers should fall back to showing the raw diff when
  * this returns null.
+ *
+ * When `fuzzy` is true, each hunk's @@ header is treated as a hint;
+ * the applier searches forward from the current cursor for the hunk's
+ * leading anchor lines instead of trusting the line number. This lets
+ * per-hunk Accept apply successive hunks to an already-edited file
+ * even though the original @@ -N counts are now stale.
  */
-export function applyUnifiedDiff(original: string, diff: string): string | null {
+export function applyUnifiedDiff(original: string, diff: string, fuzzy = false): string | null {
   const origLines = original.split('\n');
   const hunks = parseHunks(diff);
   if (hunks.length === 0) return null;
@@ -149,7 +182,19 @@ export function applyUnifiedDiff(original: string, diff: string): string | null 
   let cursor = 0; // 0-based index into origLines
 
   for (const hunk of hunks) {
-    const hunkStart = hunk.oldStart - 1; // -> 0-based
+    let hunkStart = hunk.oldStart - 1; // -> 0-based
+
+    if (fuzzy || hunkStart < cursor || hunkStart >= origLines.length) {
+      // Re-anchor by searching for the hunk's leading context/removal
+      // block. Covers two cases: explicit fuzzy mode, and strict mode
+      // where the @@ header is out of range because the file has
+      // already been partially edited.
+      const anchor = hunkAnchorLines(hunk);
+      const found = findAnchor(origLines, anchor, cursor);
+      if (found === -1) return null;
+      hunkStart = found;
+    }
+
     if (hunkStart < cursor) return null; // overlapping / out-of-order
     if (hunkStart > origLines.length) return null;
 
@@ -192,7 +237,14 @@ export function applyUnifiedDiff(original: string, diff: string): string | null 
  */
 export async function acceptStagedDiff(diff: string): Promise<string | null> {
   if (!stagedEdit) return 'No file staged';
-  const patched = applyUnifiedDiff(stagedEdit.originalContent, diff);
+  // Try strict (line-number-trusting) first, then fuzzy as a fallback.
+  // Strict is slightly safer because it catches hunks that landed at
+  // the wrong offset; fuzzy re-anchors per-hunk Accepts after the file
+  // has already been partially edited.
+  let patched = applyUnifiedDiff(stagedEdit.originalContent, diff);
+  if (patched === null) {
+    patched = applyUnifiedDiff(stagedEdit.originalContent, diff, true);
+  }
   if (patched === null) {
     return 'Could not apply diff — context mismatch. Ask the AI to regenerate against the latest file.';
   }

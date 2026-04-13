@@ -1,6 +1,7 @@
 // components/layout/Sidebar.tsx
 import React, { useState, useEffect } from 'react';
 import { execCommand } from '@/hooks/use-native-exec';
+import { useGitStatusStore } from '@/store/git-status-store';
 import {
   View,
   Text,
@@ -74,13 +75,15 @@ export function Sidebar() {
   const setLeafTab = useMultiPaneStore((s) => s.setLeafTab);
   const openUrl = useBrowserStore((s) => s.openUrl);
 
-  // Count uncommitted changes in the active repo. Polls every 20s so
-  // the badge catches file tree edits and AI Edit writebacks without
-  // hammering the shell. Only runs when a real repo is bound.
-  const [gitDirtyCount, setGitDirtyCount] = useState<number | null>(null);
+  // Count uncommitted changes in the active repo. Sidebar owns the
+  // single 20-second poller; results go into useGitStatusStore so the
+  // Sidebar badge and the AgentBar badge stay in sync without running
+  // two loops.
+  const gitDirtyCount = useGitStatusStore((s) => s.dirtyCount);
   useEffect(() => {
+    const setDirty = useGitStatusStore.getState().setDirty;
     if (!activeRepoPath) {
-      setGitDirtyCount(null);
+      setDirty(null);
       return;
     }
     let cancelled = false;
@@ -91,7 +94,7 @@ export function Sidebar() {
       );
       if (cancelled) return;
       const n = parseInt((r.stdout || '').trim(), 10);
-      setGitDirtyCount(Number.isNaN(n) ? null : n);
+      setDirty(Number.isNaN(n) ? null : n);
     };
     refresh();
     const iv = setInterval(refresh, 20_000);
