@@ -9,10 +9,73 @@
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
-import { shellyPalette } from './lib/theme-presets';
-import type { Palette } from './lib/theme-presets';
+// NOTE: no imports on purpose. tailwind.config.js does a plain
+// CommonJS require() of this file during Metro bundling, and sucrase
+// on this project's version chokes on any TS-style import in the top
+// of theme.config.ts (column 8 parse error, regardless of `import
+// type` vs `import {}`). So keep this file import-free. Mutable
+// palette object is seeded inline here; lib/theme-presets.ts holds the
+// identical shellyPalette for runtime preset swaps via Object.assign.
+export const colors = {
+  // Backgrounds (mock-exact)
+  bgDeep:     '#0A0A0A',
+  bgSurface:  '#111111',
+  bgSidebar:  '#0D0D0D',
+  border:     '#1C1C1C',
 
-export const colors: Palette = { ...shellyPalette };
+  // Accents (mock-exact)
+  accent:        '#00D4AA',
+  accentGreen:   '#4ADE80',
+  accentBlue:    '#60A5FA',
+  accentSky:     '#38BDF8',
+  accentPurple:  '#A78BFA',
+  accentPink:    '#EC4899',
+  accentAmber:   '#F59E0B',
+  accentCode:    '#60A5FA',
+  warning:       '#F59E0B',
+
+  // Text (mock-exact)
+  text1:      '#E5E7EB',
+  text2:      '#9CA3AF',
+  text3:      '#6B7280',
+
+  // Semantic
+  errorText:  '#F87171',
+  errorBg:    'rgba(248,113,113,0.12)',
+  addText:    '#4ADE80',
+  addBg:      'rgba(74,222,128,0.12)',
+
+  // Buttons
+  btnPrimaryBg:     '#00D4AA',
+  btnPrimaryText:   '#000000',
+  btnSecondaryBg:   '#1F2937',
+  btnSecondaryText: '#E5E7EB',
+
+  // Badges
+  badgeRunningBg:   'rgba(245,158,11,0.15)',
+  badgeRunningText: '#F59E0B',
+  badgeLinkedBg:    'rgba(74,222,128,0.15)',
+  badgeLinkedText:  '#4ADE80',
+  badgeConnectBg:   '#111111',
+  badgeConnectText: '#6B7280',
+
+  // Layout buttons
+  layoutActiveBg:     '#00D4AA',
+  layoutActiveText:   '#000000',
+  layoutInactiveBg:   '#111111',
+  layoutInactiveText: '#6B7280',
+
+  // CRT badge
+  crtBadgeBg:   '#0D0D0D',
+  crtBadgeText: '#00D4AA',
+
+  // Auto-save
+  autoSaveBg: '#111827',
+
+  // Diff
+  diffAddBorder:    '#4ADE80',
+  diffRemoveBorder: '#F87171',
+};
 
 // ─── Fonts ──────────────────────────────────────────────────────────────────
 
