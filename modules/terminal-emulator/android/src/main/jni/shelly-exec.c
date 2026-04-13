@@ -272,6 +272,21 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
     snprintf(exitStr, sizeof(exitStr), "%d", exitCode);
     (*env)->SetObjectArrayElement(env, result, 0, (*env)->NewStringUTF(env, exitStr));
 
+    /* Null-terminate before handing to NewStringUTF. Must make room first:
+     * if stdout_len == stdout_cap (capacity exactly filled, which happens at
+     * the 4 MiB MAX_OUTPUT ceiling), writing buf[stdout_len] would be a
+     * 1-byte heap OOB. realloc to +1 if needed. */
+    if (stdout_buf && stdout_len == stdout_cap) {
+        char *grown = (char *)realloc(stdout_buf, stdout_cap + 1);
+        if (grown) stdout_buf = grown;
+        else stdout_len = stdout_cap ? stdout_cap - 1 : 0; /* fall back to truncate */
+    }
+    if (stderr_buf && stderr_len == stderr_cap) {
+        char *grown = (char *)realloc(stderr_buf, stderr_cap + 1);
+        if (grown) stderr_buf = grown;
+        else stderr_len = stderr_cap ? stderr_cap - 1 : 0;
+    }
+
     /* Create Java strings from buffers */
     jstring stdoutJ = stdout_buf ? (*env)->NewStringUTF(env, stdout_len > 0 ? (stdout_buf[stdout_len] = '\0', stdout_buf) : "") : (*env)->NewStringUTF(env, "");
     jstring stderrJ = stderr_buf ? (*env)->NewStringUTF(env, stderr_len > 0 ? (stderr_buf[stderr_len] = '\0', stderr_buf) : "") : (*env)->NewStringUTF(env, "");

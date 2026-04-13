@@ -40,6 +40,14 @@ export type WriteFileResult =
   | { ok: true }
   | { ok: false; error: string };
 
+// Single-quote a shell argument. Survives spaces, dollars, backticks, and
+// single quotes themselves. Every file-path interpolation in this module
+// MUST go through this — paths can come from AI output, FileTree iteration,
+// or plugins, and an unescaped single quote is an injection.
+function shQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
+
 export async function execCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
   logInfo('NativeExec', 'exec: ' + command.slice(0, 80));
   try {
@@ -63,9 +71,8 @@ export async function writeFileNative(
 ): Promise<WriteFileResult> {
   try {
     const base64Content = btoa(unescape(encodeURIComponent(content)));
-    const esc = filePath.replace(/'/g, "'\\''");
     const result = await execCommand(
-      `echo '${base64Content}' | base64 -d > '${esc}'`,
+      `echo '${base64Content}' | base64 -d > ${shQuote(filePath)}`,
       30_000,
     );
     return result.exitCode === 0
@@ -85,7 +92,7 @@ export function useNativeExec() {
   ): Promise<ExecResult> => {
     const timeout = opts?.timeoutMs ?? 120_000;
     // If cwd specified, prepend cd
-    const fullCmd = opts?.cwd ? `cd '${opts.cwd}' && ${cmd}` : cmd;
+    const fullCmd = opts?.cwd ? `cd ${shQuote(opts.cwd)} && ${cmd}` : cmd;
     return execCommand(fullCmd, timeout);
   }, []);
 
@@ -108,7 +115,7 @@ export function useNativeExec() {
       // Use base64 to avoid shell escaping issues
       const base64Content = btoa(unescape(encodeURIComponent(content)));
       const result = await execCommand(
-        `echo '${base64Content}' | base64 -d > '${filePath}'`,
+        `echo '${base64Content}' | base64 -d > ${shQuote(filePath)}`,
         30_000,
       );
       return result.exitCode === 0
@@ -124,7 +131,7 @@ export function useNativeExec() {
     _encoding?: string,
   ): Promise<ReadFileResult> => {
     try {
-      const result = await execCommand(`cat '${filePath}'`, 30_000);
+      const result = await execCommand(`cat ${shQuote(filePath)}`, 30_000);
       return result.exitCode === 0
         ? { ok: true, content: result.stdout, encoding: 'utf8' }
         : { ok: false, error: result.stderr || `exit code ${result.exitCode}` };
@@ -141,7 +148,7 @@ export function useNativeExec() {
       const target = dir || '.';
       // JSON-style output for reliable parsing
       const result = await execCommand(
-        `ls -la '${target}' 2>/dev/null | tail -n +2`,
+        `ls -la ${shQuote(target)} 2>/dev/null | tail -n +2`,
         10_000,
       );
       if (result.exitCode !== 0) {
@@ -166,7 +173,7 @@ export function useNativeExec() {
   ): Promise<EditFileResult> => {
     try {
       // Read file, apply edits in memory, write back
-      const readResult = await execCommand(`cat '${filePath}'`, 30_000);
+      const readResult = await execCommand(`cat ${shQuote(filePath)}`, 30_000);
       if (readResult.exitCode !== 0) {
         return { ok: false, error: readResult.stderr || 'Cannot read file' };
       }

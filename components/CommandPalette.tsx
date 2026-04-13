@@ -309,7 +309,13 @@ export function CommandPalette() {
 
   /** Render a single palette row */
   const ActionRow = ({ item }: { item: PaletteAction }) => (
-    <Pressable style={styles.item} onPress={() => handleSelect(item)}>
+    <Pressable
+      style={styles.item}
+      onPress={() => handleSelect(item)}
+      accessibilityRole="button"
+      accessibilityLabel={item.label}
+      accessibilityHint={item.hint}
+    >
       <MaterialIcons name={item.icon as any} size={18} color="#9BA1A6" />
       <View style={styles.itemText}>
         <Text style={styles.itemLabel} numberOfLines={1}>{item.label}</Text>
@@ -346,7 +352,12 @@ export function CommandPalette() {
               selectionColor={C.accent}
               returnKeyType="go"
             />
-            <Pressable onPress={handleClose} hitSlop={8}>
+            <Pressable
+              onPress={handleClose}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Close command palette"
+            >
               <MaterialIcons name="close" size={18} color="#6B7280" />
             </Pressable>
           </View>

@@ -53,7 +53,13 @@ export function SettingsDropdown({ visible, onClose }: Props) {
             <MaterialIcons name="settings" size={13} color={C.text2} />
             <Text style={styles.headerTitle}>SETTINGS</Text>
             <View style={{ flex: 1 }} />
-            <Pressable onPress={onClose} hitSlop={8} style={styles.closeBtn}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={8}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close settings"
+            >
               <MaterialIcons name="close" size={13} color={C.text2} />
             </Pressable>
           </View>
@@ -99,13 +105,23 @@ function IntegrationsSection({
 }) {
   return (
     <Section title="INTEGRATIONS">
-      <Pressable style={styles.integrationRow} onPress={onOpenMcp}>
+      <Pressable
+        style={styles.integrationRow}
+        onPress={onOpenMcp}
+        accessibilityRole="button"
+        accessibilityLabel="Open MCP Servers settings"
+      >
         <MaterialIcons name="extension" size={13} color={C.text2} />
         <Text style={styles.integrationLabel}>MCP Servers</Text>
         <View style={{ flex: 1 }} />
         <MaterialIcons name="chevron-right" size={14} color={C.text3} />
       </Pressable>
-      <Pressable style={styles.integrationRow} onPress={onOpenLlama}>
+      <Pressable
+        style={styles.integrationRow}
+        onPress={onOpenLlama}
+        accessibilityRole="button"
+        accessibilityLabel="Open Local LLM llama.cpp settings"
+      >
         <MaterialIcons name="memory" size={13} color={C.text2} />
         <Text style={styles.integrationLabel}>Local LLM · llama.cpp</Text>
         <View style={{ flex: 1 }} />

@@ -214,6 +214,8 @@ export function Sidebar() {
                     }}
                     hitSlop={8}
                     style={styles.tasksAction}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Run agent ${agent.name} now`}
                   >
                     <MaterialIcons name="play-arrow" size={12} color={C.accentGreen} />
                   </Pressable>
@@ -237,6 +239,8 @@ export function Sidebar() {
                     }}
                     hitSlop={8}
                     style={styles.tasksAction}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete agent ${agent.name}`}
                   >
                     <MaterialIcons name="delete-outline" size={12} color={C.errorText} />
                   </Pressable>

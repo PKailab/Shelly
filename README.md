@@ -16,7 +16,6 @@
   <img alt="Built with" src="https://img.shields.io/badge/built%20with-Claude%20Code-D4A574?style=flat-square">
   <img alt="Expo" src="https://img.shields.io/badge/Expo%2054-000020?style=flat-square&logo=expo&logoColor=white">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white">
-  <img alt="Lines" src="https://img.shields.io/badge/100k%2B%20lines-of%20code-333?style=flat-square">
 </p>
 
 <p align="center">
@@ -35,39 +34,6 @@
 </p>
 
 <br>
-
----
-
-## I can't write code.
-
-I'm not an engineer. I've never written a line of TypeScript. I don't fully understand how Git works internally. I have no formal training in computer science.
-
-But I built this — a 100,000-line terminal IDE — by talking to AI.
-
-Every architectural decision in Shelly is mine. The code is not. It was created through conversation with [Claude Code](https://claude.ai/) on a Samsung Galaxy Z Fold6. I direct. The AI builds. No desktop. No laptop. Just a foldable phone and an AI that can execute commands.
-
-The keyboard you see in the screenshots? I built that too. It's called [Nacre](https://github.com/RYOITABASHI/Nacre) — an 11,000-line Android IME written in Kotlin, also created entirely through AI conversation. I'm typing on it right now, inside Shelly, improving both apps simultaneously.
-
-This is not a portfolio project. This is a tool I use every day to build things. And I'm releasing it as open source — not because the code is perfect, but because I believe this represents a new way of making software.
-
-If you find rough edges in the code, that's expected. **Improvements are not just welcome — they're the reason this is open source.**
-
----
-
-## Quick Start
-
-Download the latest APK from [**GitHub Releases**](https://github.com/RYOITABASHI/Shelly/releases), or build from source:
-
-```bash
-git clone https://github.com/RYOITABASHI/Shelly.git && cd Shelly
-pnpm install && pnpm android
-```
-
-> **Requirements:** Android device. For building from source: Node.js 22+, pnpm, Android NDK r27+. Expo Go is not supported — Shelly uses native Kotlin/C modules.
->
-> Termux is not required. Shelly ships with bash, Node.js, Python 3, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
-
-On first launch, the Setup Wizard handles permissions and AI configuration. The terminal is ready in under 5 minutes.
 
 ---
 
@@ -90,6 +56,39 @@ No copy. No paste. No tab switching. Zero friction.
 - **Single pane:** a native terminal that is faster, smarter, and more usable than Termux alone — with inline content blocks, autocomplete, syntax highlighting, and clickable errors.
 - **Split panes:** terminal + AI side by side — the AI reads what the terminal shows and executes fixes with one tap. No copy-paste bridge needed.
 - **Full layout:** sidebar + up to 4 live panes + agent bar — a mobile IDE. Browse docs in the browser pane, preview code or markdown on the right, run agents in the background, and keep your terminal front and center.
+
+---
+
+## Quick Start
+
+Download the latest APK from [**GitHub Releases**](https://github.com/RYOITABASHI/Shelly/releases), or build from source:
+
+```bash
+git clone https://github.com/RYOITABASHI/Shelly.git && cd Shelly
+pnpm install && pnpm android
+```
+
+> **Requirements:** Android device. For building from source: Node.js 22+, pnpm, Android NDK r27+. Expo Go is not supported — Shelly uses native Kotlin/C modules.
+>
+> Termux is not required. Shelly ships with bash, Node.js, Python 3, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
+
+On first launch, the Setup Wizard handles permissions and AI configuration. The terminal is ready in under 5 minutes.
+
+---
+
+## I can't write code.
+
+I'm not an engineer. I've never written a line of TypeScript. I don't fully understand how Git works internally. I have no formal training in computer science.
+
+But I built this — a mobile terminal IDE — by talking to AI.
+
+Every architectural decision in Shelly is mine. The code is not. It was created through conversation with [Claude Code](https://claude.ai/) on a Samsung Galaxy Z Fold6. I direct. The AI builds. No desktop. No laptop. Just a foldable phone and an AI that can execute commands.
+
+The keyboard you see in the screenshots? I built that too. It's called [Nacre](https://github.com/RYOITABASHI/Nacre) — an Android IME written in Kotlin, also created entirely through AI conversation. I'm typing on it right now, inside Shelly, improving both apps simultaneously.
+
+This is not a portfolio project. This is a tool I use every day to build things. And I'm releasing it as open source — not because the code is perfect, but because I believe this represents a new way of making software.
+
+If you find rough edges in the code, that's expected. **Improvements are not just welcome — they're the reason this is open source.**
 
 ---
 
@@ -293,7 +292,7 @@ Currently registered:
 
 Parts of the app are written but not finished. These are on the short-term roadmap, not in the current build:
 
-- **App icon + Play Store / F-Droid distribution** — the APK is published via GitHub Releases only; icon brief exists, store flow does not
+- **Play Store / F-Droid distribution** — the APK is published via GitHub Releases only; store submission flow not yet done
 - **End-to-end device validation** for voice dialogue, immortal sessions, and background agent AlarmManager scheduling — all wired but not yet smoke-tested on the target device
 
 ---
@@ -319,7 +318,8 @@ Parts of the app are written but not finished. These are on the short-term roadm
 | Sidebar Ports monitor (`ss -tlnp` → tap to open in Browser pane) | ✅ shipping |
 | Sidebar SSH Profiles (key-file auth, ~/.ssh/config import, tap-to-connect) | ✅ shipping |
 | Cloud storage | 🚫 out of scope — use `rclone` from the terminal pane |
-| App icon + distribution channels | 🟡 brief written, image + store flow not done |
+| App icon | ✅ shipping |
+| Distribution channels (Play Store / F-Droid) | 🟡 GitHub Releases only for now |
 
 Full validation checklist: [`docs/superpowers/specs/2026-04-13-validation-checklist.md`](docs/superpowers/specs/2026-04-13-validation-checklist.md)
 
