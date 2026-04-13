@@ -18,11 +18,16 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { colors as C, fonts as F } from '@/theme.config';
 import { LlamaCppSection } from './LlamaCppSection';
 import {
-  buildListModelsCommand,
   getLlamaCppLocalLlmConfig,
   MODEL_CATALOG,
   type LlamaCppModel,
 } from '@/lib/llamacpp-setup';
+
+// One filename per line from $HOME/models/*.gguf. Using `ls -1` instead of
+// the shared `buildListModelsCommand` (which does `ls -lh` with a fallback
+// echo "no models") so substring false-positives between overlapping
+// catalog entries can't happen.
+const LIST_MODELS_CMD = 'ls -1 "$HOME/models"/*.gguf 2>/dev/null | xargs -n1 basename 2>/dev/null';
 import { execCommand } from '@/hooks/use-native-exec';
 import { useSettingsStore } from '@/store/settings-store';
 
@@ -39,13 +44,17 @@ export function LlamaCppSectionWrapper({ onClose }: Props) {
   );
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
 
-  // Refresh installed model list by listing $HOME/models/*.gguf
+  // Refresh installed model list by listing $HOME/models/*.gguf. Compare
+  // line-by-line (not substring) so filenames that share a prefix don't
+  // mask each other.
   const refreshInstalled = useCallback(async () => {
-    const r = await execCommand(buildListModelsCommand(), 10_000);
-    const out = r.stdout ?? '';
+    const r = await execCommand(LIST_MODELS_CMD, 10_000);
+    const lines = new Set(
+      (r.stdout ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
+    );
     const found = new Set<string>();
     for (const model of MODEL_CATALOG) {
-      if (out.includes(model.filename)) found.add(model.id);
+      if (lines.has(model.filename)) found.add(model.id);
     }
     setInstalledModelIds(found);
   }, []);

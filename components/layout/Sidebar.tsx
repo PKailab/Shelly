@@ -200,7 +200,7 @@ export function Sidebar() {
                 <View style={styles.tasksSeparator} />
               )}
               <Text style={styles.tasksSubheader}>SCHEDULED</Text>
-              {agents.filter((a) => !a.enabled).map((agent) => (
+              {agents.filter((a) => a.enabled).map((agent) => (
                 <View key={`sched-${agent.id}`} style={styles.taskRow}>
                   <View style={[styles.taskDot, { backgroundColor: C.text3 }]} />
                   <View style={styles.taskInfo}>

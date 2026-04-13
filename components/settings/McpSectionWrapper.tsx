@@ -23,7 +23,7 @@ export function McpSectionWrapper({ onClose }: Props) {
       const r = await execCommand(command, 120_000);
       return {
         success: r.exitCode === 0,
-        output: r.stdout ?? '',
+        output: (r.stdout ?? '') + (r.stderr ?? ''),
       };
     },
     [],
