@@ -39,6 +39,10 @@
 | 4 | Typeless 音声入力の検証 (IME 全面改修後) | [#13](https://github.com/RYOITABASHI/Shelly/issues/13) | 15 分 (検証のみ) |
 | 5 | 端末 CJK フォント統合 — Misaki / Cica + GL atlas 更新 | [#14](https://github.com/RYOITABASHI/Shelly/issues/14) | 3–4 時間 |
 | 7 | 音声 / immortal / AlarmManager の実機スモークテスト | [#16](https://github.com/RYOITABASHI/Shelly/issues/16) | 80 分 |
+| 27 | ペースト + Enter でコマンドが実行されない (末尾に `"` が残り改行せず、`^[` が混入) — Task 7 スモークテストで発覚。通常タイプ経路は OK。ペースト経路の Enter 後 `\r` 欠落が疑わしい。キーボード「隠す」ボタンが ESC を送る副作用も要調査 (bug #22 と関連) | 未登録 | 60–90 分 |
+| 28 | UI 全面の Silkscreen → 読みやすいフォントへ一括置換 — Silkscreen は小文字コードポイントが大文字グリフとして描画される設計 (Google Fonts 仕様)。AI ペイン bubble/header, Sidebar (REPOSITORIES / TASKS / FILE TREE 等), Modal (Settings / Profiles / MCP), CommandPalette, ProfilesSection 全てが影響。ターミナルは JetBrains Mono に置換済、UI も同様に JetBrains Mono もしくは別フォントへ統一する必要あり。個別対応だと取りこぼしが必ず出るので 1 コミットでまとめて置換する。bug #23 を拡張統合 | 未登録 | 2–3 時間 |
+| 29 | 2 回目以降の Add Pane が効かない — **part 1 修正済** (`AddPaneSheet` で stale focusedPaneId を検出し `findLastLeafId(root)` にフォールバック)。**part 2 未修正**: `use-multi-pane.ts` の `splitPane` は元 leaf の tab を `makeLeaf` で新規 ID 作成するため、元 leaf の state (AI セッション UUID 等) が喪失するリスク。まず part 1 で実機が通るか確認し、通らなければ part 2 に着手 | 未登録 | 1-2 時間 |
+| 30 | Splitter (ペイン幅) のドラッグが効かない — ハンドルは描画されるがドラッグイベントが reducer に届かない。`MultiPaneContainer.tsx:99` の `Gesture.Pan()` が `containerSize.current` を参照しているが、onLayout 経路と gesture activation threshold の関係要調査。`GestureHandlerRootView` は `app/_layout.tsx:144` に存在するので祖先は OK | 未登録 | 60–90 分 |
 
 ---
 
@@ -142,6 +146,9 @@
 
 - **2026-04-14**: 初版作成。v0.1.0 スモークテスト中の発見を整理。コードレビュー / セキュリティ / アーキテクチャ / A11y / 競合 5 エージェントの指摘のうち、出荷ブロッカーではない項目をすべて P1-P3 に振り分け。
 - **2026-04-14**: Task 5 スモークテスト時にユーザーから「戻るボタン」「モデル自動検出」「自動セットアップ」の 3 つの追加要望あり → BACK ボタン (P1)、モデル自動検出強化 (P1)、自動 Recommended セットアップ (P2) として登録。
+- **2026-04-14**: Task 7 (Ports monitor) スモークテストで bug #27 発覚。`node -e "..."` をペースト + Enter してもコマンドが実行されず、末尾 `"` が残り `^[` が混入。通常タイプ経路は OK。ペースト経路の `\r` 送信欠落が疑わしい。P1 に登録し次リリースで対応。Task 7 自体はスキップして Task 8 に進行。
+- **2026-04-14**: Task 8.2 (AI ペイン) スモークテストで bug #28 発覚。Cerebras 応答自体は正常だが、AI ペインの全テキスト (bubble, header, YOU/AI label) が大文字グリフで表示される。原因は Silkscreen フォントが小文字コードポイントを大文字形状で描画する仕様。ターミナルは JetBrains Mono 済だが UI 側は Silkscreen のまま。個別対応ではなく UI 全面一括置換として P1 に登録。bug #23 を統合・拡張。
+- **2026-04-14**: Task 8.3 (Browser ペイン) スモークテストで bug #29 / #30 発覚。初回 Add Pane は成功するが 2 回目以降が無反応。原因調査で `AddPaneSheet` の `focusedPaneId` が split 後に stale になっていることを特定 (splitPane が新 ID の leaf を作るため、元 focus ID がツリーに存在しなくなる)。#29 part 1 として `leafExists` ガード + `findLastLeafId` フォールバックを実装 (コミット `<次のコミット SHA>`)、tsc 0 エラー。実機検証は次セッション。splitter drag (#30) は同根の可能性があるが未調査。
 
 ---
 

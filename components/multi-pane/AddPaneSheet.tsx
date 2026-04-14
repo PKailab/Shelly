@@ -42,7 +42,12 @@ export function AddPaneSheet({ visible, onClose }: Props) {
       return;
     }
 
-    // Add a new pane: split the focused leaf (or the root leaf)
+    // Add a new pane: split the focused leaf — but only if that leaf is
+    // still alive in the tree. After a split, splitPane() allocates NEW
+    // leaf ids for both sides of the new split, so any focusedPaneId from
+    // before the split is stale and no longer resolves via findNode().
+    // Without this guard, the second Add Pane call would look up the old
+    // id, fail silently, and leave the tree untouched (bug #29).
     const { root, splitPane } = useMultiPaneStore.getState();
     if (!root) {
       onClose();
@@ -50,7 +55,10 @@ export function AddPaneSheet({ visible, onClose }: Props) {
     }
 
     const focusedId = usePaneStore.getState().focusedPaneId;
-    const targetLeafId = focusedId ?? findFirstLeafId(root);
+    const focusedStillAlive = focusedId ? leafExists(root, focusedId) : false;
+    const targetLeafId = focusedStillAlive
+      ? (focusedId as string)
+      : findLastLeafId(root);
     if (!targetLeafId) {
       onClose();
       return;
@@ -91,9 +99,17 @@ export function AddPaneSheet({ visible, onClose }: Props) {
   );
 }
 
-function findFirstLeafId(node: any): string | null {
+function findLastLeafId(node: any): string | null {
   if (node.type === 'leaf') return node.id;
-  return findFirstLeafId(node.children[0]) ?? findFirstLeafId(node.children[1]);
+  // Walk the right child first so new panes get appended to the right
+  // edge of the split layout — matching the user mental model of "add on
+  // the right side of what I already have".
+  return findLastLeafId(node.children[1]) ?? findLastLeafId(node.children[0]);
+}
+
+function leafExists(node: any, id: string): boolean {
+  if (node.type === 'leaf') return node.id === id;
+  return leafExists(node.children[0], id) || leafExists(node.children[1], id);
 }
 
 const styles = StyleSheet.create({
