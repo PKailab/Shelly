@@ -14,22 +14,91 @@
 // - persist onUpdateLocalLlmUrl as settings-store update
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { colors as C, fonts as F } from '@/theme.config';
 import { LlamaCppSection } from './LlamaCppSection';
+import { ModalHeader } from './ModalHeader';
 import {
   getLlamaCppLocalLlmConfig,
   MODEL_CATALOG,
   type LlamaCppModel,
 } from '@/lib/llamacpp-setup';
 
-// One filename per line from $HOME/models/*.gguf. Using `ls -1` instead of
-// the shared `buildListModelsCommand` (which does `ls -lh` with a fallback
-// echo "no models") so substring false-positives between overlapping
-// catalog entries can't happen.
-const LIST_MODELS_CMD = 'ls -1 "$HOME/models"/*.gguf 2>/dev/null | xargs -n1 basename 2>/dev/null';
 import { execCommand } from '@/hooks/use-native-exec';
 import { useSettingsStore } from '@/store/settings-store';
+
+// Scan every location where a user might reasonably keep .gguf files.
+// The old implementation only looked at $HOME/models which missed manual
+// downloads into ~/Downloads, /sdcard/Download, ~/llama, etc.
+//
+// We run one `find` per path (ignoring missing paths) and emit the full
+// path per line. The caller compares basenames against MODEL_CATALOG.
+const SEARCH_PATHS = [
+  '"$HOME/models"',
+  '"$HOME"',
+  '/sdcard/Download',
+  '/sdcard/models',
+  '"$HOME/llama"',
+];
+const LIST_MODELS_CMD =
+  SEARCH_PATHS
+    .map((p) => `find ${p} -maxdepth 2 -type f -name '*.gguf' 2>/dev/null`)
+    .join('; ');
+
+// Ask the running llama-server (if any) which model it has loaded. Uses
+// the standard OpenAI-compatible /v1/models endpoint. Returns the first
+// model id on success, null if the server is down or unreachable.
+async function fetchActiveServerModelId(endpoint: string): Promise<string | null> {
+  try {
+    const url = endpoint.replace(/\/$/, '') + '/v1/models';
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 2000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const json = await res.json() as { data?: Array<{ id?: string }> };
+    const first = json.data?.[0]?.id;
+    return typeof first === 'string' && first.length > 0 ? first : null;
+  } catch {
+    return null;
+  }
+}
+
+// Fallback: parse the live llama-server process's -m argument to learn
+// which file it was loaded with. Used when /v1/models is unreachable
+// (server not running, port blocked, etc.).
+async function fetchServerModelPathFromPs(): Promise<string | null> {
+  const r = await execCommand(
+    "ps -Af 2>/dev/null | grep -F llama-server | grep -v grep | head -n1",
+    3000,
+  );
+  const line = (r.stdout ?? '').trim();
+  if (!line) return null;
+  // The -m argument is somewhere in the line; match it directly.
+  const m = line.match(/-m\s+(\S+\.gguf)/);
+  return m?.[1] ?? null;
+}
+
+// Loose match: lowercased substring in either direction. Example:
+//   catalog.filename = "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+//   disk basename    = "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"
+// -> match
+function basenameMatchesCatalog(basename: string, catalogFilename: string): boolean {
+  const a = basename.toLowerCase();
+  const b = catalogFilename.toLowerCase();
+  if (a === b) return true;
+  // Strip the trailing .gguf and compare stem prefixes so a quantization
+  // variant ("-q5" vs "-q4") with an otherwise-identical stem still counts
+  // as the same model family.
+  const stemA = a.replace(/\.gguf$/, '');
+  const stemB = b.replace(/\.gguf$/, '');
+  return stemA.includes(stemB) || stemB.includes(stemA);
+}
+
+function basenameOf(path: string): string {
+  const i = path.lastIndexOf('/');
+  return i >= 0 ? path.slice(i + 1) : path;
+}
 
 type Props = {
   onClose: () => void;
@@ -43,38 +112,73 @@ export function LlamaCppSectionWrapper({ onClose }: Props) {
     () => new Set(),
   );
   const [activeModelId, setActiveModelId] = useState<string | null>(null);
+  const [activeServerLabel, setActiveServerLabel] = useState<string | null>(null);
 
-  // Refresh installed model list by listing $HOME/models/*.gguf. Compare
-  // line-by-line (not substring) so filenames that share a prefix don't
-  // mask each other.
+  // Refresh installed model list by scanning every likely path on disk,
+  // then loose-matching basenames against the catalog. Also ask the
+  // running llama-server (if any) what model it currently has loaded,
+  // so the UI can show an "Active: ..." hint even when the on-disk file
+  // is not in a canonical location.
   const refreshInstalled = useCallback(async () => {
     const r = await execCommand(LIST_MODELS_CMD, 10_000);
-    const lines = new Set(
-      (r.stdout ?? '').split('\n').map((l) => l.trim()).filter(Boolean),
-    );
+    const fullPaths = (r.stdout ?? '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const basenames = fullPaths.map(basenameOf);
+
     const found = new Set<string>();
     for (const model of MODEL_CATALOG) {
-      if (lines.has(model.filename)) found.add(model.id);
+      for (const base of basenames) {
+        if (basenameMatchesCatalog(base, model.filename)) {
+          found.add(model.id);
+          break;
+        }
+      }
     }
     setInstalledModelIds(found);
-  }, []);
+
+    // Consult the running server for its active model. Try the HTTP
+    // endpoint first (fast, authoritative); fall back to parsing `ps`
+    // output if the endpoint is unreachable.
+    const serverModel = await fetchActiveServerModelId(localLlmUrl);
+    if (serverModel) {
+      setActiveServerLabel(serverModel);
+      // Try to map the server's model id back to a catalog entry so the
+      // UI can highlight the correct row.
+      for (const model of MODEL_CATALOG) {
+        if (basenameMatchesCatalog(serverModel, model.filename)) {
+          setActiveModelId(model.id);
+          return;
+        }
+      }
+    } else {
+      const psPath = await fetchServerModelPathFromPs();
+      if (psPath) {
+        const base = basenameOf(psPath);
+        setActiveServerLabel(base);
+        for (const model of MODEL_CATALOG) {
+          if (basenameMatchesCatalog(base, model.filename)) {
+            setActiveModelId(model.id);
+            return;
+          }
+        }
+      } else {
+        setActiveServerLabel(null);
+      }
+    }
+
+    // No server hint — fall back to the previous heuristic of picking
+    // whichever installed model happens to be first in catalog order.
+    setActiveModelId((prev) => {
+      if (prev && found.has(prev)) return prev;
+      return found.values().next().value ?? null;
+    });
+  }, [localLlmUrl]);
 
   useEffect(() => {
     refreshInstalled();
   }, [refreshInstalled]);
-
-  // Pick activeModelId as the first installed that matches; otherwise null.
-  // (The model itself is served by llama-server, which knows its own weights;
-  // Shelly only tracks which catalog entry the user last picked.)
-  useEffect(() => {
-    if (installedModelIds.size === 0) {
-      setActiveModelId(null);
-      return;
-    }
-    setActiveModelId((prev) =>
-      prev && installedModelIds.has(prev) ? prev : installedModelIds.values().next().value ?? null,
-    );
-  }, [installedModelIds]);
 
   const handleRun = useCallback(
     async (command: string, _label: string) => {
@@ -108,15 +212,22 @@ export function LlamaCppSectionWrapper({ onClose }: Props) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>LOCAL LLM · llama.cpp</Text>
-        <Pressable onPress={onClose} hitSlop={8}>
-          <Text style={styles.close}>CLOSE</Text>
-        </Pressable>
-      </View>
-      <Text style={styles.endpoint} numberOfLines={1}>
-        {localLlmUrl}
-      </Text>
+      <ModalHeader
+        title="LOCAL LLM · llama.cpp"
+        onClose={onClose}
+        subtitle={
+          <View>
+            <Text style={styles.endpoint} numberOfLines={1}>
+              {localLlmUrl}
+            </Text>
+            {activeServerLabel && (
+              <Text style={styles.active} numberOfLines={1}>
+                ACTIVE: {activeServerLabel}
+              </Text>
+            )}
+          </View>
+        }
+      />
       <ScrollView style={styles.body}>
         <LlamaCppSection
           isConnected={true}
@@ -136,29 +247,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bgDeep,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  title: {
-    fontFamily: F.family,
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.accent,
-    letterSpacing: 0.5,
-  },
-  close: {
-    fontFamily: F.family,
-    fontSize: 9,
-    fontWeight: '700',
-    color: C.text2,
-    letterSpacing: 0.5,
-  },
   endpoint: {
     fontFamily: F.family,
     fontSize: 9,
@@ -166,6 +254,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 6,
     paddingBottom: 4,
+  },
+  active: {
+    fontFamily: F.family,
+    fontSize: 9,
+    fontWeight: '700',
+    color: C.accentGreen,
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+    letterSpacing: 0.5,
   },
   body: {
     flex: 1,

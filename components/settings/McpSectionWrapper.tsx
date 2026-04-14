@@ -5,9 +5,10 @@
 // in-process JNI execCommand. Keeps McpSection.tsx untouched.
 
 import React, { useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
-import { colors as C, fonts as F } from '@/theme.config';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { colors as C } from '@/theme.config';
 import { McpSection } from './McpSection';
+import { ModalHeader } from './ModalHeader';
 import { execCommand } from '@/hooks/use-native-exec';
 
 type Props = {
@@ -31,12 +32,7 @@ export function McpSectionWrapper({ onClose }: Props) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <Text style={styles.title}>MCP SERVERS</Text>
-        <Pressable onPress={onClose} hitSlop={8}>
-          <Text style={styles.close}>CLOSE</Text>
-        </Pressable>
-      </View>
+      <ModalHeader title="MCP SERVERS" onClose={onClose} />
       <ScrollView style={styles.body}>
         <McpSection isConnected={true} onRunCommand={handleRun} />
       </ScrollView>
@@ -48,29 +44,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: C.bgDeep,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-  },
-  title: {
-    fontFamily: F.family,
-    fontSize: 11,
-    fontWeight: '700',
-    color: C.accent,
-    letterSpacing: 0.5,
-  },
-  close: {
-    fontFamily: F.family,
-    fontSize: 9,
-    fontWeight: '700',
-    color: C.text2,
-    letterSpacing: 0.5,
   },
   body: {
     flex: 1,

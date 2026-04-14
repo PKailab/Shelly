@@ -3,6 +3,17 @@
 This file is read by Codex CLI when launched inside the Shelly project.
 For Claude Code context, see `CLAUDE.md`. For Gemini CLI, see `GEMINI.md`.
 
+## ⚠️ Required reading at session start
+
+**[docs/superpowers/DEFERRED.md](./docs/superpowers/DEFERRED.md)** — the single source of truth for deferred work.
+
+This file tracks every item that has been explicitly deferred to a later release, descoped, or marked as a known limitation, along with the reason and priority (P0/P1/P2/P3). Introduced on 2026-04-14 after repeated README/code mismatches in earlier sessions.
+
+**Rules**:
+- Verbal "we'll do it later" is forbidden — everything goes into DEFERRED.md
+- Verify P0 is empty before starting any release work
+- When descoping a feature, sync both the README Status table and DEFERRED.md
+
 ---
 
 ## Project Overview
