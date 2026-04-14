@@ -39,10 +39,10 @@
 | 4 | Typeless 音声入力の検証 (IME 全面改修後) | [#13](https://github.com/RYOITABASHI/Shelly/issues/13) | 15 分 (検証のみ) |
 | 5 | 端末 CJK フォント統合 — Misaki / Cica + GL atlas 更新 | [#14](https://github.com/RYOITABASHI/Shelly/issues/14) | 3–4 時間 |
 | 7 | 音声 / immortal / AlarmManager の実機スモークテスト | [#16](https://github.com/RYOITABASHI/Shelly/issues/16) | 80 分 |
-| 27 | ペースト + Enter でコマンドが実行されない (末尾に `"` が残り改行せず、`^[` が混入) — Task 7 スモークテストで発覚。通常タイプ経路は OK。ペースト経路の Enter 後 `\r` 欠落が疑わしい。キーボード「隠す」ボタンが ESC を送る副作用も要調査 (bug #22 と関連) | 未登録 | 60–90 分 |
-| 28 | UI 全面の Silkscreen → 読みやすいフォントへ一括置換 — Silkscreen は小文字コードポイントが大文字グリフとして描画される設計 (Google Fonts 仕様)。AI ペイン bubble/header, Sidebar (REPOSITORIES / TASKS / FILE TREE 等), Modal (Settings / Profiles / MCP), CommandPalette, ProfilesSection 全てが影響。ターミナルは JetBrains Mono に置換済、UI も同様に JetBrains Mono もしくは別フォントへ統一する必要あり。個別対応だと取りこぼしが必ず出るので 1 コミットでまとめて置換する。bug #23 を拡張統合 | 未登録 | 2–3 時間 |
-| 29 | 2 回目以降の Add Pane が効かない — **part 1 修正済** (`AddPaneSheet` で stale focusedPaneId を検出し `findLastLeafId(root)` にフォールバック)。**part 2 未修正**: `use-multi-pane.ts` の `splitPane` は元 leaf の tab を `makeLeaf` で新規 ID 作成するため、元 leaf の state (AI セッション UUID 等) が喪失するリスク。まず part 1 で実機が通るか確認し、通らなければ part 2 に着手 | 未登録 | 1-2 時間 |
-| 30 | Splitter (ペイン幅) のドラッグが効かない — ハンドルは描画されるがドラッグイベントが reducer に届かない。`MultiPaneContainer.tsx:99` の `Gesture.Pan()` が `containerSize.current` を参照しているが、onLayout 経路と gesture activation threshold の関係要調査。`GestureHandlerRootView` は `app/_layout.tsx:144` に存在するので祖先は OK | 未登録 | 60–90 分 |
+| ✅ 27 | ペースト + Enter でコマンドが実行されない — **修正済 (415304e5)**。前セッションで入れた `TerminalView.java` の `performEditorAction` / `sendKeyEvent` override を削除。Samsung Keyboard の副次 performEditorAction 発火で CR が重複し、BaseInputConnection の shadow-sync 競合で末尾 `"` が欠落していた。実機検証待ち | — | 済 |
+| ✅ 28 | UI 全面の Silkscreen 大文字問題 — **修正済 (415304e5)**。`@expo-google-fonts/jetbrains-mono` 追加、`theme.config.ts` / `theme-presets.ts` のデフォルトフォントを `JetBrainsMono_400Regular` に切替。'silkscreen' / 'pixel' プリセットのみ旧フォントを維持。Text.render monkey-patch で全 `<Text>` が自動追従するので個別修正不要。実機検証待ち | — | 済 |
+| ✅ 29 | 2 回目以降の Add Pane が効かない — **part 1 修正済 (0d7f0b40)**: `AddPaneSheet` で stale focusedPaneId を検出し `findLastLeafId(root)` にフォールバック。**part 2 修正済 (409b4642)**: `splitPane` で元 leaf の ID を保持し、newLeaf 側のみ新規 ID 割当。React key 変化による PaneSlot 再マウント → AI セッション/PTY/WebView state 喪失を防止。実機検証待ち | — | 済 |
+| ✅ 30 | Splitter (ペイン幅) のドラッグが効かない — **修正済 (409b4642)**。Divider の `marginHorizontal: -8` 負 margin トリックで flex slot net 幅が 0 となり Yoga / Android の hit-test が通らなかった。Divider を `position: 'absolute'` に変更、`splitSize` を state 化して `ratio * splitSize - 8` で絶対配置、`overflow: 'visible'` 追加。実機検証待ち | — | 済 |
 
 ---
 
