@@ -461,7 +461,15 @@ export default function TerminalScreen() {
   const termFontSize = (() => {
     const base = settings.fontSize ?? 14;
     const mapped = base <= 12 ? 11 : base <= 14 ? 14 : 17;
-    return layout.isCompact ? Math.max(10, mapped - 1) : mapped;
+    const adjusted = layout.isCompact ? Math.max(10, mapped - 1) : mapped;
+    // Bug #56 — in 2×2 / 3-pane grids each pane drops below ~420dp.
+    // Step the font down so terminal content reflows instead of
+    // overflowing the pane chrome.
+    const pw = multiPaneCtx?.paneWidth ?? 0;
+    if (pw > 0 && pw < 260) return Math.max(9, adjusted - 3);
+    if (pw > 0 && pw < 360) return Math.max(10, adjusted - 2);
+    if (pw > 0 && pw < 480) return Math.max(10, adjusted - 1);
+    return adjusted;
   })();
 
   // Send text to terminal via native PTY

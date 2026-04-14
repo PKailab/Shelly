@@ -274,6 +274,10 @@ type MultiPaneLegacyView = {
   maximizedPaneId: string | null;
   /** Legacy flat tab list. */
   panes: PaneTab[];
+  /** True once zustand persist has finished rehydration. Consumers that
+   *  render chrome tied to `slots` should gate on this to avoid flashing an
+   *  empty header after force-stop → relaunch (bug #64). */
+  _hasHydrated: boolean;
 };
 
 export type MultiPaneStore =
@@ -386,6 +390,13 @@ const persistOptions: PersistOptions<MultiPaneStore, PersistedV2> = {
     } catch {
       /* non-fatal */
     }
+    // Flip hydration flag so UI chrome that depends on restored `slots`
+    // can render without flashing an empty header (bug #64).
+    try {
+      useMultiPaneStore.setState({ _hasHydrated: true });
+    } catch {
+      /* non-fatal — store ref may not yet be bound on first tick */
+    }
   },
 };
 
@@ -479,6 +490,9 @@ export const useMultiPaneStore = create<MultiPaneStore>()(
       return {
         // Core state
         ...makeInitialCore(),
+
+        // Hydration flag — flipped to true in onRehydrateStorage below.
+        _hasHydrated: false,
 
         // ── Legacy view fields (recomputed on every access) ──
         get isMultiPane() { return true; },

@@ -36,29 +36,52 @@ export const FilesTab = memo(function FilesTab() {
   const [fileContent, setFileContent] = useState('');
   const [fileLoading, setFileLoading] = useState(false);
 
-  // Scan directory
+  // Scan directory.
+  //
+  // Previous implementation used `find -maxdepth 1 -exec stat -c '%n\t%s\t%F'`
+  // which relies on GNU stat's `-c` format string. The bundled shelly-shell
+  // (Plan B, fork+exec via libexec_wrapper) on Android doesn't always ship a
+  // GNU-compatible stat, so the command produced empty stdout and the FILES
+  // tab rendered as blank (bug #53). `ls -la` is portable across busybox,
+  // toybox, coreutils, and bash builtins, so switch to parsing that.
   const scanDir = useCallback(async (dir: string) => {
     setLoading(true);
     try {
       const result = await runRawCommand(
-        `find ${shellEscape(dir)} -maxdepth 1 -not -name '.' -exec stat -c '%n\t%s\t%F' {} \\;`,
+        `ls -la ${shellEscape(dir)} 2>/dev/null`,
       );
-      const entries: FileEntry[] = (result.stdout || '').split('\n').filter(Boolean).map((line) => {
-        const [fullPath, sizeStr, typeStr] = line.split('\t');
-        const name = fullPath.split('/').pop() || fullPath;
-        const isDir = typeStr?.includes('directory') ?? false;
-        return {
+      const lines = (result.stdout || '').split('\n').filter(Boolean);
+      const entries: FileEntry[] = [];
+      for (const line of lines) {
+        // Skip "total N" header and any line that doesn't look like an ls row.
+        if (/^total\s/i.test(line)) continue;
+        // ls -la columns: perms links owner group size month day time/year name
+        // `name` may contain spaces, so split on whitespace max 9 times.
+        const parts = line.split(/\s+/);
+        if (parts.length < 9) continue;
+        const perms = parts[0];
+        if (!/^[\-dlcbps]/.test(perms)) continue;
+        const name = parts.slice(8).join(' ');
+        if (name === '.' || name === '..') continue;
+        const isDir = perms.startsWith('d');
+        const size = parseInt(parts[4] || '0', 10) || 0;
+        const fullPath = dir.endsWith('/') ? dir + name : dir + '/' + name;
+        entries.push({
           name,
           path: fullPath,
           isDirectory: isDir,
-          size: parseInt(sizeStr || '0', 10),
-          type: isDir ? 'plaintext' as PreviewFileType : detectFileType(name),
-        };
-      }).sort((a, b) => {
+          size,
+          type: isDir ? ('plaintext' as PreviewFileType) : detectFileType(name),
+        });
+      }
+      entries.sort((a, b) => {
         if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
         return a.name.localeCompare(b.name);
-      }).filter((f) => !f.name.startsWith('.') || f.name === '.gitignore');
-      setFiles(entries);
+      });
+      const filtered = entries.filter(
+        (f) => !f.name.startsWith('.') || f.name === '.gitignore',
+      );
+      setFiles(filtered);
     } catch {
       setFiles([]);
     }
@@ -189,9 +212,12 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8, borderBottomWidth: 1, borderBottomColor: '#222' },
-  backText: { fontFamily: 'Silkscreen', fontSize: 12, fontWeight: '600' },
-  breadcrumb: { fontFamily: 'Silkscreen', fontSize: 10, flex: 1 },
+  // Use JetBrainsMono for any path / filename display: Silkscreen only ships
+  // uppercase glyphs, so POSIX paths render as /DATA/DATA/... even though
+  // the filesystem is lowercase (bug #52).
+  backText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, fontWeight: '600' },
+  breadcrumb: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 10, flex: 1 },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#111' },
-  fileName: { fontFamily: 'Silkscreen', fontSize: 12, flex: 1 },
-  fileSize: { fontFamily: 'Silkscreen', fontSize: 10 },
+  fileName: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, flex: 1 },
+  fileSize: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 10 },
 });

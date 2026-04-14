@@ -25,6 +25,7 @@ import { CrtOverlay } from '@/components/CrtOverlay';
 import { VoiceChat } from '@/components/VoiceChat';
 import { useSettingsStore } from '@/store/settings-store';
 import { ConfigTUI } from '@/components/config/ConfigTUI';
+import { SaveBadge } from '@/components/SaveBadge';
 
 export function ShellLayout() {
   const theme = useTheme();
@@ -189,6 +190,12 @@ export function ShellLayout() {
       {/* Full-screen voice overlay */}
       <VoiceChat visible={showVoice} onClose={closeVoice} />
 
+      {/* Savepoint badge — floating top-right indicator, fires when
+          auto-savepoint writes a commit (see savepoint bridge in _layout.tsx) */}
+      <View pointerEvents="none" style={styles.saveBadgeSlot}>
+        <SaveBadge />
+      </View>
+
       {/* CRT effect — must be last so it renders on top of everything */}
       <CrtOverlay />
     </View>
@@ -202,5 +209,11 @@ const styles = StyleSheet.create({
   main: {
     flex: 1,
     flexDirection: 'row',
+  },
+  saveBadgeSlot: {
+    position: 'absolute',
+    top: 8,
+    right: 12,
+    zIndex: 50,
   },
 });

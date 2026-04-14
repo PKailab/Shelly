@@ -128,6 +128,13 @@
 
 ## P3 — 長期ロードマップ / 検討中
 
+### i18n: `t()` 呼び出しの `useTranslation()` 移行
+- **現状**: `lib/i18n/index.ts` は reactive な `useTranslation()` と非 reactive な `t()` の両方を export しており、40+ ファイルが後者を使っている
+- **一時対応 (bug #62, 2026-04-14)**: `app/_layout.tsx` の `<Stack>` を `key={locale}` で再 mount することで全ツリー再 render を強制。EN/JA 切替は即反映される
+- **Why not now**: 全 callsite (chelly/, components/creator/, components/snippets/, components/settings/McpSection, lib/input-router, lib/accessibility など) を `useTranslation()` に書き換えると差分が大きく、本リリースのスコープ外
+- **将来案**: 各コンポーネントで `const { t } = useTranslation()` に統一、module-scope の `t()` は system-prompt 系 (lib/gemini, lib/perplexity など getCurrentLocale 系) だけに限定
+- **スコープ感**: 半日〜1 日の機械的置換 + スモークテスト
+
 ### インライン IME compose preview
 - **現状**: v0.1.0 では **採用せず** (`setComposingText` を PTY に書かない方針)
 - **理由**: Android IME compose の state management が PTY stream と根本的に整合しない (Typeless / Samsung Keyboard / Gboard それぞれ別挙動、二重化や first-char 消失を誘発)
@@ -172,11 +179,18 @@
 
 ---
 
-## bug #66 — Savepoint 自動発火が動作しない (💾バッジが出ない) (P2)
+## bug #66 — Savepoint 自動発火が動作しない (💾バッジが出ない) (P2) — FIXED 2026-04-14 (Wave C)
 
 **発見**: 2026-04-14 Phase 5-10 Savepoint スモークテスト
 **症状**: `echo "savepoint test" > ~/save-test.txt` でファイル変更しても SaveBadge / SavepointBubble が一切表示されない。MEMORY.md では 2026-03-22 に実装済み (auto-savepoint.ts / savepoint-store / SaveBadge.tsx) となっているが動いていない。
-**疑い**: Plan B 移行で Termux API (mv/git) を使っていた経路が失われた、またはコマンド完了イベント (onBlockCompleted) のフックが外れているため変更検知が発火しない。
+**根本原因** (Case B): Savepoint 実装そのもの (auto-savepoint.ts / savepoint-store) は健在で、use-terminal-output.ts:107 から `requestSavepoint('file-change-detected')` で store に pendingRequest を積んでいた。しかし **Plan B + Superset 移行で ChatScreen / ChatHeader が runtime から外れ、pendingRequest を消化して `checkAndSave` を呼ぶ購読者がいなくなっていた**。SaveBadge 自体もどこにも mount されていなかった (`chelly/` は staging で runtime ではない、`components/chat/ChatHeader.tsx` は import 元がゼロ)。
+**修正**:
+- `app/_layout.tsx`: voice-chain bridge と同じパターンで savepoint 購読者を追加。`useSavepointStore.subscribe` で pendingRequest を監視し、`useTerminalStore` の active session `currentDir` を拾って `initGitIfNeeded` + `checkAndSave` を `execCommand` (JNI) 経由で実行、成功時に `flashBadge()`。in-flight ガード付き。
+- `components/layout/ShellLayout.tsx`: CrtOverlay の直前に `<SaveBadge />` を absolute 配置 (top:8, right:12, zIndex:50) で mount。
+- auto-savepoint.ts は元々 `git -C ${dir} ...` 形式で runCommand 経由に設計されていたため、Plan B の execCommand (JNI fork+exec+pipe) にそのまま接続できた (Case C の rewrite は不要だった)。
+**Wave C 波及**: #60 (Command Blocks onBlockCompleted 復活) とは独立。Savepoint は blockCompleted ではなく terminal-output のファイル変更パターン検知 (5 秒 debounce) で発火するため、#60 の修正には依存しない。
+**実機検証待ち**: `echo ... > file` → 5 秒後に 💾 が右上にフラッシュ、git 経路で commit が積まれることを確認。初回は `initGitIfNeeded` が走る (cwd に .git が無ければ init + .gitignore 生成)。
+**tsc**: 0 errors
 **優先度**: P2
 
 ---

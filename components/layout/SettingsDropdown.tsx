@@ -277,6 +277,9 @@ function ThemeRow() {
   // palette and the font to Shelly defaults in one tap.
   const options: Array<{ value: UiFontId; label: string }> = [
     { value: 'shelly',      label: 'Default' },
+    { value: 'silkscreen',  label: 'Silk' },
+    { value: 'pixel',       label: '8bit' },
+    { value: 'mono',        label: 'Mono' },
     { value: 'dracula',     label: 'Dracula' },
     { value: 'nord',        label: 'Nord' },
     { value: 'gruvbox',     label: 'Gruvbox' },

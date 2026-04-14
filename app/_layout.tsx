@@ -67,6 +67,14 @@ export default function RootLayout() {
   });
   const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'shelly');
   const loadSettings = useTerminalStore((s) => s.loadSettings);
+  // bug #62: many components import the non-reactive `t()` helper from
+  // @/lib/i18n (which only reads useI18n.getState().locale once per render).
+  // Subscribing to the locale here and keying the whole Stack with it forces
+  // a re-render of the entire tree when the user toggles EN/JA in Settings,
+  // so even components using plain `t()` pick up the new strings.
+  // TODO(DEFERRED): migrate remaining `t()` callsites to `useTranslation()`
+  // for a per-component reactive subscription (see P3 list).
+  const locale = useI18n((s) => s.locale);
 
   // Runtime theme preset swap. applyThemePreset() rewrites the live
   // colors object in place, re-injects Text.defaultProps.style.fontFamily,
@@ -123,6 +131,62 @@ export default function RootLayout() {
 
 
 
+    // Wire savepoint auto-save subscriber. The store's `pendingRequest` is
+    // set from use-terminal-output (file-change-detected) and from other hooks,
+    // but after the Plan B / Superset migration nothing consumed it — so the
+    // 💾 badge never fired. Subscribe here at the root and run checkAndSave
+    // via JNI execCommand in the active session's currentDir.
+    import('@/store/savepoint-store').then(({ useSavepointStore }) => {
+      import('@/hooks/use-native-exec').then(({ execCommand }) => {
+        import('@/lib/auto-savepoint').then(({ checkAndSave, initGitIfNeeded }) => {
+          import('@/store/terminal-store').then(({ useTerminalStore }) => {
+            const runCmd = async (cmd: string) => {
+              const r = await execCommand(cmd, 30_000);
+              return { stdout: r.stdout, exitCode: r.exitCode };
+            };
+            let inFlight = false;
+            useSavepointStore.subscribe((state, prev) => {
+              if (!state.pendingRequest || state.pendingRequest === prev.pendingRequest) return;
+              if (inFlight) return;
+              if (!state.isEnabled) {
+                useSavepointStore.getState().clearPendingRequest();
+                return;
+              }
+              const ts = useTerminalStore.getState();
+              const session = ts.sessions.find((s) => s.id === ts.activeSessionId);
+              const dir = session?.currentDir;
+              if (!dir) {
+                useSavepointStore.getState().clearPendingRequest();
+                return;
+              }
+              inFlight = true;
+              useSavepointStore.getState().setSaving(true);
+              (async () => {
+                try {
+                  await initGitIfNeeded(dir, runCmd);
+                  const result = await checkAndSave(dir, runCmd, (issues) => {
+                    useSavepointStore.getState().setSecurityWarnings(
+                      issues.map((i) => `${i.file}: ${i.label}`),
+                    );
+                  });
+                  if (result) {
+                    useSavepointStore.getState().flashBadge();
+                  }
+                } catch (e) {
+                  logError('SavepointBridge', 'checkAndSave failed', e);
+                } finally {
+                  useSavepointStore.getState().setSaving(false);
+                  useSavepointStore.getState().clearPendingRequest();
+                  inFlight = false;
+                }
+              })();
+            });
+            logInfo('RootLayout', 'Loaded: savepoint bridge');
+          });
+        });
+      });
+    });
+
     // Wire voice-chain bridge so VoiceChat can execute terminal commands.
     // The bridge was exported but never hooked up, leaving the voice dialogue
     // loop unable to reach the terminal.
@@ -169,7 +233,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack key={locale} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
         </Stack>
         <StatusBar style="light" />

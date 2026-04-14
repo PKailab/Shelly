@@ -105,6 +105,11 @@ const emptyStyles = StyleSheet.create({
 });
 
 export function MultiPaneContainer() {
+  // Bug #64 — wait for persist rehydration before rendering any pane chrome.
+  // Without this, a force-stop/relaunch cycle can briefly flash the
+  // EmptyState (or stale slots) before restored state arrives, which in
+  // turn tears down pane headers (back / layout buttons).
+  const hasHydrated  = useMultiPaneStore((s) => s._hasHydrated);
   const preset       = useMultiPaneStore((s) => s.preset);
   const slots        = useMultiPaneStore((s) => s.slots);
   const ratios       = useMultiPaneStore((s) => s.ratios);
@@ -123,6 +128,10 @@ export function MultiPaneContainer() {
       prev.W === width && prev.H === height ? prev : { W: width, H: height },
     );
   }, []);
+
+  if (!hasHydrated) {
+    return <View style={styles.root} onLayout={onContainerLayout} />;
+  }
 
   const usedCount = slots.filter((s) => s !== null).length;
   if (usedCount === 0) {

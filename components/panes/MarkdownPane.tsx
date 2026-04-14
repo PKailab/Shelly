@@ -5,7 +5,7 @@
  * - "Edit" button shows toast directing user to vim in terminal
  * - Export openMarkdownFile(path) reads file via execCommand and sets content
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import Markdown from 'react-native-markdown-display';
 import { useTheme } from '@/lib/theme-engine';
 import { execCommand } from '@/hooks/use-native-exec';
 import PaneInputBar from '@/components/panes/PaneInputBar';
+import { MultiPaneContext } from '@/components/multi-pane/PaneSlot';
 
 // ── Module-level state for imperative openMarkdownFile ────────────────────────
 
@@ -52,6 +53,17 @@ export default function MarkdownPane() {
   const [filePath, setFilePath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Bug #56 — density scaling for grid layouts. Scale the markdown
+  // typography down when the pane drops below ~420dp so headings and
+  // prose reflow instead of overflowing.
+  const mp = useContext(MultiPaneContext);
+  const pw = mp?.paneWidth ?? 0;
+  const mdScale = pw > 0 && pw < 260 ? 0.65
+                : pw > 0 && pw < 360 ? 0.78
+                : pw > 0 && pw < 480 ? 0.9
+                : 1;
+  const sf = (n: number) => Math.max(9, Math.round(n * mdScale));
+
   // Register setter so openMarkdownFile can push content in
   const stableSetContent = useCallback<SetContentFn>((c, fp) => {
     setContent(c);
@@ -80,12 +92,12 @@ export default function MarkdownPane() {
     body: {
       backgroundColor: '#0A0A0A',
       color: theme.colors.foreground,
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: sf(14),
+      lineHeight: sf(22),
     },
     heading1: {
       color: theme.colors.accent,
-      fontSize: 24,
+      fontSize: sf(24),
       fontWeight: '700',
       marginTop: 16,
       marginBottom: 8,
@@ -95,49 +107,49 @@ export default function MarkdownPane() {
     },
     heading2: {
       color: theme.colors.accent,
-      fontSize: 20,
+      fontSize: sf(20),
       fontWeight: '700',
       marginTop: 14,
       marginBottom: 6,
     },
     heading3: {
       color: theme.colors.accent,
-      fontSize: 17,
+      fontSize: sf(17),
       fontWeight: '600',
       marginTop: 12,
       marginBottom: 4,
     },
     heading4: {
       color: theme.colors.accent,
-      fontSize: 15,
+      fontSize: sf(15),
       fontWeight: '600',
       marginTop: 10,
       marginBottom: 4,
     },
     heading5: {
       color: theme.colors.accent,
-      fontSize: 14,
+      fontSize: sf(14),
       fontWeight: '600',
       marginTop: 8,
       marginBottom: 2,
     },
     heading6: {
       color: theme.colors.accent,
-      fontSize: 13,
+      fontSize: sf(13),
       fontWeight: '600',
       marginTop: 8,
       marginBottom: 2,
     },
     paragraph: {
       color: '#ECEDEE',
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: sf(14),
+      lineHeight: sf(22),
       marginVertical: 6,
     },
     code_inline: {
       backgroundColor: '#1A1A1A',
       color: theme.colors.ansiCyan,
-      fontSize: 13,
+      fontSize: sf(13),
       paddingHorizontal: 4,
       paddingVertical: 1,
       borderRadius: 3,
@@ -151,8 +163,8 @@ export default function MarkdownPane() {
     code_block: {
       backgroundColor: '#1A1A1A',
       color: '#ECEDEE',
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: sf(13),
+      lineHeight: sf(20),
       padding: 12,
       borderRadius: 6,
       marginVertical: 8,
@@ -171,8 +183,8 @@ export default function MarkdownPane() {
     },
     list_item: {
       color: '#ECEDEE',
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: sf(14),
+      lineHeight: sf(22),
     },
     bullet_list_icon: {
       color: theme.colors.accent,

@@ -26,7 +26,7 @@ import {
   neonGlowTeal,
 } from '@/lib/neon-glow';
 import { MaterialIcons } from '@expo/vector-icons';
-import { PaneIdContext } from '@/components/multi-pane/PaneSlot';
+import { PaneIdContext, MultiPaneContext } from '@/components/multi-pane/PaneSlot';
 import { useAIPaneStore } from '@/store/ai-pane-store';
 import { usePaneStore } from '@/store/pane-store';
 import { formatContextBadge } from '@/lib/ai-pane-context';
@@ -228,6 +228,15 @@ export default function AIPane() {
   const paneId = useContext(PaneIdContext);
   const theme = useTheme();
   const colors = theme.colors;
+  // Bug #56 — narrow grid layouts (2×2 or 1+2) drop pane width below
+  // ~360dp. Shrink horizontal padding so bubble content does not get
+  // clipped by the pane chrome.
+  const mp = useContext(MultiPaneContext);
+  const pw = mp?.paneWidth ?? 0;
+  const isCompactPane = pw > 0 && pw < 360;
+  const compactOverlay = isCompactPane
+    ? { paddingHorizontal: 6 }
+    : null;
 
   const { dispatch, cancelStreaming, isStreaming: dispatchStreaming } = useAIPaneDispatch(paneId);
 
@@ -316,7 +325,7 @@ export default function AIPane() {
   const keyExtractor = useCallback((item: ChatMessage) => item.id, []);
 
   return (
-    <View style={paneStyles.container}>
+    <View style={[paneStyles.container, compactOverlay]}>
       {/* Context badge — READING TERMINAL 1 */}
       {contextBadge && (
         <View style={paneStyles.contextBadge}>

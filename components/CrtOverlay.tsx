@@ -23,7 +23,11 @@ const PHOSPHOR_ALPHA_MIN = 0.005;
 const PHOSPHOR_ALPHA_MAX = 0.09;
 const VIGNETTE_BAND_RATIO = 0.20;
 const VIGNETTE_OPACITY_MIN = 0.05;
-const VIGNETTE_OPACITY_MAX = 0.35;
+// bug #61: at full intensity the four black bands combined with the panel's
+// natural OLED non-uniformity produced visible corner brightness asymmetry
+// (top-right bright, bottom-left dark). Capping the ceiling at 0.22 keeps
+// the vignette readable as a CRT cue without amplifying panel mura.
+const VIGNETTE_OPACITY_MAX = 0.22;
 import { useCosmeticStore } from '@/store/cosmetic-store';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -47,7 +51,12 @@ export function CrtOverlay() {
   const lerp = (a: number, b: number) => a + (b - a) * t;
   const scanlineOpacity = lerp(SCANLINE_OPACITY_MIN, SCANLINE_OPACITY_MAX);
   const phosphorOpacity = lerp(PHOSPHOR_ALPHA_MIN, PHOSPHOR_ALPHA_MAX);
-  const vignetteOpacity = lerp(VIGNETTE_OPACITY_MIN, VIGNETTE_OPACITY_MAX);
+  // bug #61: compress the vignette blend so the top 20% of slider travel
+  // does not push the bands beyond comfortable contrast. Double safety on
+  // top of the clamped VIGNETTE_OPACITY_MAX constant.
+  const vignetteT = Math.min(t, 0.8) / 0.8;
+  const vignetteOpacity =
+    VIGNETTE_OPACITY_MIN + (VIGNETTE_OPACITY_MAX - VIGNETTE_OPACITY_MIN) * vignetteT;
 
   return (
     <View
