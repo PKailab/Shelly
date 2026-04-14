@@ -38,11 +38,14 @@ const SEARCH_PATHS = [
   '"$HOME"',
   '/sdcard/Download',
   '/sdcard/models',
-  '"$HOME/llama"',
+  '/sdcard/llama',
 ];
+// Emit "<size> <path>" per line via `find -printf` so the caller can dedup
+// identical files reachable through multiple search roots (e.g. $HOME and
+// $HOME/models) by (basename, size) without an extra stat round-trip.
 const LIST_MODELS_CMD =
   SEARCH_PATHS
-    .map((p) => `find ${p} -maxdepth 2 -type f -name '*.gguf' 2>/dev/null`)
+    .map((p) => `find ${p} -maxdepth 2 -type f -name '*.gguf' -printf '%s %p\\n' 2>/dev/null`)
     .join('; ');
 
 // Ask the running llama-server (if any) which model it has loaded. Uses
@@ -121,10 +124,22 @@ export function LlamaCppSectionWrapper({ onClose }: Props) {
   // is not in a canonical location.
   const refreshInstalled = useCallback(async () => {
     const r = await execCommand(LIST_MODELS_CMD, 10_000);
-    const fullPaths = (r.stdout ?? '')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
+    // Parse "<size> <path>" lines and dedup by (basename, size) — the same
+    // file can show up multiple times when search roots overlap.
+    const seen = new Set<string>();
+    const fullPaths: string[] = [];
+    for (const raw of (r.stdout ?? '').split('\n')) {
+      const line = raw.trim();
+      if (!line) continue;
+      const sp = line.indexOf(' ');
+      if (sp < 0) continue;
+      const size = line.slice(0, sp);
+      const path = line.slice(sp + 1);
+      const key = `${basenameOf(path)}|${size}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      fullPaths.push(path);
+    }
     const basenames = fullPaths.map(basenameOf);
 
     const found = new Set<string>();

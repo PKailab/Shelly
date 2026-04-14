@@ -70,9 +70,25 @@ function EditModal({ visible, initial, onSave, onClose }: EditModalProps) {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={[styles.modalBox, { backgroundColor: c.background, borderColor: c.border }]}>
-          <Text style={[styles.modalTitle, { color: c.foreground }]}>
-            {initial.id ? 'Edit Profile' : 'Add Profile'}
-          </Text>
+          {/* Leading BACK affordance for users whose device doesn't have
+              an edge-swipe gesture enabled. Matches the ModalHeader used
+              by the MCP / llama.cpp wrappers — see issue #11. */}
+          <View style={styles.modalHeaderRow}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={styles.modalBackButton}
+              accessibilityRole="button"
+              accessibilityLabel="Back to profiles"
+            >
+              <MaterialIcons name="arrow-back" size={16} color={c.accent} />
+              <Text style={[styles.modalBackText, { color: c.accent }]}>BACK</Text>
+            </Pressable>
+            <Text style={[styles.modalTitle, { color: c.foreground, flex: 1, textAlign: 'center' }]} numberOfLines={1}>
+              {initial.id ? 'Edit Profile' : 'Add Profile'}
+            </Text>
+            <View style={styles.modalBackButton} />
+          </View>
 
           <Text style={labelStyle}>Name *</Text>
           <TextInput style={inputStyle} value={name} onChangeText={setName} placeholder="my-server" placeholderTextColor={c.muted} autoCapitalize="none" />
@@ -308,11 +324,30 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 32,
   },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 64,
+    minHeight: 32,
+  },
+  modalBackText: {
+    fontFamily: F.family,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
   modalTitle: {
     fontFamily: F.family,
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 16,
   },
   label: {
     fontFamily: F.family,
