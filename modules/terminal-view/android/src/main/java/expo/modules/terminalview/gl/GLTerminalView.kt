@@ -152,9 +152,16 @@ class GLTerminalView(context: Context) : GLSurfaceView(context) {
             }
 
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-                // Never forward to the PTY. Compose is held by the IME, so
-                // there is nothing on the terminal row to erase. Real
-                // BackSpace arrives through sendKeyEvent(KEYCODE_DEL).
+                // Soft keyboards (Gboard, Samsung Keyboard, Nacre, Typeless,
+                // most others) deliver BackSpace via this method rather
+                // than via sendKeyEvent(KEYCODE_DEL). Forward each DEL to
+                // the PTY. Safe now that primeImeBuffer is gone on the
+                // Canvas path — the IME never sends phantom deletes.
+                val session = shellySession?.terminalSession ?: return super.deleteSurroundingText(beforeLength, afterLength)
+                if (beforeLength > 0) {
+                    val del = ByteArray(beforeLength) { 0x7F }
+                    session.write(del, 0, del.size)
+                }
                 return super.deleteSurroundingText(beforeLength, afterLength)
             }
 

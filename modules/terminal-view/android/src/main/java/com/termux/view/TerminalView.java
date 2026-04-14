@@ -471,14 +471,20 @@ public class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
-                // Never forward deleteSurroundingText to the PTY. Composing
-                // text is now held by the IME (not drawn on the terminal
-                // row), so there is nothing on the PTY to "erase." Real
-                // user BackSpace is delivered through sendKeyEvent with
-                // KEYCODE_DEL — that path writes 0x7F to the PTY via
-                // onKeyDown. Forwarding here would double-delete on every
-                // real backspace AND eat prompt characters on IME buffer
-                // resync.
+                // Most soft keyboards deliver BackSpace through this method,
+                // NOT through sendKeyEvent(KEYCODE_DEL). Forward each DEL
+                // to the PTY so on-screen backspace works. This was safe
+                // to do once primeImeBuffer was removed — there is no
+                // sentinel for the IME to "clean up" any more, so every
+                // deleteSurroundingText call corresponds to a real user
+                // backspace.
+                if (leftLength > 0) {
+                    StringBuilder delSeq = new StringBuilder(leftLength);
+                    for (int i = 0; i < leftLength; i++) {
+                        delSeq.append('\u007F');
+                    }
+                    sendTextToTerminal(delSeq);
+                }
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
 
