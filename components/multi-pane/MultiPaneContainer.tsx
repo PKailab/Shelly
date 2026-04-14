@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
@@ -83,15 +83,25 @@ const emptyStyles = StyleSheet.create({
   },
 });
 
-/** Draggable divider between two panes (12px invisible hit area) */
+/** Draggable divider between two panes.
+ *
+ * Positioned absolutely over the split boundary. We can't use a flex-in-line
+ * divider with a negative margin for the hit area — Yoga / Android hit-testing
+ * uses the layout rect, so a net-zero-width flex slot makes Pan/Tap gestures
+ * unreachable even if the visual grip looks correct. That was bug #30.
+ *
+ * Instead, the parent split gives us the current container pixel size so we
+ * can convert `ratio` to an absolute offset and carve out a real 16px strip
+ * that owns its own hit region.
+ */
 function Divider({
   splitNode,
   isHorizontal,
-  containerSize,
+  splitSize,
 }: {
   splitNode: PaneSplit;
   isHorizontal: boolean;
-  containerSize: React.MutableRefObject<number>;
+  splitSize: number;
 }) {
   const { setSplitRatio, resetSplitRatio } = useMultiPaneStore();
   const startRatio = useRef(splitNode.ratio);
@@ -101,10 +111,9 @@ function Divider({
       startRatio.current = splitNode.ratio;
     })
     .onUpdate((e) => {
-      const size = containerSize.current;
-      if (size <= 0) return;
+      if (splitSize <= 0) return;
       const delta = isHorizontal ? e.translationX : e.translationY;
-      const newRatio = startRatio.current + delta / size;
+      const newRatio = startRatio.current + delta / splitSize;
       setSplitRatio(splitNode.id, newRatio);
     });
 
@@ -117,9 +126,18 @@ function Divider({
 
   const composed = Gesture.Race(pan, doubleTap);
 
+  // Don't render the hit strip until we know the container size — otherwise
+  // the first frame would place the divider at offset -8 which looks glitchy.
+  if (splitSize <= 0) return null;
+
+  const offset = splitNode.ratio * splitSize - 8;
+  const absoluteStyle = isHorizontal
+    ? { position: 'absolute' as const, top: 0, bottom: 0, left: offset, width: 16 }
+    : { position: 'absolute' as const, left: 0, right: 0, top: offset, height: 16 };
+
   return (
     <GestureDetector gesture={composed}>
-      <View style={isHorizontal ? styles.dividerV : styles.dividerH}>
+      <View style={[isHorizontal ? styles.dividerV : styles.dividerH, absoluteStyle]}>
         {/* Accent line + 3-dot handle so the user can see where to grab */}
         <View style={isHorizontal ? styles.dividerVLine : styles.dividerHLine} />
         <View style={isHorizontal ? styles.dividerGripV : styles.dividerGripH}>
@@ -135,7 +153,17 @@ function Divider({
 /** Recursively render the pane tree */
 function PaneTreeNode({ node }: { node: PaneNode }) {
   const { setLeafTab, splitPane, removePane, root, maxPanes } = useMultiPaneStore();
-  const containerSize = useRef(0);
+  // The divider is absolutely positioned, so we need the pixel size of the
+  // split container in state (not a ref) to re-render when it changes.
+  const [splitSize, setSplitSize] = useState(0);
+
+  const isHorizontal = node.type === 'split' && node.direction === 'horizontal';
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    const next = isHorizontal ? width : height;
+    setSplitSize((prev) => (prev === next ? prev : next));
+  }, [isHorizontal]);
 
   if (node.type === 'leaf') {
     const leafCount = root ? countLeavesQuick(root) : 1;
@@ -152,13 +180,6 @@ function PaneTreeNode({ node }: { node: PaneNode }) {
     );
   }
 
-  const isHorizontal = node.direction === 'horizontal';
-
-  const onLayout = useCallback((e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    containerSize.current = isHorizontal ? width : height;
-  }, [isHorizontal]);
-
   return (
     <View
       style={[styles.split, isHorizontal ? styles.splitH : styles.splitV]}
@@ -167,14 +188,14 @@ function PaneTreeNode({ node }: { node: PaneNode }) {
       <View style={{ flex: node.ratio }}>
         <PaneTreeNode node={node.children[0]} />
       </View>
-      <Divider
-        splitNode={node}
-        isHorizontal={isHorizontal}
-        containerSize={containerSize}
-      />
       <View style={{ flex: 1 - node.ratio }}>
         <PaneTreeNode node={node.children[1]} />
       </View>
+      <Divider
+        splitNode={node}
+        isHorizontal={isHorizontal}
+        splitSize={splitSize}
+      />
     </View>
   );
 }
@@ -227,6 +248,10 @@ const styles = StyleSheet.create({
   },
   split: {
     flex: 1,
+    // Divider is absolutely positioned and may extend past the flex row/column
+    // boundary by a few pixels when the grip sits at the very edge. Without
+    // overflow: 'visible' Android would clip the hit region.
+    overflow: 'visible',
   },
   splitH: {
     flexDirection: 'row',
@@ -234,19 +259,15 @@ const styles = StyleSheet.create({
   splitV: {
     flexDirection: 'column',
   },
-  // 16px hit area with a 2px accent line + 3-dot grip centered so the
-  // user can actually find and drag it. Previously a 1px border-color
-  // line in a 12px hitbox, both invisible on a dark background.
+  // 16px hit strip placed absolutely over the split boundary. The inner
+  // accent line + 3-dot grip give the user an obvious place to grab. See
+  // the Divider component for why absolute positioning is required.
   dividerV: {
-    width: 16,
-    marginHorizontal: -8,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
   dividerH: {
-    height: 16,
-    marginVertical: -8,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,

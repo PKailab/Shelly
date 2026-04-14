@@ -235,12 +235,16 @@ export const useMultiPaneStore = create<MultiPaneState & MultiPaneActions>(
         };
         if (countTerminalLeaves(root) >= 2) return;
       }
-      const oldLeaf = makeLeaf(
-        (() => {
-          const f = findNode(root, leafId);
-          return f && f.node.type === 'leaf' ? f.node.tab : 'terminal';
-        })(),
-      );
+      // IMPORTANT: preserve the original leaf id on the "old" side of the
+      // new split. makeLeaf() always mints a fresh id, and the tree's leaf
+      // id drives the React key on PaneSlot plus every native binding
+      // keyed by leafId (AI session uuid, PTY session, WebView instance,
+      // paneAgents registry, focusedPaneId, maximizedPaneId). Re-minting
+      // the id on every split would remount the old pane and silently
+      // wipe its native state — that is bug #29 part 2.
+      const found = findNode(root, leafId);
+      if (!found || found.node.type !== 'leaf') return;
+      const oldLeaf: PaneLeaf = { type: 'leaf', id: leafId, tab: found.node.tab };
       const newLeaf = makeLeaf(newTab);
       const split = makeSplit(direction, oldLeaf, newLeaf);
       const newRoot = replaceNode(cloneTree(root), leafId, split);
