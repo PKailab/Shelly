@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/lib/theme-engine';
+import { fonts as F } from '@/theme.config';
 import { useProfileStore, SSHProfile } from '@/store/profile-store';
 import { useTerminalStore } from '@/store/terminal-store';
 
@@ -242,6 +243,7 @@ export function ProfilesSection() {
 
 const styles = StyleSheet.create({
   emptyText: {
+    fontFamily: F.family,
     fontSize: 11,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -267,12 +269,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileName: {
+    fontFamily: F.family,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   profileHost: {
+    fontFamily: F.family,
     fontSize: 9,
     marginTop: 1,
   },
@@ -288,6 +292,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   actionBtnText: {
+    fontFamily: F.family,
     fontSize: 11,
   },
   // Modal
@@ -304,11 +309,13 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   modalTitle: {
+    fontFamily: F.family,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 16,
   },
   label: {
+    fontFamily: F.family,
     fontSize: 11,
     marginBottom: 4,
     marginTop: 10,
@@ -318,6 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 8,
+    fontFamily: F.family,
     fontSize: 13,
   },
   row2: {

@@ -436,14 +436,14 @@ class ShellyTerminalView(
     }
 
     override fun shouldBackButtonBeMappedToEscape(): Boolean = true
-    // PC-terminal mode: force char-based input so the IME does not start a
-    // composing buffer. Every keystroke reaches the PTY immediately, the
-    // way a desktop terminal emulator behaves. The TerminalView's
-    // onCreateInputConnection branches on this to pick TYPE_NULL /
-    // TYPE_TEXT_VARIATION_VISIBLE_PASSWORD + TYPE_TEXT_FLAG_NO_SUGGESTIONS,
-    // which keeps predictive text, autocorrect, and the candidate-bar
-    // compose path out of the terminal input flow.
-    override fun shouldEnforceCharBasedInput(): Boolean = true
+    // Leave char-based input OFF so TerminalView picks the
+    // TYPE_CLASS_TEXT | NO_SUGGESTIONS branch. This keeps the IME's
+    // composing path alive — Japanese / CJK users can see the in-progress
+    // conversion inline on the PTY row before hitting Enter to confirm,
+    // matching what desktop terminals like iTerm2 and the recent Claude
+    // Code inline-input update do. ASCII symbols still commit immediately
+    // because the IME does not compose them.
+    override fun shouldEnforceCharBasedInput(): Boolean = false
     override fun shouldUseCtrlSpaceWorkaround(): Boolean = false
     override fun isTerminalViewSelected(): Boolean = terminalView.hasFocus()
 

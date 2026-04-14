@@ -353,19 +353,27 @@ public class TerminalView extends View {
             /** Track what composing text is currently on the PTY so we can erase it */
             private String mLastComposingSent = "";
 
-            /**
-             * Re-seed the Editable with a non-empty sentinel so the IME (Gboard
-             * etc.) keeps sending BackSpace through deleteSurroundingText. If
-             * the Editable is empty, Gboard treats BackSpace as a no-op and
-             * silently swallows the key. We use a single ASCII space as the
-             * sentinel and place the cursor after it.
-             */
-            private void primeImeBuffer() {
-                Editable e = getEditable();
-                e.clear();
-                e.append(' ');
-                android.text.Selection.setSelection(e, 1);
-            }
+            // primeImeBuffer() used to seed the Editable with a sentinel ASCII
+            // space so Gboard would not silently swallow BackSpace. That hack
+            // was correct for the old TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            // input type — the IME kept no shadow buffer and the Editable had
+            // to stay non-empty to receive BackSpace.
+            //
+            // With TYPE_CLASS_TEXT | NO_SUGGESTIONS (the current mode used so
+            // inline IME composing is visible on the PTY row), the IME
+            // maintains its own shadow buffer independent of our Editable,
+            // and the sentinel becomes actively harmful:
+            //   1. Paste: Gboard deletes the sentinel via
+            //      deleteSurroundingText(1, 0), which this class forwarded to
+            //      the PTY as DEL — eating the first pasted character.
+            //   2. Paste: Gboard's sentence-start auto-cap fires because the
+            //      sentinel space looks like "end of previous sentence",
+            //      uppercasing subsequent letters.
+            //   3. Enter on a fresh prompt: finishComposingText re-seeds the
+            //      sentinel, Gboard deletes it, and the Enter key travels
+            //      behind the phantom DEL — first press appears to do
+            //      nothing.
+            // All three symptoms disappear if we stop priming the Editable.
 
             private void eraseComposingFromPty() {
                 if (mLastComposingSent.isEmpty()) return;
@@ -387,22 +395,31 @@ public class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: setComposingText(\"" + text + "\", " + newCursorPosition + ")");
                 }
-                String newText = text != null ? text.toString() : "";
-
-                // Simple, reliable path: always erase the previous composing
-                // text from the PTY and send the new full string. The earlier
-                // ASCII delta optimization assumed Gboard's composing buffer
-                // and the PTY echo stayed in lockstep, but in practice they
-                // drift (especially after paste / backspace) and characters
-                // get dropped. JNI fork+exec PTY makes the resend cheap.
-                eraseComposingFromPty();
-                if (!newText.isEmpty()) {
-                    sendTextToTerminal(newText);
-                    mLastComposingSent = newText;
-                }
-                Log.d("ShellyIME", "setComposing text=\"" + newText + "\"");
-
-                mComposingText = "";
+                // Do NOT forward composing text to the PTY. Let the IME own
+                // the in-progress text buffer — the IME's own candidate bar
+                // and inline preview handle visual feedback. The PTY will
+                // receive the final string exactly once through commitText.
+                //
+                // Previous attempts drew the preview directly on the PTY row
+                // (erase-and-rewrite on each compose tick). That produced:
+                //
+                //  1. Double-output with Typeless: the IME calls
+                //     finishComposingText() before the final commitText();
+                //     when commitText arrives the preview is gone from our
+                //     tracking state and the committed string is appended,
+                //     leaving "こんにちはこんにちは" on the row.
+                //  2. Held-back output with Typeless confirm: the IME never
+                //     calls commitText until focus changes / keyboard
+                //     collapses, so the committed text only appears when
+                //     the user dismisses the keyboard.
+                //  3. DEL-erase race: when the compose buffer grows faster
+                //     than the PTY echoes previous DELs, the erase step
+                //     truncates committed characters.
+                //
+                // Termux stock behavior is exactly this: setComposingText
+                // updates the Editable but never writes to the PTY. That is
+                // what we now do here too, just via BaseInputConnection.
+                mComposingText = text != null ? text.toString() : "";
                 return super.setComposingText(text, newCursorPosition);
             }
 
@@ -410,14 +427,23 @@ public class TerminalView extends View {
             public boolean finishComposingText() {
                 Log.d("ShellyIME", "finishComposing prev=\"" + mLastComposingSent + "\"");
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
-                // Composing text is already on the PTY — just clear tracking state
-                mLastComposingSent = "";
+                // IMPORTANT: do NOT clear mLastComposingSent here.
+                //
+                // Some IMEs (Typeless voice-input, Samsung Keyboard CJK flow)
+                // call finishComposingText() *before* the final commitText()
+                // that carries the confirmed text. If we cleared the tracking
+                // state here, commitText would see an empty preview, skip the
+                // erase step, and append the committed string alongside the
+                // still-visible composing preview — producing duplicates like
+                // "こんにちはこんにちは".
+                //
+                // Instead, leave mLastComposingSent intact and let the next
+                // commitText() decide whether to erase+rewrite, or the next
+                // setComposingText() naturally replace it. If no further IME
+                // event arrives, the preview stays on screen — which is OK
+                // because it reflects the user's confirmed text.
                 mComposingText = "";
                 super.finishComposingText();
-                // Re-seed a sentinel so the IME thinks there's still something to
-                // backspace into. clear() here would leave the Editable empty,
-                // and Gboard would silently swallow the next BackSpace press.
-                primeImeBuffer();
                 return true;
             }
 
@@ -427,30 +453,16 @@ public class TerminalView extends View {
                     mClient.logInfo(LOG_TAG, "IME: commitText(\"" + text + "\", " + newCursorPosition + ")");
                 }
                 String commitStr = text != null ? text.toString() : "";
-
-                // Simple, reliable path: erase any in-flight composing from PTY,
-                // then send the committed text. The previous delta-detection
-                // optimization caused dropped characters on paste, leftover state
-                // after backspace, and a "first character missing" bug for the
-                // next input. JNI fork+exec PTY is fast enough that the
-                // erase+resend overhead is invisible.
-                if (!mLastComposingSent.isEmpty()) {
-                    eraseComposingFromPty();
-                }
+                // setComposingText no longer writes to the PTY, so there is
+                // nothing to erase here — just send the final committed
+                // string once. One commit = one PTY write.
                 if (!commitStr.isEmpty()) {
                     sendTextToTerminal(commitStr);
                 }
                 Log.d("ShellyIME", "commit text=\"" + commitStr + "\"");
-
                 mComposingText = "";
                 mLastComposingSent = "";
-                super.commitText(text, newCursorPosition);
-                // Don't clear() — that would leave the Editable empty and Gboard
-                // would stop sending BackSpace through deleteSurroundingText.
-                // Re-seed a sentinel character instead so the IME has something
-                // to "delete back to."
-                primeImeBuffer();
-                return true;
+                return super.commitText(text, newCursorPosition);
             }
 
             @Override
@@ -459,19 +471,15 @@ public class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
-                // Send DEL (0x7F) directly to the terminal session to avoid async
-                // race conditions with sendKeyEvent dispatching through the input pipeline.
-                if (leftLength > 0) {
-                    StringBuilder delSeq = new StringBuilder(leftLength);
-                    for (int i = 0; i < leftLength; i++) {
-                        delSeq.append('\u007F');
-                    }
-                    sendTextToTerminal(delSeq);
-                }
-                boolean result = super.deleteSurroundingText(leftLength, rightLength);
-                // Re-seed so the IME has something to delete on the *next* press.
-                primeImeBuffer();
-                return result;
+                // Never forward deleteSurroundingText to the PTY. Composing
+                // text is now held by the IME (not drawn on the terminal
+                // row), so there is nothing on the PTY to "erase." Real
+                // user BackSpace is delivered through sendKeyEvent with
+                // KEYCODE_DEL — that path writes 0x7F to the PTY via
+                // onKeyDown. Forwarding here would double-delete on every
+                // real backspace AND eat prompt characters on IME buffer
+                // resync.
+                return super.deleteSurroundingText(leftLength, rightLength);
             }
 
             void sendTextToTerminal(CharSequence text) {

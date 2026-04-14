@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { colors as C } from '@/theme.config';
+import { colors as C, fonts as F } from '@/theme.config';
 import {
   View,
   Text,
@@ -455,6 +455,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: '#ECEDEE',
+    fontFamily: F.family,
     fontSize: 15,
     paddingVertical: 4,
   },
@@ -475,10 +476,12 @@ const styles = StyleSheet.create({
   },
   itemLabel: {
     color: '#ECEDEE',
+    fontFamily: F.family,
     fontSize: 14,
   },
   itemHint: {
     color: '#4B5563',
+    fontFamily: F.family,
     fontSize: 11,
     marginTop: 2,
   },
@@ -492,12 +495,14 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     color: '#6B7280',
+    fontFamily: F.family,
     fontSize: 9,
     fontWeight: '600',
     letterSpacing: 0.5,
   },
   emptyText: {
     color: '#4B5563',
+    fontFamily: F.family,
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 24,
@@ -509,6 +514,7 @@ const styles = StyleSheet.create({
   },
   sectionHeaderText: {
     color: '#374151',
+    fontFamily: F.family,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1.2,
@@ -521,6 +527,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     color: '#333',
+    fontFamily: F.family,
     fontSize: 10,
   },
 });

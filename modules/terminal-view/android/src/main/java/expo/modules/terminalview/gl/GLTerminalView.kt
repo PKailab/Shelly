@@ -104,67 +104,58 @@ class GLTerminalView(context: Context) : GLSurfaceView(context) {
 
     // === InputConnection (IME support) ===
     //
-    // We want a "raw PTY" input mode — every keystroke should land in the
-    // terminal as-is, not sit in an IME composition buffer that only
-    // flushes on a finishComposingText() event. Two consequences of the
-    // old path (inputType = TYPE_TEXT_VARIATION_VISIBLE_PASSWORD +
-    // default BaseInputConnection compose handling):
+    // We want the terminal to behave like iTerm2 / gnome-terminal: ASCII
+    // symbols commit instantly, but Japanese / CJK conversion shows its
+    // in-progress candidates inline on the PTY row and only finalizes on
+    // confirm. That is what `TYPE_CLASS_TEXT | NO_SUGGESTIONS` gives us —
+    // IMEs that want to compose still can, but autocorrect and predictive
+    // substitution are suppressed.
     //
-    //   1. Symbols, URLs, paths — anything the IME *doesn't* send
-    //      through its candidate bar — arrived instantly via commitText.
-    //      But letters and kana were held by the IME until the user
-    //      picked a candidate, so they were invisible on the terminal
-    //      until confirmation. Mixed visibility = confusing.
-    //   2. Some IMEs (Samsung Keyboard's predictive mode, swipe input,
-    //      any keyboard that calls setComposingText instead of
-    //      commitText) ended up swallowing the first character on
-    //      paste/auto-correct because commitText was never called for
-    //      the composing run.
-    //
-    // Fix: declare the View as a TYPE_NULL text editor. TYPE_NULL is the
-    // Android-blessed way for terminal emulators to say "I am a dumb
-    // character sink — don't compose, don't autocorrect, don't suggest."
-    // IMEs that respect the flag (Gboard, Samsung Keyboard, Nacre)
-    // will fall back to direct KeyEvent delivery, which is exactly the
-    // behavior this app wants.
-    //
-    // We still override setComposingText / finishComposingText as a
-    // safety net for keyboards that call them anyway — commit the text
-    // immediately instead of buffering.
+    // Per-composing redraw is tracked on the PTY side: each
+    // setComposingText erases the previous compose run, rewrites the new
+    // one, and commitText flushes. See the equivalent block in
+    // TerminalView.java for the Canvas renderer.
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
-        outAttrs.inputType = InputType.TYPE_NULL
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or
-            EditorInfo.IME_FLAG_NO_EXTRACT_UI or
-            EditorInfo.IME_ACTION_NONE
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT or
+            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN
 
         return object : BaseInputConnection(this, true) {
-            override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
-                writeToSession(text)
-                return true
-            }
+            // setComposingText does NOT write to the PTY. The IME owns its
+            // in-progress buffer via the BaseInputConnection Editable; the
+            // candidate bar above the soft keyboard is the user-visible
+            // preview. When the user confirms, the IME calls commitText
+            // with the final string, which we forward to the PTY once.
+            //
+            // The previous approach (draw compose directly on the PTY row,
+            // erase on each re-compose) broke on Typeless (voice input),
+            // which calls finishComposingText *before* the final commitText
+            // and buffers the commit until the keyboard collapses. See the
+            // long comment in TerminalView.java for the full history.
 
-            // If the IME still tries to compose (some keyboards ignore
-            // TYPE_NULL), forward the in-progress text as if it were
-            // already committed. Each keystroke becomes visible on the
-            // terminal immediately — matching the symbol path.
             override fun setComposingText(text: CharSequence, newCursorPosition: Int): Boolean {
-                writeToSession(text)
-                return true
+                return super.setComposingText(text, newCursorPosition)
             }
 
             override fun finishComposingText(): Boolean {
-                // Nothing to do — we already flushed each setComposingText
-                // call. Returning true tells the IME the composition is
-                // accepted.
-                return true
+                return super.finishComposingText()
+            }
+
+            override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
+                val session = shellySession?.terminalSession ?: return false
+                val s = text?.toString() ?: ""
+                if (s.isNotEmpty()) {
+                    val bytes = s.toByteArray(Charsets.UTF_8)
+                    session.write(bytes, 0, bytes.size)
+                }
+                return super.commitText(text, newCursorPosition)
             }
 
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-                val session = shellySession?.terminalSession ?: return false
-                for (i in 0 until beforeLength) {
-                    session.write(byteArrayOf(0x7F), 0, 1) // DEL
-                }
-                return true
+                // Never forward to the PTY. Compose is held by the IME, so
+                // there is nothing on the terminal row to erase. Real
+                // BackSpace arrives through sendKeyEvent(KEYCODE_DEL).
+                return super.deleteSurroundingText(beforeLength, afterLength)
             }
 
             override fun sendKeyEvent(event: KeyEvent): Boolean {
@@ -175,13 +166,6 @@ class GLTerminalView(context: Context) : GLSurfaceView(context) {
                     inputHandler?.onKeyUp(event.keyCode, event) ?: return false
                 }
                 return true
-            }
-
-            private fun writeToSession(text: CharSequence) {
-                if (text.isEmpty()) return
-                val session = shellySession?.terminalSession ?: return
-                val bytes = text.toString().toByteArray(Charsets.UTF_8)
-                session.write(bytes, 0, bytes.size)
             }
         }
     }

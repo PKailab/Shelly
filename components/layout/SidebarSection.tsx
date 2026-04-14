@@ -112,6 +112,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: C.btnPrimaryText,
+    fontFamily: F.family,
     fontSize: F.badge.size,
     fontWeight: F.badge.weight,
   },

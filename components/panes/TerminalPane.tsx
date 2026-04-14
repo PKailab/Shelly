@@ -399,6 +399,25 @@ export default function TerminalScreen() {
     }
   }, [pendingResetId, sessions, resetSession]);
 
+  // Consume pendingCommand writes from the rest of the app (Sidebar profile
+  // rows, Command Palette git/tmux shortcuts, Sidebar Tasks run-now, …).
+  // These sources call useTerminalStore.insertCommand() which stages a
+  // command here; TerminalPane is the only consumer of the channel because
+  // it owns the PTY native session handle. Writes are type-them-don't-run:
+  // the user still has to press Enter (this matches the historical behavior
+  // of the tmux/git palette shortcuts and lets profile rows insert an ssh
+  // command without executing it on devices where Enter is unreliable).
+  const pendingCommand = useTerminalStore((s) => s.pendingCommand);
+  useEffect(() => {
+    if (!pendingCommand) return;
+    if (!activeSession?.nativeSessionId) return;
+    const target = activeSession.nativeSessionId;
+    TerminalEmulator.writeToSession(target, pendingCommand).catch((err) => {
+      console.warn('[Terminal] pendingCommand writeToSession failed:', err);
+    });
+    useTerminalStore.getState().clearPendingCommand();
+  }, [pendingCommand, activeSession?.nativeSessionId]);
+
   // FirstMate disabled — CLI tools are pre-installed, MOTD is sufficient
   // useEffect(() => {
   //   if (isConnected && !firstMateChecked.current) {
