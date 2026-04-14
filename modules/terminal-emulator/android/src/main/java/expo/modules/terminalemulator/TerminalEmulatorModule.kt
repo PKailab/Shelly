@@ -448,5 +448,12 @@ class TerminalEmulatorModule : Module() {
                 "stderr" to stderr
             )
         }
+
+        // Bug #36: read /proc/net/tcp{,6} (or any small procfs file) directly
+        // via in-process fopen. Bypasses bash/LD_PRELOAD which exits=1 on some
+        // devices due to PATH/SELinux/LD_LIBRARY_PATH interactions.
+        AsyncFunction("readProcNetFile") { path: String ->
+            ShellyJNI.readProcNetFile(path)
+        }
     }
 }

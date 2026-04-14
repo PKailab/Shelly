@@ -52,6 +52,9 @@ import { useChatStore } from '@/store/chat-store';
 import { generateId } from '@/lib/id';
 import { BlockList } from '@/components/terminal/BlockList';
 import { execCommand } from '@/hooks/use-native-exec';
+import { parseInput } from '@/lib/input-router';
+import { parseAgentCommand, createAgent } from '@/lib/agent-manager';
+import { suggestTool } from '@/lib/agent-tool-router';
 import { getHomePath } from '@/lib/home-path';
 import { runFirstLaunchSetup } from '@/lib/first-launch-setup';
 import { logInfo, logLifecycle } from '@/lib/debug-logger';
@@ -585,11 +588,63 @@ export default function TerminalScreen() {
             onBlockCompleted={(e) => {
               const { command, output, exitCode } = e.nativeEvent;
               if (command && command.trim()) {
+                const trimmedCmd = command.trim();
+
+                // bug #59: Intercept @mention commands (@agent / @claude / ...)
+                // Bash naturally rejects them ("@agent: command not found") so
+                // we swallow that error and route through Shelly's own layer.
+                // Typing goes straight through the native PTY, so the earliest
+                // JS-visible intercept point is onBlockCompleted — we replace
+                // the failed bash block with a synthetic success block.
+                const parsed = parseInput(trimmedCmd);
+                if (parsed.layer === 'mention' && parsed.target === 'agent') {
+                  const { addEntryBlock, activeSessionId } = useTerminalStore.getState();
+                  let resultMessage: string;
+                  try {
+                    const agentResult = parseAgentCommand(parsed.prompt);
+                    if (agentResult.type === 'create') {
+                      // Natural-language agent creation. Build a minimal agent
+                      // with sensible defaults — the full creation wizard can
+                      // refine this later. Name is derived from the first word
+                      // of the prompt (e.g. "test echo hello" -> "test").
+                      const promptText = agentResult.message;
+                      const firstWord = promptText.split(/\s+/)[0] || 'agent';
+                      const name = firstWord.replace(/[^a-zA-Z0-9_-]/g, '') || `agent-${Date.now().toString(36)}`;
+                      const suggestion = agentResult.data?.suggestion ?? suggestTool(promptText);
+                      const agent = createAgent({
+                        name,
+                        description: promptText.slice(0, 120),
+                        prompt: promptText,
+                        schedule: null,
+                        tool: suggestion.tool,
+                        outputPath: `$HOME/.shelly/agents/${name}/output.md`,
+                      });
+                      resultMessage = `✅ Agent "${agent.name}" registered (${suggestion.label}). Run it with: @agent run ${agent.name}`;
+                    } else {
+                      resultMessage = agentResult.message;
+                    }
+                  } catch (err) {
+                    resultMessage = `[@agent] error: ${err instanceof Error ? err.message : String(err)}`;
+                  }
+                  addEntryBlock({
+                    id: generateId(),
+                    sessionId: activeSessionId ?? '',
+                    command: trimmedCmd,
+                    output: resultMessage.split('\n').map((line: string) => ({ text: line, type: 'stdout' as const })),
+                    timestamp: Date.now(),
+                    exitCode: 0,
+                    isRunning: false,
+                    blockStatus: 'done',
+                    connectionMode: 'native',
+                  });
+                  return;
+                }
+
                 const { addEntryBlock, activeSessionId } = useTerminalStore.getState();
                 addEntryBlock({
                   id: generateId(),
                   sessionId: activeSessionId ?? '',
-                  command: command.trim(),
+                  command: trimmedCmd,
                   output: (output || '').split('\n').map((line: string) => ({ text: line, type: 'stdout' as const })),
                   timestamp: Date.now(),
                   exitCode: typeof exitCode === 'number' ? exitCode : 0,

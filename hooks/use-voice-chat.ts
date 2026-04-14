@@ -330,14 +330,14 @@ export function useVoiceChat() {
     });
   }, []);
 
-  const deactivate = useCallback(() => {
+  const deactivate = useCallback(async () => {
     stopSpeaking();
     abortRef.current?.abort();
     const recording = recordingRef.current;
     recordingRef.current = null;
     if (recording) {
-      // bug #46: release まで確実に走らせる (fire-and-forget)
-      void releaseRecorder(recording);
+      // bug #67: release を await して他アプリのマイク占有を解放
+      await releaseRecorder(recording);
     }
     setState({
       status: 'idle',

@@ -158,6 +158,149 @@
 
 ---
 
+## bug #67 — マイク権限「許可しない」設定で Shelly が再起動する / 音声入力がマイク占有しっぱなし (P1)
+
+**発見**: 2026-04-14 v0.1.0 スモークテスト後の追加報告
+**症状 1 (マイク占有)**: Shelly 起動中に音声入力を 1 回使うと、その後 Shelly がフォアグラウンド / バックグラウンドに関係なく他のアプリ (Typeless など) でマイクが使えなくなる。Typeless のログに「他のアプリでマイクを使用しています」と出る。= Shelly がマイクのリリースを怠っている、または AudioFocus を離していない可能性。
+**症状 2 (権限変更で再起動)**: デバイス設定 → アプリ → Shelly → 権限 → マイクを「許可しない」に変更した瞬間に Shelly プロセスが強制再起動される。これは Android の仕様で権限変更時のプロセス kill が走るため正常動作だが、**作業中の状態 (CLI セッション、履歴) が全部消えるのは致命的**。bug #65 (Immortal Sessions 未実装) と合わさると作業ロストが発生する。
+**ユーザー指摘**: 「許可しないにしたタイミングで、Shelly が再起動してしまう」「CLI を立ち上げた作業中だったらたまったものじゃない」(2026-04-14)
+**疑い**:
+1. `hooks/use-speech-input.ts` / `use-voice-chat.ts` で AudioRecorder.stop() 後の release() を呼び忘れている。前回 releaseRecorder() ヘルパー追加したが一部経路で漏れている可能性。
+2. AudioFocus が `AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE` で取得されたまま release されていない。
+3. マイク権限 revoke 時のプロセス kill は Android の仕様 → bug #65 Immortal Sessions 実装で緩和可能。
+**優先度**: P1 (マイク占有は実用性阻害、権限変更 kill は Immortal Sessions 側で吸収)
+
+---
+
+## bug #66 — Savepoint 自動発火が動作しない (💾バッジが出ない) (P2)
+
+**発見**: 2026-04-14 Phase 5-10 Savepoint スモークテスト
+**症状**: `echo "savepoint test" > ~/save-test.txt` でファイル変更しても SaveBadge / SavepointBubble が一切表示されない。MEMORY.md では 2026-03-22 に実装済み (auto-savepoint.ts / savepoint-store / SaveBadge.tsx) となっているが動いていない。
+**疑い**: Plan B 移行で Termux API (mv/git) を使っていた経路が失われた、またはコマンド完了イベント (onBlockCompleted) のフックが外れているため変更検知が発火しない。
+**優先度**: P2
+
+---
+
+## bug #65 — Immortal Sessions が機能していない (tmux セッション復元されない) (P1)
+
+**発見**: 2026-04-14 Phase 5-9 force-stop → 再起動後の状態確認
+**症状**: force-stop → 再起動後、ターミナル履歴がゼロ。vim セッションも復活せず fresh shell に戻った。MEMORY.md では 2026-03-26 に tmux + bridge で Immortal Sessions 実装済みとなっているが、Plan B 移行 (Termux 除去) で tmux 層が失われた可能性大。
+**疑い**: `~/shelly-bridge/start-shelly.sh` の tmux 起動経路が Termux 依存だったため Plan B で破棄された。現在は libbash.so 単独で fork-exec しているだけで tmux 層なし。
+**優先度**: P1 (主要セールスポイントなので解消必須、ただしリリース後でも可)
+
+---
+
+## bug #64 — force-stop → 再起動後に Pane ヘッダー UI が消失する (P2)
+
+**発見**: 2026-04-14 Phase 5-9 再起動直後
+**症状**: 再起動後、ターミナル Pane の左上にあるはずの ←戻るボタンや 4-pane レイアウトボタンが表示されていない。Settings は残っている。
+**疑い**: 永続化された pane-store の state が復元される前に UI が描画され、レイアウトボタンの描画条件 (`slots.length > 0` など) に到達していない可能性。
+**優先度**: P2
+
+---
+
+## bug #63 — vim から脱出できない (キー入力が swallow される疑い) (P0)
+
+**発見**: 2026-04-14 Phase 5-9 Immortal Sessions スモークテスト
+**症状**: `vim /tmp/test.txt` 実行 → vim が空バッファで起動 ("Type :qa and press <Enter> to exit Vim" メッセージ表示)。キー入力しても `:qa` が打てず脱出不可。
+**ログ観察**: `adb logcat --pid=618` で 15 秒ごとに `ShellyExec: exec FAILED: cat /proc/net/tcp{,6}` が繰り返されているが、vim セッションへの keyDown / InputConnection ログが一切出ていない。
+**疑い**:
+1. bug #58 (ペースト先頭欠落) で `vim ...` が `im ...` などに壊れた可能性
+2. bug #37 修正 (TerminalView.sendKeyEvent で KEYCODE_ESCAPE swallow) が副作用で他のキーコードも飲み込んでいる可能性
+3. vim は alt-buffer モードなので TerminalView 側のモード分岐が壊れている可能性
+**優先度**: P0 (リリースブロッカー — 実用的な終了操作が不可能)
+
+---
+
+## bug #61 — CRT エフェクト全開で色ムラ (ビネット強度過剰) (P2)
+
+**発見**: 2026-04-14 Phase 5-8 Settings スモークテスト
+**症状**: CRT エフェクト intensity 最大にすると画面四隅で輝度差が出すぎ、右上が明るく左下が暗いムラが発生。ユーザー報告「CRT 全開だとムラが出る」。
+**方針**: ビネット係数の上限をクランプ、または intensity スライダーの max を 80% に抑制。
+**優先度**: P2
+
+---
+
+## bug #62 — i18n 言語切替 (EN/JA) が UI に反映されない (P2)
+
+**発見**: 2026-04-14 Phase 5-8 Settings スモークテスト
+**症状**: Settings で言語を切替えても UI の文字が変わった様子がない。ユーザー報告「スクショの状態だと EN と JA の違いがわからん」。
+**疑い**: i18n リソースの切替フックは効いているが、UI 側の大半が英語固定 (Silkscreen フォント由来の大文字化もあり判別困難)、または翻訳キーが両言語で同一。
+**優先度**: P2
+
+---
+
+## bug #60 — Command Blocks の視覚装飾 (セパレータ/バッジ/折りたたみ) が表示されない (P2)
+
+**発見**: 2026-04-14 Phase 5-7 Command Blocks スモークテスト
+**症状**: コマンド実行後の出力がプレーンテキスト表示のみ。MEMORY.md では 2026-04-06 に Kotlin Canvas 版 (BlockChromeRenderer + BlockAnimator) 実装済みだが、現ビルドでは罫線・バッジ・折りたたみ UI が一切描画されない。
+**疑い**: Plan B 移行時に BlockChromeRenderer のフック (onBlockStart / onBlockCompleted) が TerminalSession から外れた、または feature flag が無効。
+**優先度**: P2 (機能としては存在する想定、UX 改善項目)
+
+---
+
+## bug #59 — `@agent` コマンドがインターセプトされず bash に渡される (P1) [根本原因: #60 依存]
+
+**2026-04-15 追加調査結果**: TerminalPane.tsx:588-641 の `onBlockCompleted` フックで既に実装済み (parseInput → parseAgentCommand → createAgent → synthetic success block で置換)。実機で再現するのは `onBlockCompleted` イベント自体が発火していないため = **bug #60 (Command Blocks 装飾なし) と同根**。block event が JS 側に届いていないのが根本原因。#60 を解決すれば #59 も自動的に直る見込み。
+
+**発見**: 2026-04-14 Phase 5 TASKS スモークテスト
+**症状**: ターミナルで `@agent test echo hello` を実行すると `libbash.so: @agent: command not found` が返り、TASKS セクションにも登録されない。MEMORY.md では 2026-04-06 に Background Agents 実装済みとなっているが、ターミナル入力フックが効いていない。
+**疑い**: Plan B 移行時に TerminalView / shelly-exec 経路へ乗り換えた際に `@agent` 前方一致フックが欠落、または tmux/bash セッションが直接受け取るようになった。
+**優先度**: P1
+
+---
+
+## bug #36 — PORTS セクションが listener を検知しない (P1) [再現確認済み]
+
+**発見**: 2026-04-14 Phase 5 PORTS 実地検証
+**症状**: ターミナルで `nc -l -p 8080 &` を起動しても PORTS は "No listeners" のまま。複数回起動試行で `bind: Address already in use` が出ているので実際にはポートが開いているはず。
+**疑い**: `/proc/net/tcp{,6}` パース経路は実装済みだが、(a) 読み取り自体が失敗している (b) UI refresh トリガがない (c) filter 条件が厳しすぎて除外している、のどれか。
+**優先度**: P1
+
+---
+
+## bug #58 — ペースト時に先頭 1 文字目が `:` に置換される (P0 近い)
+
+**発見**: 2026-04-14 Phase 5 PORTS 検知テスト中（既知症状の再現確認）
+**症状**: クリップボードからペーストすると先頭 1 文字目が `:` になる。`python3 -m http.server 8080 &` を貼ると `:ython3 -m http.server 8080 &` 相当になり、bash は行頭の `:`（null command）以降を独立コマンドとして解釈、結果として `python` が消えたように見えて `3 -m ...` が command not found で落ちる。
+**関連**: bug #27 (ペースト末尾 `"` 残留・`\r` 欠落) と同じペースト経路の問題。前回セッションで修正したつもりが未解消。
+**ユーザー指摘**: 「コピペで1文字目が:になるのまだ直ってない」(2026-04-14)
+**影響範囲**: すべてのペースト操作。CLI 実用性に直結する致命的バグ。
+**影響範囲**: すべてのペースト操作。CLI 実用性に直結する致命的バグ。
+**優先度**: P1 (リリース後即修正推奨)
+
+---
+
+## bug #54 — Font picker が Silkscreen 以外反映されない (P1)
+
+**発見**: 2026-04-14 Phase 5 スモークテスト
+**症状**: Settings の Font 切替で Silkscreen (8bit) との差は明確に見えるが、JetBrains Mono など他のフォントに切替えても UI 全体のフォント形状が変わらない。
+**疑い**: 以前の monkey-patch (Text の defaultProps 上書き) が Silkscreen を強制適用しているため、他 preset の値が無視される。または theme-engine 側で font family 値が伝播していない。
+**優先度**: P1
+
+---
+
+## bug #57 — Groq 応答のコードブロックが ActionBlock 化されない (P1)
+
+**発見**: 2026-04-14 Phase 3 AI Edit golden path スモークテスト中
+**症状**: Cerebras がレート制限 → Groq にフォールバック、Groq は正しく ```echo "hello shelly" > ~/test-edit.txt``` を含む応答を返すが、ChatBubble に「実行 / Apply」ボタンが一切表示されない。コードブロックが普通の markdown として描画されているだけ。
+**疑い**: bug #39/#40 の AI Edit ActionBlock 実装が Cerebras 経路のみで Groq 経路にフックが入っていない。`parse-code-blocks` → ActionBlock 変換ルートの provider 分岐要確認。
+**影響範囲**: Groq を選んでいるユーザー全員 AI Edit 使えない。Cerebras 一択になる。
+**優先度**: P1
+
+---
+
+## bug #56 — ペイン内コンテンツがペインサイズに最適化されない (P1)
+
+**発見**: 2026-04-14 Phase 2 4-pane preset スモークテスト中
+**症状**: 4-pane (2×2) に分割したとき、各ペイン (Terminal / Browser / AI Chat / Markdown) の中身が小さい幅・高さにリフローしない。フォントサイズ・パディング・カラム数が固定で、コンテンツが溢れる / はみ出す。
+**影響範囲**: 全ペインタイプ共通の可能性あり。特に 4-pane 時の視認性が悪い。
+**関連**: #51 (theme presets) / #52・#53 (preview pane) / #54 (font picker) / #55 (theme switch 残留) と一緒にビジュアル系まとめ対応推奨。
+**方針候補**: 親サイズ検知 → フォント段階縮小、密度プリセット (compact/normal)、または子コンポーネント側で onLayout → 自身の親サイズ追従に切替。
+**優先度**: P1 (リリース後の品質改善バッチで対応)
+
+---
+
 ## History
 
 - **2026-04-14**: 初版作成。v0.1.0 スモークテスト中の発見を整理。コードレビュー / セキュリティ / アーキテクチャ / A11y / 競合 5 エージェントの指摘のうち、出荷ブロッカーではない項目をすべて P1-P3 に振り分け。

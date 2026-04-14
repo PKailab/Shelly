@@ -1,6 +1,7 @@
 // components/layout/Sidebar.tsx
 import React, { useState, useEffect } from 'react';
 import { execCommand } from '@/hooks/use-native-exec';
+import TerminalEmulator from '@/modules/terminal-emulator/src/TerminalEmulatorModule';
 import { useGitStatusStore } from '@/store/git-status-store';
 import { usePortsStore, parseProcNet, portLabel } from '@/store/ports-store';
 import {
@@ -81,12 +82,15 @@ export function Sidebar() {
     const setEntries = usePortsStore.getState().setEntries;
     let cancelled = false;
     const refresh = async () => {
+      // bug #36: shelling out to `cat /proc/net/tcp*` through libbash
+      // + LD_PRELOAD fails with exit=1 on some devices. Read the files
+      // directly in-process via JNI fopen instead — same data, no shell.
       const [v4, v6] = await Promise.all([
-        execCommand('cat /proc/net/tcp 2>/dev/null', 3_000),
-        execCommand('cat /proc/net/tcp6 2>/dev/null', 3_000),
+        TerminalEmulator.readProcNetFile('/proc/net/tcp').catch(() => ''),
+        TerminalEmulator.readProcNetFile('/proc/net/tcp6').catch(() => ''),
       ]);
       if (cancelled) return;
-      setEntries(parseProcNet(v4.stdout || '', v6.stdout || ''));
+      setEntries(parseProcNet(v4 || '', v6 || ''));
     };
     refresh();
     const iv = setInterval(refresh, 15_000);

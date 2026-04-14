@@ -422,7 +422,7 @@ export const CommandInput = forwardRef<CommandInputHandle, Props>(function Comma
 
   const handleMicToggle = useCallback(async () => {
     if (speechState.status === 'recording') {
-      stopRecording();
+      await stopRecording();
     } else if (speechState.status === 'idle') {
       startRecording();
     }

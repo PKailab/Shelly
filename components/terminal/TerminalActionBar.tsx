@@ -75,7 +75,7 @@ export function TerminalActionBar({ copyFileToCwd, sendText, onVoiceDialog }: Pr
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     if (speechState.status === 'recording') {
-      stopRecording();
+      await stopRecording();
     } else if (speechState.status === 'idle') {
       startRecording();
     }

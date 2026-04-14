@@ -314,3 +314,67 @@ release_strings:
     if (command)    (*env)->ReleaseStringUTFChars(env, commandJ,    command);
     return NULL;
 }
+
+/*
+ * readProcNetFile — read a small procfs file (e.g. /proc/net/tcp6) directly
+ * via fopen in-process. Works around bug #36: shelling out to `cat` via
+ * bash+LD_PRELOAD fails with exit=1 on some devices due to PATH/SELinux/
+ * LD_LIBRARY_PATH interactions, but fopen() from the app process itself
+ * has no such constraint — the app's own uid can read /proc/net/tcp{,6}
+ * (the kernel filters rows by uid so we only see this app's sockets).
+ *
+ * Returns the file contents as a Java String, or an empty string on any
+ * error (file missing, permission denied, etc.). Never throws.
+ */
+JNIEXPORT jstring JNICALL
+Java_expo_modules_terminalemulator_ShellyJNI_readProcNetFile(
+        JNIEnv *env,
+        jclass  clazz __attribute__((unused)),
+        jstring pathJ)
+{
+    if (!pathJ) return (*env)->NewStringUTF(env, "");
+    const char *path = (*env)->GetStringUTFChars(env, pathJ, NULL);
+    if (!path) return (*env)->NewStringUTF(env, "");
+
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        LOGE("readProcNetFile: fopen(%s) failed: %s", path, strerror(errno));
+        (*env)->ReleaseStringUTFChars(env, pathJ, path);
+        return (*env)->NewStringUTF(env, "");
+    }
+
+    /* /proc/net/tcp{,6} is typically well under 64 KiB; grow if needed. */
+    size_t cap = 65536;
+    size_t len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) {
+        fclose(f);
+        (*env)->ReleaseStringUTFChars(env, pathJ, path);
+        return (*env)->NewStringUTF(env, "");
+    }
+
+    for (;;) {
+        if (len + 1 >= cap) {
+            size_t newCap = cap * 2;
+            if (newCap > MAX_OUTPUT) newCap = MAX_OUTPUT;
+            if (newCap <= cap) break; /* hit ceiling */
+            char *tmp = (char *)realloc(buf, newCap);
+            if (!tmp) break;
+            buf = tmp;
+            cap = newCap;
+        }
+        size_t want = cap - len - 1;
+        size_t n = fread(buf + len, 1, want, f);
+        len += n;
+        if (n < want) break; /* EOF or error */
+    }
+    buf[len] = '\0';
+    fclose(f);
+
+    LOGI("readProcNetFile: %s -> %zu bytes", path, len);
+
+    jstring result = (*env)->NewStringUTF(env, buf);
+    free(buf);
+    (*env)->ReleaseStringUTFChars(env, pathJ, path);
+    return result;
+}

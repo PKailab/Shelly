@@ -22,6 +22,7 @@ import { useI18n } from '@/lib/i18n';
 import { colors as C, fonts as F, sizes as S, radii as R } from '@/theme.config';
 import { McpSectionWrapper } from '@/components/settings/McpSectionWrapper';
 import { LlamaCppSectionWrapper } from '@/components/settings/LlamaCppSectionWrapper';
+import { applyThemePreset } from '@/lib/theme-presets';
 
 type Props = {
   visible: boolean;
@@ -244,7 +245,16 @@ function FontFamilyRow() {
             <Pressable
               key={opt.value}
               style={[styles.segBtn, active && styles.segBtnActive]}
-              onPress={() => updateSettings({ uiFont: opt.value })}
+              onPress={() => {
+                // Apply synchronously so the live `colors` object + Text
+                // monkey-patch flip BEFORE React re-renders from the
+                // settings-store update. Without this explicit call we
+                // relied on RootLayout's useEffect, which can race with
+                // the AsyncStorage write in updateSettings and leaves the
+                // UI stuck on the previous font (bug #28/#54).
+                applyThemePreset(opt.value);
+                updateSettings({ uiFont: opt.value });
+              }}
               hitSlop={4}
             >
               <Text style={[styles.segLabel, active && styles.segLabelActive]}>
@@ -281,7 +291,12 @@ function ThemeRow() {
             <Pressable
               key={opt.value}
               style={[styles.segBtn, active && styles.segBtnActive]}
-              onPress={() => updateSettings({ uiFont: opt.value })}
+              onPress={() => {
+                // See FontFamilyRow — apply synchronously to avoid the
+                // AsyncStorage race that caused bug #28/#54.
+                applyThemePreset(opt.value);
+                updateSettings({ uiFont: opt.value });
+              }}
               hitSlop={4}
             >
               <Text style={[styles.segLabel, active && styles.segLabelActive]}>

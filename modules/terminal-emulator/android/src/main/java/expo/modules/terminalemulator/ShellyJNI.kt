@@ -40,4 +40,13 @@ object ShellyJNI {
         command: String,
         timeoutMs: Int
     ): Array<String>
+
+    /**
+     * Read a small procfs file (e.g. /proc/net/tcp{,6}) directly via fopen
+     * in-process. Works around bug #36 where shelling out to `cat` via
+     * bash+LD_PRELOAD fails with exit=1 on some devices. Returns an empty
+     * string on any error. Never throws.
+     */
+    @JvmStatic
+    external fun readProcNetFile(path: String): String
 }

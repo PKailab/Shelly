@@ -112,6 +112,16 @@ public class TerminalView extends View {
     int mCombiningAccent;
 
     /**
+     * IME shadow buffer — tracks characters we've committed to the PTY but
+     * haven't yet seen a newline for. Shared between the BaseInputConnection
+     * subclass (normal IME path) and onTouchEvent middle-button paste so both
+     * paths keep the delete-storm guard in sync. See bug #58.
+     */
+    final StringBuilder mImeShadow = new StringBuilder();
+    /** Timestamp of the last commit flushed from any path (IME or paste). */
+    long mLastImeCommitAt = 0;
+
+    /**
      * The current AutoFill type returned for {@link View#getAutofillType()} by {@link #getAutofillType()}.
      *
      * The default is {@link #AUTOFILL_TYPE_NONE} so that AutoFill UI, like toolbar above keyboard
@@ -410,11 +420,20 @@ public class TerminalView extends View {
             // not-yet-newlined* characters. It resets on \n / \r because
             // at that point the bash line editor owns the buffer, not us.
 
-            private final StringBuilder mShadow = new StringBuilder();
+            // mShadow is promoted to the outer TerminalView class (mImeShadow)
+            // so that non-IME paste paths (middle-button paste, JS-side paste)
+            // can keep it in sync. See bug #58.
             /** Current compose run (what setComposingText last received) */
             private String mComposingRun = "";
-            /** Timestamps used to detect IME DEL storms */
-            private long mLastCommitAt = 0;
+            /**
+             * The last string flushed by finishComposingText(). Used by
+             * commitText() to suppress the Typeless/Samsung double-flush
+             * where the IME calls finishComposingText immediately followed
+             * by commitText with the same payload. See bug #27.
+             * Cleared after one commitText consumes it.
+             */
+            private String mLastFinishFlush = "";
+            // mLastCommitAt is promoted to TerminalView.mLastImeCommitAt for the same reason.
             private long mLastDeleteAt = 0;
             private int mDeleteBurst = 0;
             /** Window (ms) after a commit during which DELs are treated as IME resync, not user BS */
@@ -427,9 +446,9 @@ public class TerminalView extends View {
                 // last newline in the flushed text.
                 int idx = Math.max(text.lastIndexOf('\n'), text.lastIndexOf('\r'));
                 if (idx < 0) return;
-                mShadow.setLength(0);
+                mImeShadow.setLength(0);
                 if (idx + 1 < text.length()) {
-                    mShadow.append(text, idx + 1, text.length());
+                    mImeShadow.append(text, idx + 1, text.length());
                 }
             }
 
@@ -438,9 +457,9 @@ public class TerminalView extends View {
                 sendTextToTerminal(text);
                 // Track what we just sent in the shadow so future
                 // deleteSurroundingText calls can consume from it.
-                mShadow.append(text);
+                mImeShadow.append(text);
                 resetShadowAfterNewline(text);
-                mLastCommitAt = android.os.SystemClock.uptimeMillis();
+                mLastImeCommitAt = android.os.SystemClock.uptimeMillis();
                 mDeleteBurst = 0;
             }
 
@@ -470,6 +489,7 @@ public class TerminalView extends View {
                 // collapses.
                 if (!mComposingRun.isEmpty()) {
                     Log.d("ShellyIME", "finishComposing flush=\"" + mComposingRun + "\"");
+                    mLastFinishFlush = mComposingRun;
                     sendToPtyAndShadow(mComposingRun);
                     mComposingRun = "";
                 }
@@ -485,14 +505,20 @@ public class TerminalView extends View {
                 }
                 String commitStr = text != null ? text.toString() : "";
 
-                // If the IME already flushed the same string via
-                // finishComposingText immediately before this commitText
-                // (the Typeless double-path), don't flush it twice.
-                if (!commitStr.isEmpty()) {
+                // GUARD #27: If finishComposingText() already flushed the same
+                // string (Typeless/Samsung double-path), don't send twice.
+                // The previous version compared against non-empty only, which
+                // still double-fired when the IME called finishComposingText
+                // followed immediately by commitText with the same run, eating
+                // the trailing Enter/quote characters from pasted text.
+                if (!commitStr.isEmpty() && commitStr.equals(mLastFinishFlush)) {
+                    Log.d("ShellyIME", "commit SUPPRESSED (already flushed via finishComposing) =\"" + commitStr + "\"");
+                } else if (!commitStr.isEmpty()) {
                     Log.d("ShellyIME", "commit=\"" + commitStr + "\"");
                     sendToPtyAndShadow(commitStr);
                 }
 
+                mLastFinishFlush = "";
                 mComposingRun = "";
                 mComposingText = "";
                 return super.commitText(text, newCursorPosition);
@@ -520,15 +546,15 @@ public class TerminalView extends View {
                 // backspace: soft keyboards auto-repeat at roughly 50ms
                 // intervals, which look identical to an IME DEL storm.
                 long now = android.os.SystemClock.uptimeMillis();
-                boolean justCommitted = now - mLastCommitAt < IME_RESYNC_WINDOW_MS;
+                boolean justCommitted = now - mLastImeCommitAt < IME_RESYNC_WINDOW_MS;
                 boolean composing = !mComposingRun.isEmpty();
 
                 if (justCommitted || composing) {
                     Log.d("ShellyIME", "deleteSurrounding SWALLOW left=" + leftLength
                         + " justCommitted=" + justCommitted + " composing=" + composing);
                     // Drop from shadow so the shadow stays in sync.
-                    int drop = Math.min(leftLength, mShadow.length());
-                    if (drop > 0) mShadow.setLength(mShadow.length() - drop);
+                    int drop = Math.min(leftLength, mImeShadow.length());
+                    if (drop > 0) mImeShadow.setLength(mImeShadow.length() - drop);
                     return super.deleteSurroundingText(leftLength, rightLength);
                 }
 
@@ -540,8 +566,8 @@ public class TerminalView extends View {
                     }
                     sendTextToTerminal(delSeq);
                 }
-                int drop = Math.min(leftLength, mShadow.length());
-                if (drop > 0) mShadow.setLength(mShadow.length() - drop);
+                int drop = Math.min(leftLength, mImeShadow.length());
+                if (drop > 0) mImeShadow.setLength(mImeShadow.length() - drop);
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
 
@@ -847,7 +873,22 @@ public class TerminalView extends View {
                     ClipData.Item clipItem = clipData.getItemAt(0);
                     if (clipItem != null) {
                         CharSequence text = clipItem.coerceToText(getContext());
-                        if (!TextUtils.isEmpty(text)) mEmulator.paste(text.toString());
+                        if (!TextUtils.isEmpty(text)) {
+                            // FIX #58: Update shadow buffer and commit timestamp so the
+                            // subsequent IME deleteSurroundingText() resync storm
+                            // (justCommitted=false path) doesn't eat the first pasted char.
+                            String pasted = text.toString();
+                            mLastImeCommitAt = android.os.SystemClock.uptimeMillis();
+                            mImeShadow.append(pasted);
+                            int nl = Math.max(pasted.lastIndexOf('\n'), pasted.lastIndexOf('\r'));
+                            if (nl >= 0) {
+                                mImeShadow.setLength(0);
+                                if (nl + 1 < pasted.length()) {
+                                    mImeShadow.append(pasted, nl + 1, pasted.length());
+                                }
+                            }
+                            mEmulator.paste(pasted);
+                        }
                     }
                 }
             } else if (mEmulator.isMouseTrackingActive()) { // BUTTON_PRIMARY.
