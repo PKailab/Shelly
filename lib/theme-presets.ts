@@ -19,7 +19,7 @@ import { Text } from 'react-native';
 // Text.render once so the injected fontFamily lives at the head of the
 // style array — explicit per-site styles still win if they specify
 // fontFamily themselves, but the default covers every unspecified case.
-let currentFontFamily = 'Silkscreen';
+let currentFontFamily = 'JetBrainsMono_400Regular';
 let textRenderPatched = false;
 function patchTextRenderOnce() {
   if (textRenderPatched) return;
@@ -408,15 +408,19 @@ export const tokyoNightPalette: Palette = {
   diffRemoveBorder: '#F7768E',
 };
 
+// NOTE: after bug #28, every preset except the explicit 'silkscreen' /
+// 'pixel' opt-ins defaults to JetBrainsMono_400Regular so lowercase UI
+// text renders as lowercase. The Silkscreen preset still ships for users
+// who want the original aesthetic, but it is no longer the default.
 export const themePresets: Record<ThemePresetId, ThemePreset> = {
-  shelly:       { id: 'shelly',       font: 'Silkscreen',   colors: shellyPalette },
-  silkscreen:   { id: 'silkscreen',   font: 'Silkscreen',   colors: silkscreenPalette },
-  pixel:        { id: 'pixel',        font: 'PressStart2P', colors: silkscreenPalette },
-  mono:         { id: 'mono',         font: 'monospace',    colors: silkscreenPalette },
-  dracula:      { id: 'dracula',      font: 'Silkscreen',   colors: draculaPalette },
-  nord:         { id: 'nord',         font: 'Silkscreen',   colors: nordPalette },
-  gruvbox:      { id: 'gruvbox',      font: 'Silkscreen',   colors: gruvboxPalette },
-  'tokyo-night':{ id: 'tokyo-night',  font: 'Silkscreen',   colors: tokyoNightPalette },
+  shelly:       { id: 'shelly',       font: 'JetBrainsMono_400Regular', colors: shellyPalette },
+  silkscreen:   { id: 'silkscreen',   font: 'Silkscreen',               colors: silkscreenPalette },
+  pixel:        { id: 'pixel',        font: 'PressStart2P',             colors: silkscreenPalette },
+  mono:         { id: 'mono',         font: 'JetBrainsMono_400Regular', colors: silkscreenPalette },
+  dracula:      { id: 'dracula',      font: 'JetBrainsMono_400Regular', colors: draculaPalette },
+  nord:         { id: 'nord',         font: 'JetBrainsMono_400Regular', colors: nordPalette },
+  gruvbox:      { id: 'gruvbox',      font: 'JetBrainsMono_400Regular', colors: gruvboxPalette },
+  'tokyo-night':{ id: 'tokyo-night',  font: 'JetBrainsMono_400Regular', colors: tokyoNightPalette },
 };
 
 // ── Runtime apply ──────────────────────────────────────────────────

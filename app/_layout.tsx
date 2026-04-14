@@ -11,6 +11,7 @@ import "react-native-reanimated";
 import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import { Silkscreen_400Regular, Silkscreen_700Bold } from "@expo-google-fonts/silkscreen";
+import { JetBrainsMono_400Regular, JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono";
 import { useTerminalStore } from "@/store/terminal-store";
 import { useSoundStore, unloadSounds } from "@/lib/sounds";
 import { loadAgentsFromDisk } from "@/lib/agent-manager";
@@ -35,10 +36,10 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 const ebStyles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D1117', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  title: { color: '#F85149', fontSize: 20, fontWeight: '700', fontFamily: 'Silkscreen', marginBottom: 12 },
-  message: { color: '#8B949E', fontSize: 14, fontFamily: 'Silkscreen', textAlign: 'center', marginBottom: 24 },
+  title: { color: '#F85149', fontSize: 20, fontWeight: '700', fontFamily: 'JetBrainsMono_400Regular', marginBottom: 12 },
+  message: { color: '#8B949E', fontSize: 14, fontFamily: 'JetBrainsMono_400Regular', textAlign: 'center', marginBottom: 24 },
   button: { backgroundColor: '#21262D', borderWidth: 1, borderColor: '#30363D', borderRadius: 8, paddingHorizontal: 24, paddingVertical: 12 },
-  buttonText: { color: '#C9D1D9', fontSize: 14, fontFamily: 'Silkscreen', fontWeight: '600' },
+  buttonText: { color: '#C9D1D9', fontSize: 14, fontFamily: 'JetBrainsMono_400Regular', fontWeight: '600' },
 });
 
 export const unstable_settings = {
@@ -56,6 +57,13 @@ export default function RootLayout() {
     // path — Metro can't resolve that through the package subpath).
     'Silkscreen': Silkscreen_400Regular,
     'Silkscreen-Bold': Silkscreen_700Bold,
+    // JetBrains Mono — default UI font replacing Silkscreen. Silkscreen
+    // renders lowercase code points with uppercase glyphs (Google Fonts
+    // design), which made every lowercase UI label read as shouting.
+    // JetBrains Mono gives us real lowercase, keeps the monospace feel
+    // across terminal + UI, and avoids shipping yet another font file.
+    'JetBrainsMono_400Regular': JetBrainsMono_400Regular,
+    'JetBrainsMono_700Bold': JetBrainsMono_700Bold,
   });
   const uiFont = useSettingsStore((s) => s.settings.uiFont ?? 'shelly');
   const loadSettings = useTerminalStore((s) => s.loadSettings);

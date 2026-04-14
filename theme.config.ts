@@ -80,9 +80,11 @@ export const colors = {
 // ─── Fonts ──────────────────────────────────────────────────────────────────
 
 export const fonts = {
-  // Default UI font — matches the mock's pixel aesthetic while staying
-  // readable at small sizes. Users can override via Settings → Display → Font.
-  family: 'Silkscreen',
+  // Default UI font — JetBrains Mono for real lowercase glyphs and a
+  // shared aesthetic with the terminal. Silkscreen used to be the default
+  // but renders lowercase as uppercase by design (bug #28). Users can
+  // override via Settings → Display → Font.
+  family: 'JetBrainsMono_400Regular',
 
   // PressStart2P is an 8x8 pixel font, so each unit reads about 1.4× a normal
   // monospace pixel. These sizes were tuned down from 10/9/8 because the

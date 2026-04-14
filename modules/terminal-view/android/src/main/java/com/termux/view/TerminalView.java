@@ -504,28 +504,34 @@ public class TerminalView extends View {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
                 // Forward DELs to the PTY — this is the path soft keyboards
-                // use for backspace. But reject IME "resync storms" that
-                // happen immediately after a commit or during an active
-                // compose. Those are the IME trying to reset its shadow
-                // buffer, not the user holding backspace.
+                // use for backspace. Reject only the two specific IME-init
+                // patterns we've caught in logcat:
+                //
+                //   (a) DELs fired within the 250ms window right after a
+                //       commit. That's the Nacre/Gboard resync storm that
+                //       was erasing 25 characters of prompt text when the
+                //       user first tapped the terminal.
+                //   (b) DELs fired while a compose run is active. Those
+                //       are IME buffer re-alignments, not user intent.
+                //
+                // Everything else is forwarded, including long-press BS
+                // bursts. The previous "bursting >= 3 within 80ms" heuristic
+                // was removed because it also blocked real long-press
+                // backspace: soft keyboards auto-repeat at roughly 50ms
+                // intervals, which look identical to an IME DEL storm.
                 long now = android.os.SystemClock.uptimeMillis();
                 boolean justCommitted = now - mLastCommitAt < IME_RESYNC_WINDOW_MS;
                 boolean composing = !mComposingRun.isEmpty();
-                boolean bursting = (now - mLastDeleteAt) < 80 && mDeleteBurst >= 3;
 
-                if (justCommitted || composing || bursting) {
+                if (justCommitted || composing) {
                     Log.d("ShellyIME", "deleteSurrounding SWALLOW left=" + leftLength
-                        + " justCommitted=" + justCommitted + " composing=" + composing + " bursting=" + bursting);
-                    mDeleteBurst++;
-                    mLastDeleteAt = now;
-                    // Also drop from shadow so the shadow stays in sync.
+                        + " justCommitted=" + justCommitted + " composing=" + composing);
+                    // Drop from shadow so the shadow stays in sync.
                     int drop = Math.min(leftLength, mShadow.length());
                     if (drop > 0) mShadow.setLength(mShadow.length() - drop);
                     return super.deleteSurroundingText(leftLength, rightLength);
                 }
 
-                mDeleteBurst++;
-                mLastDeleteAt = now;
                 Log.d("ShellyIME", "deleteSurrounding FORWARD left=" + leftLength);
                 if (leftLength > 0) {
                     StringBuilder delSeq = new StringBuilder(leftLength);
@@ -534,7 +540,6 @@ public class TerminalView extends View {
                     }
                     sendTextToTerminal(delSeq);
                 }
-                // Also shrink the shadow.
                 int drop = Math.min(leftLength, mShadow.length());
                 if (drop > 0) mShadow.setLength(mShadow.length() - drop);
                 return super.deleteSurroundingText(leftLength, rightLength);
