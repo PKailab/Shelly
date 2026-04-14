@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMultiPaneStore, type PaneNode, type PaneSplit, type PaneLeaf } from '@/hooks/use-multi-pane';
 import { PaneSlot } from './PaneSlot';
@@ -104,24 +105,50 @@ function Divider({
   splitSize: number;
 }) {
   const { setSplitRatio, resetSplitRatio } = useMultiPaneStore();
-  const startRatio = useRef(splitNode.ratio);
+  const startRatioRef = useRef(splitNode.ratio);
+
+  // Gesture.Pan() callbacks run on the UI thread as worklets in RNGH 2.x.
+  // Calling a plain JS function (Zustand's setSplitRatio) from a worklet
+  // throws "Object is not a function" because the JS reference isn't
+  // reachable from the UI runtime. We pre-declare tiny JS-thread helpers
+  // and wrap them with runOnJS so the UI thread queues the mutation
+  // back onto the JS thread.
+  const handleBegin = (start: number) => {
+    startRatioRef.current = start;
+  };
+  const handleUpdate = (id: string, delta: number, size: number) => {
+    if (size <= 0) return;
+    const newRatio = startRatioRef.current + delta / size;
+    setSplitRatio(id, newRatio);
+  };
+  const handleReset = (id: string) => {
+    resetSplitRatio(id);
+  };
+
+  // Capture props into plain constants so the worklet closure doesn't
+  // dereference React refs or hook return values across the UI bridge.
+  const splitId = splitNode.id;
+  const startRatio = splitNode.ratio;
+  const size = splitSize;
+  const horizontal = isHorizontal;
 
   const pan = Gesture.Pan()
     .onBegin(() => {
-      startRatio.current = splitNode.ratio;
+      'worklet';
+      runOnJS(handleBegin)(startRatio);
     })
     .onUpdate((e) => {
-      if (splitSize <= 0) return;
-      const delta = isHorizontal ? e.translationX : e.translationY;
-      const newRatio = startRatio.current + delta / splitSize;
-      setSplitRatio(splitNode.id, newRatio);
+      'worklet';
+      const delta = horizontal ? e.translationX : e.translationY;
+      runOnJS(handleUpdate)(splitId, delta, size);
     });
 
   // Double-tap = reset to 50/50
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onEnd(() => {
-      resetSplitRatio(splitNode.id);
+      'worklet';
+      runOnJS(handleReset)(splitId);
     });
 
   const composed = Gesture.Race(pan, doubleTap);
