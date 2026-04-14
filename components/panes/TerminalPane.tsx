@@ -449,7 +449,12 @@ export default function TerminalScreen() {
   // settings store hasn't loaded yet. Compact screens (Z Fold6 cover ~ 373dp)
   // shave one extra step.
   const termFontSize = (() => {
-    const base = settings.fontSize ?? 12;
+    // Default to M (14) instead of S (12) because:
+    // (a) S = 7px Silkscreen is too small for most phone screens,
+    // (b) CJK (Noto fallback) reads more naturally at the M cell size,
+    // (c) users reported S feels "too small" in field testing.
+    // Users who want compact can still pick S in Settings.
+    const base = settings.fontSize ?? 14;
     // settings.fontSize comes in as 12/14/16 from the S/M/L preset.
     // Widened from the previous 8/10/12 mapping (users said fontSize
     // button had no visible effect) so each step is clearly distinct.
