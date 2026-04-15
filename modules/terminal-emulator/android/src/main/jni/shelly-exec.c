@@ -228,7 +228,18 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
         }
         if (ret == 0) continue; /* timeout on select, loop will check deadline */
 
-        /* Read stdout */
+        /* Read stdout.
+         *
+         * bug #70: the previous version treated any `n <= 0` as EOF, which
+         * misclassified EAGAIN/EWOULDBLOCK (transient empty-pipe state on a
+         * non-blocking fd) as end-of-stream. On devices where the child
+         * takes a beat to write before closing (common with bash + tiny
+         * commands like `git status | wc -l`), the parent would read once,
+         * see nothing, flag EOF, and return exitCode=0 + stdout="" while
+         * the child was still mid-flight. The fix is to only flag EOF on
+         * a genuine read=0 return; treat n<0 with EAGAIN/EWOULDBLOCK/EINTR
+         * as "try again next select tick".
+         */
         if (!stdout_eof && FD_ISSET(stdout_pipe[0], &rfds)) {
             if (stdout_len >= stdout_cap) {
                 stdout_cap *= 2;
@@ -237,8 +248,16 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
             }
             ssize_t n = read(stdout_pipe[0], stdout_buf + stdout_len,
                            (stdout_cap - stdout_len > 4096) ? 4096 : stdout_cap - stdout_len);
-            if (n <= 0) stdout_eof = 1;
-            else stdout_len += n;
+            if (n == 0) {
+                stdout_eof = 1;
+            } else if (n < 0) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                    stdout_eof = 1;
+                }
+                /* else: spurious wake, retry on next select tick */
+            } else {
+                stdout_len += n;
+            }
         }
 
         /* Read stderr */
@@ -250,8 +269,15 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
             }
             ssize_t n = read(stderr_pipe[0], stderr_buf + stderr_len,
                            (stderr_cap - stderr_len > 4096) ? 4096 : stderr_cap - stderr_len);
-            if (n <= 0) stderr_eof = 1;
-            else stderr_len += n;
+            if (n == 0) {
+                stderr_eof = 1;
+            } else if (n < 0) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                    stderr_eof = 1;
+                }
+            } else {
+                stderr_len += n;
+            }
         }
     }
 
