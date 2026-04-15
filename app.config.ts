@@ -41,7 +41,19 @@ const config: ExpoConfig & { android?: any } = {
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
     // usesCleartextTraffic now handled by plugins/with-android-security.js (localhost only)
-    permissions: ["POST_NOTIFICATIONS", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_SPECIAL_USE"],
+    // bug #92: MANAGE_EXTERNAL_STORAGE allows the terminal to read scripts
+    // and files that the user adb push'es to /sdcard/Download. Without this,
+    // Scoped Storage (targetSdk 30+) blocks direct open() on /sdcard paths
+    // and the "push a script, source it from the shell" workflow is broken.
+    // We request it at first run via Environment.isExternalStorageManager().
+    // Shelly is distributed via GitHub Releases / F-Droid (not Play Store),
+    // so the all-files-access restriction does not apply.
+    permissions: [
+      "POST_NOTIFICATIONS",
+      "FOREGROUND_SERVICE",
+      "FOREGROUND_SERVICE_SPECIAL_USE",
+      "MANAGE_EXTERNAL_STORAGE",
+    ],
     intentFilters: [
       {
         action: "VIEW",

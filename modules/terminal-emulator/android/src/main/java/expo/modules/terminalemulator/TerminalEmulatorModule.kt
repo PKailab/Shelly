@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
@@ -263,6 +264,47 @@ class TerminalEmulatorModule : Module() {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(intent)
+            }
+            null
+        }
+
+        // bug #92: MANAGE_EXTERNAL_STORAGE permission check + Settings launcher.
+        // Android 11+ (API 30) gates /sdcard read/write behind Scoped Storage;
+        // the only way for a terminal app to keep the "adb push a script to
+        // /sdcard/Download, source it from the shell" workflow working is to
+        // request the all-files-access special permission. Shelly is shipped
+        // via GitHub Releases / F-Droid so the Play Store audit does not apply.
+        AsyncFunction("hasAllFilesAccess") {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Environment.isExternalStorageManager()
+            } else {
+                // On Android 10 and below legacy READ/WRITE_EXTERNAL_STORAGE
+                // covers /sdcard read, so no special request is needed.
+                true
+            }
+        }
+
+        AsyncFunction("requestAllFilesAccess") {
+            val context = appContext.reactContext ?: return@AsyncFunction null
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return@AsyncFunction null
+            if (Environment.isExternalStorageManager()) return@AsyncFunction null
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback to the generic all-apps screen if the per-package
+                // deep link isn't available on this OEM build.
+                try {
+                    val fallback = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(fallback)
+                } catch (_: Exception) {
+                    Log.w("TerminalEmulator", "Cannot open all-files-access settings", e)
+                }
             }
             null
         }

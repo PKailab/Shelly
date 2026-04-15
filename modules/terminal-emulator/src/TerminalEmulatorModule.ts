@@ -23,6 +23,10 @@ declare class TerminalEmulatorModuleType extends NativeModule {
   updateSessionNotification(info: string): Promise<void>;
   isIgnoringBatteryOptimizations(): Promise<boolean>;
   requestBatteryOptimizationExemption(): Promise<void>;
+  /** bug #92: Android 11+ MANAGE_EXTERNAL_STORAGE gate — true on < API 30 since legacy perms cover /sdcard. */
+  hasAllFilesAccess(): Promise<boolean>;
+  /** bug #92: Fires the per-package all-files-access settings intent. No-op when already granted or API < 30. */
+  requestAllFilesAccess(): Promise<void>;
   testExecve(): Promise<{ success: boolean; result?: string; error?: string }>;
   scheduleAgent(agentId: string, intervalMs: number, triggerAtMs: number): Promise<void>;
   cancelAgent(agentId: string): Promise<void>;

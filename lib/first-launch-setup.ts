@@ -43,14 +43,51 @@ export async function resetSetup(): Promise<void> {
  */
 export async function runFirstLaunchSetup(sessionId: string): Promise<void> {
   const done = await isSetupComplete();
-  if (done) return;
+  if (done) {
+    // Even if setup was already marked complete in a prior session, re-check
+    // the all-files-access permission every launch. Users can revoke it from
+    // system settings; we want to surface the request again so the shell
+    // isn't silently locked out of /sdcard (bug #92).
+    await ensureAllFilesAccess();
+    return;
+  }
 
   logInfo('FirstLaunchSetup', 'MOTD now handled by .bashrc — marking complete');
+
+  // bug #92: first-launch is the natural moment to ask for MANAGE_EXTERNAL_STORAGE
+  // so the "adb push a script, source it from the shell" workflow works. See
+  // ensureAllFilesAccess below for the non-blocking approach used.
+  await ensureAllFilesAccess();
 
   // MOTD is now displayed by .bashrc on first launch (checks ~/.shelly_motd_shown)
   // This function just marks the TS-side flag as complete
   await markSetupComplete();
   logInfo('FirstLaunchSetup', 'Setup flag saved');
+}
+
+/**
+ * bug #92: Ensure the app holds MANAGE_EXTERNAL_STORAGE. Android 11+ gates
+ * /sdcard direct access behind this special permission; without it any
+ * `source /sdcard/Download/*.sh` fails with EACCES even with the legacy
+ * READ/WRITE_EXTERNAL_STORAGE permissions declared in the manifest.
+ *
+ * Non-blocking: if the user doesn't already have the permission, we just
+ * fire an Intent to the settings page and return. The call is idempotent
+ * so we can safely call it on every launch; the native side short-circuits
+ * when the permission is already granted.
+ */
+async function ensureAllFilesAccess(): Promise<void> {
+  try {
+    const has = await TerminalEmulator.hasAllFilesAccess();
+    if (has) {
+      logInfo('FirstLaunchSetup', 'MANAGE_EXTERNAL_STORAGE already granted');
+      return;
+    }
+    logInfo('FirstLaunchSetup', 'requesting MANAGE_EXTERNAL_STORAGE');
+    await TerminalEmulator.requestAllFilesAccess();
+  } catch (e) {
+    logInfo('FirstLaunchSetup', 'ensureAllFilesAccess failed: ' + e);
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
