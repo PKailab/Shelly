@@ -19,6 +19,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '@/lib/theme-engine';
 import { useSidebarStore } from '@/store/sidebar-store';
 import { normalizePath } from '@/lib/normalize-path';
+import { readDirEntries } from '@/lib/fs-native';
 import { useAgentStore } from '@/store/agent-store';
 import { useTerminalStore } from '@/store/terminal-store';
 import { deleteAgent } from '@/lib/agent-manager';
@@ -63,6 +64,53 @@ export function Sidebar() {
   const runHistory = useAgentStore((s) => s.runHistory);
   const [addRepoVisible, setAddRepoVisible] = useState(false);
   const [repoInput, setRepoInput] = useState('');
+
+  /**
+   * bug #73: validate a repo path before adding it. Previously the UI
+   * accepted any string and stored it, leading to ghost entries that just
+   * showed empty file trees and 0 git dirty counts. Now we try to list
+   * the directory via JNI readDir (which never throws; it returns an empty
+   * array on ENOENT/EACCES) and refuse the add if the readdir yields
+   * nothing AND a probe lstat via readDirEntries on the parent also shows
+   * the entry is missing. The heuristic is cheap and catches the common
+   * mistakes: typos, Termux-era paths, and unmounted SD-card paths.
+   */
+  const tryAddRepo = async (rawPath: string): Promise<void> => {
+    const path = rawPath.trim();
+    if (!path) return;
+    const normalized = normalizePath(path);
+    // readDirEntries returns [] on missing dir; empty repo is unlikely.
+    // To distinguish "empty" from "missing", probe the parent and check
+    // whether the basename is present. Still permissive: if the parent is
+    // unreadable we fall through and accept the add (likely a permission
+    // corner case rather than a typo).
+    const slash = normalized.lastIndexOf('/');
+    const parent = slash > 0 ? normalized.slice(0, slash) : '/';
+    const basename = slash >= 0 ? normalized.slice(slash + 1) : normalized;
+    let exists = false;
+    try {
+      const parentEntries = await readDirEntries(parent);
+      if (parentEntries.length === 0) {
+        // Parent unreadable — fall through and accept the add.
+        exists = true;
+      } else {
+        exists = parentEntries.some((e) => e.name === basename && (e.type === 'd' || e.type === 'l'));
+      }
+    } catch {
+      exists = true; // don't block on probe failure
+    }
+    if (!exists) {
+      Alert.alert(
+        'Directory not found',
+        `The path "${path}" does not exist on this device. Double-check the spelling or pick an existing folder.`,
+      );
+      return;
+    }
+    addRepo(path);
+    setActiveRepo(path);
+    setRepoInput('');
+    setAddRepoVisible(false);
+  };
 
   const focusedPaneId = usePaneStore((s) => s.focusedPaneId);
   const setLeafTab = useMultiPaneStore((s) => s.setLeafTab);
@@ -425,15 +473,7 @@ export function Sidebar() {
               autoCapitalize="none"
               autoCorrect={false}
               autoFocus
-              onSubmitEditing={() => {
-                const path = repoInput.trim();
-                if (path) {
-                  addRepo(path);
-                  setActiveRepo(path);
-                  setRepoInput('');
-                  setAddRepoVisible(false);
-                }
-              }}
+              onSubmitEditing={() => void tryAddRepo(repoInput)}
             />
             <View style={styles.modalBtns}>
               <Pressable
@@ -444,15 +484,7 @@ export function Sidebar() {
               </Pressable>
               <Pressable
                 style={styles.modalAddBtn}
-                onPress={() => {
-                  const path = repoInput.trim();
-                  if (path) {
-                    addRepo(path);
-                    setActiveRepo(path);
-                    setRepoInput('');
-                    setAddRepoVisible(false);
-                  }
-                }}
+                onPress={() => void tryAddRepo(repoInput)}
               >
                 <Text style={styles.modalAddText}>ADD</Text>
               </Pressable>
