@@ -150,17 +150,15 @@ coreutils: /sdcard/Download/patch-codex.sh: Permission denied
 
 ---
 
-### bug #73 — Sidebar repo のパス正規化漏れ (P1)
+### ✅ bug #73 — Sidebar repo のパス正規化漏れ (修正済: 0687fca3)
 
 **発見**: 2026-04-15 Phase 6-A Test 5-2 logcat 解析
-**症状**: ユーザーが `~/Shelly` をコピペで ADD REPOSITORY 追加 → 内部で `/data/data/com.termux/files/home/Shelly` に変換されて保存される。実際のパスは `/data/data/com.termux/files/usr/lib/...` などに配置されているため、FileTree の `git status --porcelain` が `cd: No such file or directory` で exit=1。
-```
-execCommand FAILED: cd: /data/data/com.termux/files/home/Shelly: No such file or directory
-cmd=cd '/data/data/com.termux/files/home/Shelly' && git status --porcelain
-```
-**原因**: repo 追加パスで Termux 時代の HOME (`/data/data/com.termux/files/home`) を前提としたパス展開ロジックが残っている可能性。Shelly の HOME は `/data/user/0/dev.shelly.terminal/files/home`。
-**修正方針**: (1) `~` 展開は Shelly の HOME を参照、(2) 存在チェック (stat) を repo 追加時に行い、存在しない場合は保存拒否 + トースト。
-**優先度**: P1 (bug #70 修正後の動作確認で正式判断。#70 JNI readDir 移行で自動解消する可能性あり)
+**症状**: ユーザーが `~/Shelly` を ADD REPOSITORY 追加 → 内部で Termux 時代のパスに展開される / 存在しないパスが ghost entry として残る。
+**修正内容**:
+- normalizePath は既に Wave H で Shelly HOME を参照するように修正済み (bug #43)
+- 0687fca3: Sidebar の ADD REPOSITORY モーダルで readDirEntries 経由の親ディレクトリ probe を追加。basename が実在するかを確認してから addRepo を呼び、存在しない場合は Alert "Directory not found" を出す。
+- bug #70 修正 (4fac02d0) により、git status 経由での存在確認も信頼できる動作に戻った。
+**優先度**: 元 P1。解決済み → v0.1.0 に含まれる。
 
 ---
 
@@ -173,45 +171,37 @@ cmd=cd '/data/data/com.termux/files/home/Shelly' && git status --porcelain
 
 ---
 
-### bug #70 — Sidebar の ls/git 実行が shell 経由で exit=0 stdout=0chars を返す (P0)
+### ✅ bug #70 — Sidebar の ls/git 実行が shell 経由で exit=0 stdout=0chars を返す (修正済: 4fac02d0)
 
 **発見**: 2026-04-15 Phase 6-A Test 4 実機検証
-**症状**: `/data/data/com.termux/files/home/Shelly` を ADD REPOSITORY で追加しても FILE TREE が空のまま。logcat で以下のパターンを確認:
-```
-exec: ls -1pa "/data/data/com.termux/files/home/Shelly" 2>/dev/null | head -100
-exit=0 stdout=0chars
-exec: cd '...' && git status --porcelain
-exit=1 stdout=0chars
-```
-**原因**: bug #36 (PORTS の `cat /proc/net/tcp`) と同根で、shell 経由の execCommand が exit=0 返しつつ stdout 空。Sidebar / FileTree / GitStatusBadge / PORTS すべてが `execCommand("ls ...")` / `execCommand("git ...")` に依存しているため、**現在 shell-based な読取経路を使っているすべてのサイドバー機能が壊れている**。
-**修正範囲**: bug #36 の PORTS では readProcNetFile JNI に切替えたが、**Sidebar / FileTree / GitStatus も同様に JNI の readDir / readFile 経由に切替える必要がある**。または libbash.so の PATH 問題を根本解決。
-**優先度**: P0 (すべてのサイドバー機能が壊れているので出荷不可)
+**症状**: shell 経由の execCommand が exit=0 stdout=0chars を返し、Sidebar / FileTree / GitStatusBadge / PORTS のすべての読み取り機能が壊れていた。
+**真の原因判明 (2026-04-16)**: `shelly-exec.c` の `execSubprocess` read loop が **non-blocking read の EAGAIN を EOF として誤認識** していた。`if (n <= 0) stdout_eof = 1` で n<0 (EAGAIN) と n==0 (EOF) を同列扱い。子プロセスが少し遅れて書き込む (bash + 小さい command は fork から書き出しまで数 ms 遅延がある) と、select が false positive で wake → read が EAGAIN → 親が EOF 判定 → 空 buffer 返却。
+**修正内容** (4fac02d0):
+- `n == 0` → 真の EOF として eof フラグを立てる
+- `n < 0` + errno が EAGAIN/EWOULDBLOCK/EINTR → spurious wake として retry
+- `n < 0` + それ以外の errno → 致命的エラーとして eof 扱い
+- stdout / stderr 両方に適用
+**影響**: bug #36 / #70 で「JNI に切り替える」ワークアラウンドをしていた機能の多くは、実は shell 経由の execCommand でも動作するようになる。FileTree / Sidebar / GitStatus / auto-savepoint 等の shell 経由読み取りが復活。
+**優先度**: 元 P0。解決済み → v0.1.0 に含まれる。
 
 ---
 
-### bug #69 — Sidebar REPOSITORIES に Mock のダミーが表示され切替不能 (P0)
+### ✅ bug #69 — Sidebar REPOSITORIES に Mock のダミーが表示され切替不能 (修正済: Wave F fdd4f0db)
 
 **発見**: 2026-04-15 Phase 6-A Test 2 (リポジトリ切替) 実機検証
-**症状**: サイドバーに SHELLY V9.2 / NACRE / LLM-BENCH-V2 の 3 リポジトリが表示されるがタップしても何も起きない。logcat に `[Shelly][Sidebar] Found 0 repos` / `[Shelly][ShellLayout] Repos loaded: 0` と記録されている。
-**原因**: `components/layout/Sidebar.tsx:278-299` で `repoPaths.length === 0` の時に **"Mock dummy repos matching mock screenshot"** というコメント付きのハードコードプレースホルダを描画している。`<View>` でラップされており Pressable も onPress も無い → タップしても何も反応しないのは仕様通り。新規ユーザーは永遠に Mock を見続けることになる。
-**修正方針**: Mock dummy 分岐を削除して、repo 0 件時は明確な空状態 UI ("No repositories yet. Tap + ADD REPOSITORY to browse your code.") に差し替える。
-**優先度**: P0 (ユーザーが機能を見つけられない致命的 UX 欠陥)
+**症状**: サイドバーに SHELLY V9.2 / NACRE / LLM-BENCH-V2 の 3 ダミーが表示されるがタップしても何も起きない。
+**修正内容** (Wave F fdd4f0db): Mock dummy 分岐を削除して、repo 0 件時は空状態 UI ("No repositories yet. Tap + ADD REPOSITORY to browse your code.") に置き換え済み。
+**優先度**: 元 P0。解決済み → v0.1.0 に含まれる。
 
 ---
 
-### bug #68 — AI ペインの Local LLM が sever running 状態を検知せず "not enabled" エラー
+### ✅ bug #68 — AI ペインの Local LLM が server running 状態を検知せず "not enabled" エラー (修正済: Wave F fdd4f0db)
 
 **発見**: 2026-04-15 Phase 6-A Test 1 (LLM ローカル 1 往復) 実機検証
-**症状**:
-- llama.cpp Setup 画面では **RUNNING** 状態で Qwen2.5-3B-Instruct-Q4_K_M.gguf が ACTIVE
-- サーバーは http://127.0.0.1:8080 で稼働中
-- AI ペインでプロバイダを Local に切替えて「こんにちは。」送信 → **"Error: Local LLM is not enabled. Enable it in Settings → Local LLM."**
-**疑い**: AI ペインの Local プロバイダ経路が llama.cpp サーバーの running 状態ではなく、別の enabled フラグ (Settings → Local LLM トグル) を参照している。Setup 画面の "RUNNING" と AI プロバイダの "enabled" が別管理。
-**調査指針**:
-- `hooks/use-ai-dispatch.ts` または `lib/local-llm.ts` で "Local LLM is not enabled" を grep
-- enabled フラグの管理 store (settings-store or llama-store) を特定
-- Setup 画面の Start/Stop ボタンが enabled フラグを flip しているかを確認
-**優先度**: P0 (ローカル LLM 使えないと v0.1.0 のセールスポイント「ローカル推論」が成立しない)
+**症状**: AI ペインでプロバイダを Local に切替え → "Error: Local LLM is not enabled. Enable it in Settings → Local LLM."
+**修正内容** (Wave F fdd4f0db): `hooks/use-ai-pane-dispatch.ts:272-284` で `settings.localLlmEnabled` トグル参照を廃止し、`settings.localLlmUrl` がセットされているかだけをゲートに変更。Plan B 以降は Setup 画面の Start/Stop が直接 `localLlmUrl` を更新するので、Setup で RUNNING なら AI ペインでも即使える。
+**確認**: 2026-04-16 Session A で `use-ai-dispatch.ts` が旧チャット画面用の dead code であることを確認 (どこからも import されていない)。新しい AI ペイン経路 (use-ai-pane-dispatch.ts) は URL チェックのみ。
+**優先度**: 元 P0。解決済み → v0.1.0 に含まれる。
 
 ---
 
