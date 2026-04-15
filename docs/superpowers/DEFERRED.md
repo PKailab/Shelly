@@ -71,6 +71,116 @@
 
 ## P0 — 次リリース前の必須対応 (v0.1.0 ブロッカー)
 
+### bug #91 — ペースト時にコマンドが改行で分割される (P0 — 最優先)
+
+**発見**: 2026-04-16 Codex 手動パッチ検証中
+**症状**: 長い単一行シェルコマンドをペーストボタン / コピペで送ると、bash がコマンドの途中で Enter を押されたように受け取って中途実行する。画面上は先頭に `<` が混入し、最初の 1-2 文字が欠落しているように見える (`<cho hello` / `<wn("proot"...`)。
+```
+ユーザー意図: sed -i 's#spawn(binaryPath, process.argv.slice(2)#spawn("proot",...' "$cdj"
+実際の実行:
+  <place(process.env.HOME, "/root"), ...process.argv.slice(2)]
+  > /*shelly-proot*/#' "$cdj"; grep -c shelly-proot "$cdj"; codex --version
+  libbash.so: s#spawn(binaryPath, process.argv.slice(2)#spawn("proot", [binaryPath.replace(proc
+  ess.env.HOME, "/root"), ...process.argv.slice(2)]
+  /*shelly-proot*/#: No such file or directory
+```
+**影響**: **Shelly で Shelly を開発するワークフローが完全に成立しない。** コピペで 1 行シェルコマンドを流し込めない = tmux がない環境で長いコマンドを手打ちする羽目になる。v0.1.0 のセールスポイント「モバイルで開発」が成立しない最大のブロッカー。
+**原因候補**:
+1. クリップボード側に入った時点で既に改行混入している (AI 出力由来の wrap を clipboard manager が改行化して保存)
+2. TerminalEmulator.paste() の CR/LF 正規化が中途半端
+3. bracketed paste モード非使用時に bash が各 CR を即実行している
+4. IME paste 経路と CommandKeyBar paste 経路で処理が分岐していて片方が壊れている
+5. 先頭 `<` 欠落は `\e[200~` の先頭 ESC+`[` が消費されて `2` / `0` / `0` / `~` が欠落し残りが画面に出ている可能性 (bracketed paste シーケンスが半分だけ食われている)
+**再現手順**:
+1. 複雑な文字を含む単一行コマンド (`#`, `'`, `(`, `)` 多用) をクリップボードにコピー
+2. Shelly ターミナルで Paste ボタンまたは system paste
+3. Enter 押下前に bash が途中実行してしまう
+**修正方針**:
+1. 根本調査: `adb logcat` で ShellyTerminalSession.paste() / TerminalEmulator.paste() の入力と出力 byte stream をダンプ
+2. bracketed paste モードを常時有効化 (DECSET 2004 を Shelly 側で強制 ON、もしくは bash 起動時に `bind 'set enable-bracketed-paste on'` を .bashrc に追加)
+3. paste 内容の改行を完全に除去する (CR/LF → 空文字) オプションを追加、もしくはユーザー設定で切替
+4. IME commitText 経路と CommandKeyBar 経路の処理差分を潰す (bug #27 / #58 の時と同じように両方通らせる)
+**優先度**: P0 (v0.1.0 ブロッカー — このバグを直さない限り、Shelly を開発機として使うという当初目的が成立しない)
+
+---
+
+### bug #92 — /sdcard 上のシェルスクリプトが読み込み不可 (P0)
+
+**発見**: 2026-04-16 Codex 手動パッチ検証中
+**症状**: `/sdcard/Download/*.sh` を `source`, `.`, `cat ... > ~/file && . ~/file` のいずれで読んでも `Permission denied` になる。`bash` は `command not found` (PATH 外)。
+```
+~$ source /sdcard/Download/patch-codex.sh
+libbash.so: /sdcard/Download/patch-codex.sh: Permission denied
+~$ . /sdcard/Download/patch-codex.sh
+libbash.so: /sdcard/Download/patch-codex.sh: Permission denied
+~$ cat /sdcard/Download/patch-codex.sh > ~/patch.sh && . ~/patch.sh
+coreutils: /sdcard/Download/patch-codex.sh: Permission denied
+```
+**原因**: Android の FUSE 経由 `/sdcard` マウントは MANAGE_EXTERNAL_STORAGE 権限を持たないプロセスから **exec/read が拒否される** (Scoped Storage)。Shelly のプロセスは本来 `MEDIA_*` 権限のみで /sdcard を直接開けない。
+**影響**: ユーザーが sdcard の Download フォルダに置いたスクリプトやファイルを Shelly から読み込めない。ワイヤレスデバッグ経由でスクリプトをデバイスに送り込む標準的なワークフローが機能しない。
+**修正方針**:
+1. Shelly アプリに `MANAGE_EXTERNAL_STORAGE` or SAF 読み書き権限を追加
+2. `/sdcard/Shelly/` のような Shelly 固有のディレクトリを MediaStore 経由で作成し、そこを読める状態にする
+3. Files タブ (Device → Download) で見えるファイルをターミナル側から `~/imported/` にコピーするブリッジを作る
+**優先度**: P0 (外部ファイル取り込み経路が無いと v0.1.1 開発の生産性に直撃)
+
+---
+
+### bug #93 — bash という名前の実行ファイルが PATH から見えない (P1)
+
+**発見**: 2026-04-16 Codex 手動パッチ検証中
+**症状**:
+```
+~$ bash /path/to/script.sh
+libbash.so: bash: command not found
+```
+Shelly は Plan B で bash を libbash.so として bionic ダイナミックリンカ経由で起動しているため、`bash` という名前の exec が `$PATH` 上に存在しない。`source` や `.` は builtin なので動くが、`bash <script>` の形のスクリプト実行が全滅する。
+**影響**: 世の中のスクリプトは大半が `bash foo.sh` で実行するので、npm postinstall, shell installer (oh-my-bash, n, pyenv 等), CI スクリプトが軒並み動かない。
+**修正方針**:
+1. `$HOME/bin/bash` に `exec /system/bin/linker64 $libDir/libbash.so "$@"` のラッパーを配置 (proot wrapper と同じパターン)
+2. `$HOME/bin` を PATH 先頭に追加 (既に通っていれば OK)
+3. `/bin/bash` と `/usr/bin/bash` を `$HOME/bin/bash` への symlink にできるか検討 (root 不要、普通のファイル作成)
+**優先度**: P1 (claude/gemini が動けば v0.1.0 は出せる。v0.1.1 で対応)
+
+---
+
+### bug #94 — Shelly ターミナルのペースト経路の根本設計見直し (P0 調査タスク)
+
+**発見**: 2026-04-16 セッション全体の教訓
+**症状**: bug #27 (ペースト末尾残留) / #58 (先頭 `:` 混入) / #81 (ペースト先頭バイトクリップ) / #91 (ペースト改行分割) と、**ペースト経路だけで 4 件の独立したバグ** が出ている。修正しても別の症状が別の場所で浮上する = **設計レベルで経路が複雑すぎる**。
+**現在の経路**:
+- A. システムクリップボード (Android ClipboardManager)
+- B. IME commitText (ソフトキーボード経由)
+- C. IME sendKeyEvent (ハードウェアキー)
+- D. CommandKeyBar Paste ボタン → `pasteToSession` JNI
+- E. Middle-click paste (TerminalView onTouchEvent)
+それぞれが CR/LF 正規化 / bracketed paste ラッピング / flush タイミング を **別々に扱っている** ため、1 つのバグ修正が別経路に波及する。
+**修正方針 (本格修正)**:
+1. ペースト処理を単一の `TerminalEmulator.paste(String)` に集約 — IME/CommandKeyBar/TouchEvent すべてここを通す
+2. CR/LF 正規化ロジックを 1 箇所に統一 — bracketed paste 有無で分岐
+3. 単体テストを追加 (`TerminalEmulatorPasteTest`) — 改行・CRLF・ESC シーケンス混入・日本語 IME 入力の 4 ケース
+4. logcat トレースを追加して経路ごとの入力バイトを可視化
+**優先度**: P0 調査 (bug #91 の直接原因特定後、本格修正はこの #94 の枠で対応)
+
+---
+
+### bug #95 — Wave L の post-install sed patch が走らない (P1)
+
+**発見**: 2026-04-16 Wave L 実機検証
+**症状**: HomeInitializer.kt の post-install ジョブで codex.js に sed patch を当てる処理が追加されているが、実機で `grep -c shelly-proot codex.js` が 0 を返す = patch が実行されていない。
+**原因候補**:
+1. post-install は `( __shelly_bg_cli_update & )` で背景ジョブ化されており、patch 実行タイミングが npm install 完了前に走っているか、そもそも起動していない
+2. `grep -q 'shelly-proot' codex.js` のガード条件が、マーカー文字列が file 内に無いのに true 判定してしまっている
+3. `_run $libDir/coreutils --coreutils-prog=sed` の invocation が失敗してサイレントスキップ
+**影響**: Wave L の Codex サポートが機能しない。bug #76 の解決が阻まれる。
+**修正方針**:
+1. post-install を同期実行に戻し、ログを `~/.shelly-cli/install.log` に追記してデバッグ可能に
+2. `grep -q` の出力を `|| echo "no shelly-proot marker"` でログに残す
+3. sed invocation 失敗時に exit code をチェックしてエラーログ
+**優先度**: P1 (bug #76 と連動。codex が v0.1.1 送りなら #95 も v0.1.1)
+
+---
+
 ### bug #73 — Sidebar repo のパス正規化漏れ (P1)
 
 **発見**: 2026-04-15 Phase 6-A Test 5-2 logcat 解析
@@ -145,19 +255,38 @@ exit=1 stdout=0chars
 
 ## P1 — v0.1.1 で対応推奨
 
-### bug #76 — Codex CLI が起動しない (optional native dep 欠落)
+### bug #76 — Codex CLI が起動しない (optional native dep 欠落 + sed patch 未適用)
 
 **発見**: 2026-04-15 Phase 6-A CLI 動作確認
 **症状**: `codex` 実行時に以下のエラー:
 ```
 Error: Missing optional dependency @openai/codex-linux-arm64.
 Reinstall Codex: npm install -g @openai/codex@latest
-  at file:///.../node_modules/@openai/codex/bin/codex.js:100:11
 ```
-**原因推定**: `@openai/codex` はプラットフォーム固有のネイティブバイナリを optional deps として持っており、Shelly の自動 CLI install (HomeInitializer の bash post-install スクリプト) が `--include=optional` または `--os linux --cpu arm64` を渡していないため、Android (Bionic libc) 環境では optional dep が解決されない。
-**修正方針**: bash post-install で `npm config set os linux; npm config set cpu arm64; npm install ... --include=optional` の形に変更、または明示的に `@openai/codex-linux-arm64` を一緒に install する。
-**現状**: `claude` (PASS) と `gemini` で代替可能なので **出荷ブロッカーではない**。v0.1.1 で対応。
-**優先度**: P1
+Wave L インストール後の新しい症状:
+```
+error: "/data/data/dev.shelly.terminal/files/home/.shelly-cli/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/codex/codex" has unexpected e_type: 2
+```
+**原因**: (1) `@openai/codex` はプラットフォーム固有のネイティブバイナリを optional deps として持ち、Android では `--include=optional --os=linux --cpu=arm64` を渡さないと install されない → Wave L で修正済。(2) 静的リンク ET_EXEC aarch64 バイナリは Android の mmap_min_addr 制限で直接 exec 不可 → Wave L で Alpine minirootfs + proot wrapper を追加し、codex.js に sed patch を当てて `spawn("proot", ...)` に書き換える方針。
+**Wave L 実機検証 (2026-04-16)**:
+- ✅ Alpine rootfs 展開成功 (`~/.shelly-rootfs/etc/alpine-release` 存在)
+- ✅ proot wrapper 配置成功 (`~/bin/proot` 存在、PATH 通り)
+- ✅ codex 関数定義は `termux-libs/node codex.js` を直接呼ぶ形 (正しい。sed patch された codex.js 内部で proot を spawn する設計)
+- ✅ npm install で codex.js + optional dep インストール完了
+- ❌ **sed patch が走っていない** (`grep -c shelly-proot codex.js` → 0)
+- ❌ 結果として codex.js は proot を経由せず直接 ET_EXEC を spawn → `unexpected e_type: 2`
+**追加の原因推定**: HomeInitializer の post-install ジョブ内にある sed patch ブロックが、(a) 背景ジョブ (`( __shelly_bg_cli_update & )`) の中で早すぎるタイミングで走っていて npm install 完了前に codex.js を見に行ってスキップしている、または (b) `grep -q 'shelly-proot'` ガードの初回条件が誤判定、または (c) 背景ジョブ自体が起動していない。
+**手動パッチ検証 (進行中)**: `sed -i 's|spawn(binaryPath,|spawn("proot",[binaryPath.replace(process.env.HOME,"/root"),|' codex.js` でパッチを当て、proot 経由で起動するかを確認中。手動パッチが動けば post-install ロジックのタイミング修正だけで本修正可能。
+**修正方針**:
+1. post-install 内の sed patch ブロックを npm install 完了確認後に同期実行させる (背景ジョブのサブシェル化を外す、または `wait` を入れる)
+2. `grep -q 'shelly-proot'` ガードを `grep -q '/\*shelly-proot\*/'` にして確実にマーカー文字列にマッチさせる
+3. 手動パッチで動作確認後、HomeInitializer 側で .bashrc 再生成タイミングも要検証 (BASHRC_VERSION bump しないと更新されない)
+**現状**: `claude` (PASS) と `gemini` で代替可能なので **出荷ブロッカーではない**。v0.1.1 で対応。ただしユーザーが強く希望しているため本日中に解決試行継続。
+**優先度**: P1 (ユーザー希望により実質 P0 扱い)
+
+---
+
+(bug #91 は P0 セクションに移動済み)
 
 ---
 
@@ -331,6 +460,7 @@ Reinstall Codex: npm install -g @openai/codex@latest
 - **2026-04-15**: Wave A/B/C/D/E で #27 / #28 / #36 / #51 / #52 / #53 / #54 / #55 / #56 / #57 / #58 / #59 / #60 / #61 / #62 / #63 / #64 / #65 / #66 / #67 を一括修正。
 - **2026-04-15**: DEFERRED.md 再構成 — 先頭に「🟢 現状サマリ」「🟡 一段落後チェックリスト」を追加、各 bug にステータスマーク。
 - **2026-04-15**: Phase 6-A 継続実機検証で #68 / #69 / #70 を特定・コード修正済 (未ビルド)。Test 5-1 Tab ✅ / Test 5-2 ↑ ✅ (履歴空時の無反応で一時誤診、後に正常動作確認)。#73 (repo パス正規化) / #74 (空履歴 ↑ UX) を登録。
+- **2026-04-16**: v0.1.0 Wave L 実機検証セッション。Codex CLI を動かすために Alpine rootfs + proot wrapper を導入したが実機で複数の根本問題が顕在化。**bug #91** (ペースト改行分割、P0)、**bug #92** (/sdcard noexec/read 拒否、P0)、**bug #93** (`bash` コマンドが PATH 外、P1)、**bug #94** (ペースト経路設計がバラバラで同種バグが繰り返し発生、P0 調査)、**bug #95** (Wave L の codex.js sed patch が post-install 内で走らない、P1) を登録。bug #76 を Wave L 検証結果で更新。本日 v0.1.0 を出すのは **bug #91 を根本修正してから** という方針に変更。codex は v0.1.1 送り (claude + gemini の 2 本で v0.1.0 を出荷予定)。
 
 ---
 
