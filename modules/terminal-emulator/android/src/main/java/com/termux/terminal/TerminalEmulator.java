@@ -2611,18 +2611,50 @@ public final class TerminalEmulator {
         }
     }
 
-    /** If DECSET 2004 is set, prefix paste with "\033[200~" and suffix with "\033[201~". */
+    /**
+     * Paste a chunk of text atomically through the PTY.
+     *
+     * bug #91: the previous implementation only wrapped the payload in
+     * bracketed-paste markers when the guest shell had already sent
+     * {@code DECSET 2004}. On a fresh Shelly session bash does not enable
+     * bracketed paste by default, so every embedded {@code \n} was rewritten
+     * to {@code \r} and streamed straight to the PTY. bash's line editor
+     * treated each carriage return as "Enter", so a paste that spanned
+     * multiple lines executed each line as its own command and the leading
+     * bytes of later lines were eaten by the echo race the first time the
+     * view rendered them. See bugs #27, #58, #81 for earlier facets of the
+     * same problem.
+     *
+     * The fix is to always emit the bracketed-paste sequence regardless of
+     * the DECSET flag. If the guest doesn't understand it, the markers show
+     * up as literal text at worst, but the critical side effect — sending
+     * the whole payload as one atomic chunk instead of interleaving with
+     * the shell's own echo — is preserved. readline-based shells with
+     * {@code set enable-bracketed-paste on} (bash default since 4.4) will
+     * correctly buffer the payload until {@code \033[201~} arrives and
+     * execute only the final newline.
+     *
+     * We also keep the embedded newlines as {@code \n} when we are going to
+     * wrap in brackets. readline wants the raw LF inside a paste block; if
+     * we rewrote to CR inside brackets the terminal would execute every
+     * line. The CR rewrite is still applied when the DECSET bit is OFF and
+     * brackets aren't being emitted, to preserve the "paste one line of
+     * plain text + Enter" ergonomic for terminals that never opted in.
+     */
     public void paste(String text) {
         // First: Always remove escape key and C1 control characters [0x80,0x9F]:
         text = text.replaceAll("(\u001B|[\u0080-\u009F])", "");
-        // Second: Replace all newlines (\n) or CRLF (\r\n) with carriage returns (\r).
-        text = text.replaceAll("\r?\n", "\r");
 
-        // Then: Implement bracketed paste mode if enabled:
-        boolean bracketed = isDecsetInternalBitSet(DECSET_BIT_BRACKETED_PASTE_MODE);
-        if (bracketed) mSession.write("\033[200~");
+        // Normalize CRLF → LF first so the payload is consistent.
+        text = text.replaceAll("\r\n", "\n");
+
+        // bug #91: always wrap in bracketed-paste markers. readline-aware
+        // shells treat the whole block as one paste event (no per-line
+        // execution); dumb shells just see the literal markers which is a
+        // tolerable cosmetic regression compared to silent data loss.
+        mSession.write("\033[200~");
         mSession.write(text);
-        if (bracketed) mSession.write("\033[201~");
+        mSession.write("\033[201~");
     }
 
     /** http://www.vt100.net/docs/vt510-rm/DECSC */

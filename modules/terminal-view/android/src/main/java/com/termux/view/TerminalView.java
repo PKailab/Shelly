@@ -515,8 +515,34 @@ public class TerminalView extends View {
                 if (!commitStr.isEmpty() && commitStr.equals(mLastFinishFlush)) {
                     Log.d("ShellyIME", "commit SUPPRESSED (already flushed via finishComposing) =\"" + commitStr + "\"");
                 } else if (!commitStr.isEmpty()) {
-                    Log.d("ShellyIME", "commit=\"" + commitStr + "\"");
-                    sendToPtyAndShadow(commitStr);
+                    // bug #91: if the IME just handed us a multi-line block or a
+                    // chunk bigger than a realistic typed keystroke, treat it as
+                    // a paste. Routing through mEmulator.paste() funnels the
+                    // payload through the single CR/LF-normalized + bracketed
+                    // path instead of sendTextToTerminal's per-char loop. The
+                    // per-char loop rewrote every embedded newline to \r and
+                    // streamed them straight to the PTY, which made bash
+                    // execute each line of a pasted block immediately and let
+                    // the early lines race the view's own echo (hence the
+                    // "first byte clipped" / "sed: no pattern" symptoms users
+                    // were seeing when they pasted long one-liners).
+                    boolean isPaste = commitStr.length() > 1
+                        && (commitStr.indexOf('\n') >= 0
+                            || commitStr.indexOf('\r') >= 0
+                            || commitStr.length() >= 16);
+                    if (isPaste && mEmulator != null) {
+                        Log.d("ShellyIME", "commit-as-paste len=" + commitStr.length());
+                        mEmulator.paste(commitStr);
+                        // Keep the IME shadow in sync with what we just sent
+                        // so the follow-up deleteSurroundingText storm doesn't
+                        // eat the prompt. A paste resets the shadow the same
+                        // way a newline does (bash line editor owns it now).
+                        mLastImeCommitAt = android.os.SystemClock.uptimeMillis();
+                        mImeShadow.setLength(0);
+                    } else {
+                        Log.d("ShellyIME", "commit=\"" + commitStr + "\"");
+                        sendToPtyAndShadow(commitStr);
+                    }
                 }
 
                 mLastFinishFlush = "";
