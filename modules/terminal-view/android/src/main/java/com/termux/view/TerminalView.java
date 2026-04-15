@@ -1289,9 +1289,14 @@ public class TerminalView extends View {
 
     /** Check if the terminal size in rows and columns should be updated. */
     public void updateSize() {
-        int viewWidth = getWidth();
-        int viewHeight = getHeight();
-        if (viewWidth == 0 || viewHeight == 0 || mTermSession == null) return;
+        // bug #82: honor View padding so the terminal text doesn't crash into
+        // the right edge of the pane. getWidth() / getHeight() include
+        // padding, so we subtract it explicitly before computing columns /
+        // rows. onDraw() translates the canvas by the same amount so the
+        // emulator still draws from origin.
+        int viewWidth = getWidth() - getPaddingLeft() - getPaddingRight();
+        int viewHeight = getHeight() - getPaddingTop() - getPaddingBottom();
+        if (viewWidth <= 0 || viewHeight <= 0 || mTermSession == null) return;
 
         // Set to 80 and 24 if you want to enable vttest.
         int newColumns = Math.max(4, (int) (viewWidth / mRenderer.mFontWidth));
@@ -1317,6 +1322,22 @@ public class TerminalView extends View {
         if (mEmulator == null) {
             canvas.drawColor(0XFF000000);
         } else {
+            // bug #82: paint the padding region in the terminal background
+            // so it visually merges with the content, then translate so the
+            // renderer still draws from origin. The columns/rows count was
+            // already computed against the padding-shrunk width in
+            // updateSize(), so this keeps the text away from the pane edge.
+            int padL = getPaddingLeft();
+            int padT = getPaddingTop();
+            int padR = getPaddingRight();
+            int padB = getPaddingBottom();
+            if (padL != 0 || padT != 0 || padR != 0 || padB != 0) {
+                int bg = mEmulator.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND];
+                canvas.drawColor(bg);
+                canvas.save();
+                canvas.translate(padL, padT);
+            }
+
             // render the terminal view and highlight any selected text
             int[] sel = mDefaultSelectors;
             if (mTextSelectionCursorController != null) {
@@ -1328,6 +1349,10 @@ public class TerminalView extends View {
             // Draw composing (pre-edit) text overlay at cursor position
             if (mComposingText != null && !mComposingText.isEmpty()) {
                 drawComposingText(canvas);
+            }
+
+            if (padL != 0 || padT != 0 || padR != 0 || padB != 0) {
+                canvas.restore();
             }
 
             // render the text selection handles

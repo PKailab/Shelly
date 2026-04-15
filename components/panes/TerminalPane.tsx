@@ -873,8 +873,11 @@ const styles = StyleSheet.create({
   connectingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   connectingText: { fontSize: 15, fontFamily: 'Silkscreen', fontWeight: '600' },
 
-  // Native terminal view
-  terminalView: { backgroundColor: '#000' },
+  // Native terminal view. bug #82: small horizontal gutter so text
+  // doesn't crash into the pane edge. The native updateSize() subtracts
+  // getPaddingLeft/Right before computing cols, so this correctly reduces
+  // the reflow width instead of just cropping the rightmost column.
+  terminalView: { backgroundColor: '#000', paddingHorizontal: 6, paddingVertical: 2 },
 
   // Error state
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
