@@ -37,8 +37,15 @@ object HomeInitializer {
      *        sed-patch gemini-cli's hardcoded Termux check after install.
      *        Bumping resets the cached .bashrc and clears the daily update
      *        marker so the next bash launch re-runs the install with the
-     *        new flags instead of waiting 24h. */
-    private const val BASHRC_VERSION = 16
+     *        new flags instead of waiting 24h.
+     *    17: bug #80 — the CLI auto-update subshell used to run as a tracked
+     *        background job and bash would dump a multi-line "[1]+ Done (...)"
+     *        notification containing the whole install pipeline with
+     *        unexpanded $__shelly_cli_dir literals the next time the user
+     *        pressed Enter. Wrapped the body in a named function and
+     *        launched via `( __shelly_bg_cli_update & )` so the job is
+     *        orphaned and never enters the parent shell's job table. */
+    private const val BASHRC_VERSION = 17
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -137,44 +144,54 @@ object HomeInitializer {
             sb.appendLine()
 
             // CLI auto-update (background, once per day)
-            // Placed after coreutils so date/cat functions are available
+            // Placed after coreutils so date/cat functions are available.
+            //
+            // bug #80: previously this used `( ... ) &>/dev/null &` which ran
+            // the update as a tracked background job. Bash's job control
+            // still prints a multi-line "[1]+ Done (...)" notification with
+            // the entire subshell body the next time the user presses Enter,
+            // and variable names like $__shelly_cli_dir show up unexpanded
+            // because bash stores the pre-expansion command string. We now
+            // wrap the whole thing in a named function, redirect inside the
+            // function so bash never sees any output, and launch via an
+            // outer subshell `( fn & )` so the job is orphaned and never
+            // enters the parent shell's job table — no Done line at all.
             sb.appendLine("# Auto-update CLI tools (background, once per day)")
             sb.appendLine("__shelly_update_marker=\"\$HOME/.shelly_last_update\"")
             sb.appendLine("__shelly_update_interval=86400")
             sb.appendLine("__shelly_now=\$(date +%s 2>/dev/null || printf '%(%s)T' -1 2>/dev/null || echo 0)")
             sb.appendLine("__shelly_last_update=\$(cat \"\$__shelly_update_marker\" 2>/dev/null || echo 0)")
-            sb.appendLine("if [ \$(( __shelly_now - __shelly_last_update )) -ge \$__shelly_update_interval ]; then")
-            sb.appendLine("  (")
-            sb.appendLine("    mkdir -p \"\$__shelly_cli_dir\"")
+            sb.appendLine("__shelly_bg_cli_update() {")
+            sb.appendLine("  exec </dev/null >/dev/null 2>&1")
+            sb.appendLine("  mkdir -p \"\$__shelly_cli_dir\"")
             // bug #76: @openai/codex has optionalDependencies for the platform-
             // specific native binary (@openai/codex-linux-arm64). On Android
-            // npm doesn't auto-install them because Bionic libc isn't recognized
-            // as a normal Linux target, so we force-install both packages and
-            // pass --include=optional explicitly. bug #77: @google/gemini-cli
-            // checks for /data/data/com.termux/files at runtime and throws if
-            // it isn't there, so we sed the throw out after install.
-            sb.appendLine("    _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js install --prefix \"\$__shelly_cli_dir\" --include=optional --os=linux --cpu=arm64 @anthropic-ai/claude-code@latest @google/gemini-cli@latest @openai/codex@latest 2>/dev/null")
-            sb.appendLine("    # bug #76: patch codex.js to use proot for the ET_EXEC native binary on Android")
-            sb.appendLine("    __codex_js=\"\$__shelly_cli_dir/node_modules/@openai/codex/bin/codex.js\"")
-            sb.appendLine("    if [ -f \"\$__codex_js\" ] && ! grep -q proot \"\$__codex_js\" 2>/dev/null; then")
-            sb.appendLine("      _run $libDir/coreutils --coreutils-prog=sed -i 's/spawn(binaryPath, process.argv.slice(2)/spawn(\"proot\", [binaryPath, ...process.argv.slice(2)]/' \"\$__codex_js\" 2>/dev/null")
-            sb.appendLine("    fi")
-            sb.appendLine("    # bug #77: neutralize gemini-cli's hardcoded Termux check. The bundle")
-            sb.appendLine("    # filename includes a content hash (chunk-XXXXX.js) so we glob the whole")
-            sb.appendLine("    # bundle dir and rewrite every \"You need to install Termux\" throw into")
-            sb.appendLine("    # a noop. We also drop the throw keyword so the surrounding control flow")
-            sb.appendLine("    # falls through to the non-Termux code path.")
-            sb.appendLine("    __gemini_bundle_dir=\"\$__shelly_cli_dir/node_modules/@google/gemini-cli/bundle\"")
-            sb.appendLine("    if [ -d \"\$__gemini_bundle_dir\" ]; then")
-            sb.appendLine("      for __f in \"\$__gemini_bundle_dir\"/chunk-*.js; do")
-            sb.appendLine("        [ -f \"\$__f\" ] || continue")
-            sb.appendLine("        if grep -q 'You need to install Termux' \"\$__f\" 2>/dev/null; then")
-            sb.appendLine("          _run $libDir/coreutils --coreutils-prog=sed -i 's|throw new Error(\"You need to install Termux[^\"]*\")|undefined|g' \"\$__f\" 2>/dev/null")
-            sb.appendLine("        fi")
-            sb.appendLine("      done")
-            sb.appendLine("    fi")
-            sb.appendLine("    echo \"\$__shelly_now\" > \"\$__shelly_update_marker\"")
-            sb.appendLine("  ) &>/dev/null &")
+            // npm doesn't auto-install them because Bionic libc isn't
+            // recognized as a normal Linux target, so pass --include=optional
+            // and --os=linux --cpu=arm64 to pull the arm64 build down.
+            sb.appendLine("  _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js install --prefix \"\$__shelly_cli_dir\" --include=optional --os=linux --cpu=arm64 @anthropic-ai/claude-code@latest @google/gemini-cli@latest @openai/codex@latest")
+            sb.appendLine("  # bug #76: patch codex.js to use proot for the ET_EXEC native binary on Android")
+            sb.appendLine("  __codex_js=\"\$__shelly_cli_dir/node_modules/@openai/codex/bin/codex.js\"")
+            sb.appendLine("  if [ -f \"\$__codex_js\" ] && ! grep -q proot \"\$__codex_js\"; then")
+            sb.appendLine("    _run $libDir/coreutils --coreutils-prog=sed -i 's/spawn(binaryPath, process.argv.slice(2)/spawn(\"proot\", [binaryPath, ...process.argv.slice(2)]/' \"\$__codex_js\"")
+            sb.appendLine("  fi")
+            // bug #77: neutralize gemini-cli's hardcoded Termux check. The
+            // bundle filename includes a content hash (chunk-XXXXX.js) so we
+            // glob the whole bundle dir and rewrite every
+            // "You need to install Termux" throw into a noop expression.
+            sb.appendLine("  __gemini_bundle_dir=\"\$__shelly_cli_dir/node_modules/@google/gemini-cli/bundle\"")
+            sb.appendLine("  if [ -d \"\$__gemini_bundle_dir\" ]; then")
+            sb.appendLine("    for __f in \"\$__gemini_bundle_dir\"/chunk-*.js; do")
+            sb.appendLine("      [ -f \"\$__f\" ] || continue")
+            sb.appendLine("      if grep -q 'You need to install Termux' \"\$__f\"; then")
+            sb.appendLine("        _run $libDir/coreutils --coreutils-prog=sed -i 's|throw new Error(\"You need to install Termux[^\"]*\")|undefined|g' \"\$__f\"")
+            sb.appendLine("      fi")
+            sb.appendLine("    done")
+            sb.appendLine("  fi")
+            sb.appendLine("  echo \"\$__shelly_now\" > \"\$__shelly_update_marker\"")
+            sb.appendLine("}")
+            sb.appendLine("if [ \$(( __shelly_now - __shelly_last_update )) -ge \$__shelly_update_interval ]; then")
+            sb.appendLine("  ( __shelly_bg_cli_update & )")
             sb.appendLine("fi")
             sb.appendLine()
 

@@ -131,6 +131,28 @@ class ShellyTerminalSession(
         emulator.append(bytes, bytes.size)
     }
 
+    /**
+     * Paste text as if it came from the clipboard. Unlike [write] this runs
+     * through [TerminalEmulator.paste] which normalizes `\r\n` / `\n` to `\r`
+     * and wraps the payload in bracketed-paste markers when DECSET 2004 is
+     * on, so shells and line editors treat the whole chunk as a single
+     * paste event instead of interleaving it with their own echo. bug #81 —
+     * action bar Paste used to call [write] directly and the first byte of
+     * the payload would get clipped because bash's echo raced the raw PTY
+     * write.
+     */
+    fun paste(text: String) {
+        val emulator = terminalSession.emulator
+        if (emulator != null) {
+            emulator.paste(text)
+        } else {
+            // Emulator not attached yet (session just created) — fall back
+            // to the raw writer with minimal CRLF normalization so the
+            // paste still lands somewhere useful.
+            write(text.replace("\r\n", "\r").replace("\n", "\r"))
+        }
+    }
+
     fun getTranscriptText(maxLines: Int): String {
         val emulator = terminalSession.emulator ?: return ""
         val screen = emulator.screen

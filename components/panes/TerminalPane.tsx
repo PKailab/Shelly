@@ -510,6 +510,18 @@ export default function TerminalScreen() {
     });
   }, [activeSession?.nativeSessionId]);
 
+  // bug #81: Paste path for clipboard contents. Goes through the emulator's
+  // paste() which normalizes CR/LF and wraps the payload in bracketed-paste
+  // markers, so bash/zsh treat the whole chunk as a single paste event. The
+  // raw write path clipped the first byte of multi-line clipboard payloads
+  // because bash's prompt echo raced the PTY write.
+  const pasteToTerminal = useCallback((text: string) => {
+    if (!activeSession || !text) return;
+    TerminalEmulator.pasteToSession(activeSession.nativeSessionId, text).catch((err) => {
+      console.warn('[Terminal] pasteToSession failed:', err);
+    });
+  }, [activeSession?.nativeSessionId]);
+
   // bug #44: Voice input routing.
   //
   // Previously the STT transcript was written straight into the PTY, which
@@ -784,6 +796,7 @@ export default function TerminalScreen() {
         <CommandKeyBar
           sendKey={sendKey}
           sendText={sendToTerminal}
+          sendPaste={pasteToTerminal}
           isCompact={layout.isCompact || (multiPaneCtx?.paneWidth ?? layout.width) < 420}
           onAttach={() => {
             import('expo-document-picker').then((mod) => {

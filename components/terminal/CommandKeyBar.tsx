@@ -21,6 +21,8 @@ import { fonts as F } from '@/theme.config';
 type Props = {
   sendKey: (keyCode: string) => void;
   sendText: (text: string) => void;
+  /** bug #81: paste-aware writer that goes through TerminalEmulator.paste(). Falls back to sendText. */
+  sendPaste?: (text: string) => void;
   isCompact?: boolean;
   /** Suggested key set from PTY output detection */
   suggestedSet?: KeySetId;
@@ -113,7 +115,7 @@ const KEY_SETS: Record<KeySetId, { label: string; icon: string; keys: KeyConfig[
 const SET_ORDER_FULL: KeySetId[] = ['default', 'vim', 'git', 'repl', 'navigate'];
 const SET_ORDER_NO_VIM: KeySetId[] = ['default', 'git', 'repl', 'navigate'];
 
-export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAttach, onVoice, onVoiceLong }: Props) {
+export function CommandKeyBar({ sendKey, sendText, sendPaste, isCompact, suggestedSet, onAttach, onVoice, onVoiceLong }: Props) {
   const { colors: c } = useTheme();
   const { settings } = useTerminalStore();
   // bug #48: Gate the Vim key page behind a settings toggle. Vim users opt in
@@ -152,7 +154,14 @@ export function CommandKeyBar({ sendKey, sendText, isCompact, suggestedSet, onAt
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     if (key.action === 'paste') {
-      Clipboard.getStringAsync().then((text) => { if (text) sendText(text); }).catch(() => {});
+      // bug #81: prefer the paste-aware path (routes through the emulator's
+      // paste() — CR/LF normalized + bracketed-paste wrapped). Fallback to
+      // sendText for legacy callers that haven't passed sendPaste through.
+      Clipboard.getStringAsync().then((text) => {
+        if (!text) return;
+        if (sendPaste) sendPaste(text);
+        else sendText(text);
+      }).catch(() => {});
       return;
     }
     if (key.action === 'alt-toggle') {
