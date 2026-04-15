@@ -145,6 +145,22 @@ exit=1 stdout=0chars
 
 ## P1 — v0.1.1 で対応推奨
 
+### bug #76 — Codex CLI が起動しない (optional native dep 欠落)
+
+**発見**: 2026-04-15 Phase 6-A CLI 動作確認
+**症状**: `codex` 実行時に以下のエラー:
+```
+Error: Missing optional dependency @openai/codex-linux-arm64.
+Reinstall Codex: npm install -g @openai/codex@latest
+  at file:///.../node_modules/@openai/codex/bin/codex.js:100:11
+```
+**原因推定**: `@openai/codex` はプラットフォーム固有のネイティブバイナリを optional deps として持っており、Shelly の自動 CLI install (HomeInitializer の bash post-install スクリプト) が `--include=optional` または `--os linux --cpu arm64` を渡していないため、Android (Bionic libc) 環境では optional dep が解決されない。
+**修正方針**: bash post-install で `npm config set os linux; npm config set cpu arm64; npm install ... --include=optional` の形に変更、または明示的に `@openai/codex-linux-arm64` を一緒に install する。
+**現状**: `claude` (PASS) と `gemini` で代替可能なので **出荷ブロッカーではない**。v0.1.1 で対応。
+**優先度**: P1
+
+---
+
 | # | タイトル | Issue / Status | 見積 |
 |---|---|---|---|
 | 1 | llama.cpp UI: pre-installed model 検出 + active server model 表示 | [#10](https://github.com/RYOITABASHI/Shelly/issues/10) | 60–90 分 |

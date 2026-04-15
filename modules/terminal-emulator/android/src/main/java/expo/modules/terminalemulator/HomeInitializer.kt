@@ -31,8 +31,14 @@ object HomeInitializer {
      *        \[ \] into literal backslash-bracket bytes, so bash never
      *        saw them as width hints and `echo "$PS1"` dumped ugly
      *        \[\]~\[\]\$. printf -v keeps \[ \] literal for bash while
-     *        still expanding \033 into ESC. */
-    private const val BASHRC_VERSION = 15
+     *        still expanding \033 into ESC.
+     *    16: bug #76/#77 — pass --include=optional/--os=linux/--cpu=arm64
+     *        to the npm install line so codex pulls its native binary, and
+     *        sed-patch gemini-cli's hardcoded Termux check after install.
+     *        Bumping resets the cached .bashrc and clears the daily update
+     *        marker so the next bash launch re-runs the install with the
+     *        new flags instead of waiting 24h. */
+    private const val BASHRC_VERSION = 16
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -57,6 +63,14 @@ object HomeInitializer {
         val currentVersion = try { versionFile.readText().trim().toInt() } catch (_: Exception) { 0 }
 
         if (!bashrc.exists() || currentVersion < BASHRC_VERSION) {
+            // bug #76/#77: when the bashrc version bumps because the install
+            // script changed, force the next bash launch to re-run the npm
+            // install instead of waiting for the daily update window. The
+            // simplest knob is to delete the timestamp marker — the install
+            // block treats a missing marker as "older than the interval" and
+            // re-runs.
+            try { File(home, ".shelly_last_update").delete() } catch (_: Exception) {}
+
             val sb = StringBuilder()
 
             // Environment — preserve PATH/LD_LIBRARY_PATH if already set by
@@ -68,6 +82,13 @@ object HomeInitializer {
             sb.appendLine("export SHELL=\"$libDir/libbash.so\"")
             sb.appendLine("export PATH=\"${home.absolutePath}/bin:\${PATH:-$libDir:/system/bin:/vendor/bin}\"")
             sb.appendLine("export LD_LIBRARY_PATH=\"\${LD_LIBRARY_PATH:-$libDir}\"")
+            // bug #77: gemini-cli bundles a hardcoded check that throws if
+            // process.env.TERMUX_VERSION is undefined on Android, even though
+            // it never actually needs Termux for the chat path. Setting any
+            // value satisfies the check and lets the bundle load. We pair this
+            // with the post-install sed below so a future gemini release that
+            // moves to a different gating mechanism still gets neutralised.
+            sb.appendLine("export TERMUX_VERSION=shelly")
             sb.appendLine()
 
             // Linker64 helper function
@@ -125,11 +146,32 @@ object HomeInitializer {
             sb.appendLine("if [ \$(( __shelly_now - __shelly_last_update )) -ge \$__shelly_update_interval ]; then")
             sb.appendLine("  (")
             sb.appendLine("    mkdir -p \"\$__shelly_cli_dir\"")
-            sb.appendLine("    _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js install --prefix \"\$__shelly_cli_dir\" @anthropic-ai/claude-code@latest @google/gemini-cli@latest @openai/codex@latest 2>/dev/null")
-            sb.appendLine("    # Patch codex.js to use proot for ET_EXEC binary on Android")
+            // bug #76: @openai/codex has optionalDependencies for the platform-
+            // specific native binary (@openai/codex-linux-arm64). On Android
+            // npm doesn't auto-install them because Bionic libc isn't recognized
+            // as a normal Linux target, so we force-install both packages and
+            // pass --include=optional explicitly. bug #77: @google/gemini-cli
+            // checks for /data/data/com.termux/files at runtime and throws if
+            // it isn't there, so we sed the throw out after install.
+            sb.appendLine("    _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js install --prefix \"\$__shelly_cli_dir\" --include=optional --os=linux --cpu=arm64 @anthropic-ai/claude-code@latest @google/gemini-cli@latest @openai/codex@latest 2>/dev/null")
+            sb.appendLine("    # bug #76: patch codex.js to use proot for the ET_EXEC native binary on Android")
             sb.appendLine("    __codex_js=\"\$__shelly_cli_dir/node_modules/@openai/codex/bin/codex.js\"")
             sb.appendLine("    if [ -f \"\$__codex_js\" ] && ! grep -q proot \"\$__codex_js\" 2>/dev/null; then")
             sb.appendLine("      _run $libDir/coreutils --coreutils-prog=sed -i 's/spawn(binaryPath, process.argv.slice(2)/spawn(\"proot\", [binaryPath, ...process.argv.slice(2)]/' \"\$__codex_js\" 2>/dev/null")
+            sb.appendLine("    fi")
+            sb.appendLine("    # bug #77: neutralize gemini-cli's hardcoded Termux check. The bundle")
+            sb.appendLine("    # filename includes a content hash (chunk-XXXXX.js) so we glob the whole")
+            sb.appendLine("    # bundle dir and rewrite every \"You need to install Termux\" throw into")
+            sb.appendLine("    # a noop. We also drop the throw keyword so the surrounding control flow")
+            sb.appendLine("    # falls through to the non-Termux code path.")
+            sb.appendLine("    __gemini_bundle_dir=\"\$__shelly_cli_dir/node_modules/@google/gemini-cli/bundle\"")
+            sb.appendLine("    if [ -d \"\$__gemini_bundle_dir\" ]; then")
+            sb.appendLine("      for __f in \"\$__gemini_bundle_dir\"/chunk-*.js; do")
+            sb.appendLine("        [ -f \"\$__f\" ] || continue")
+            sb.appendLine("        if grep -q 'You need to install Termux' \"\$__f\" 2>/dev/null; then")
+            sb.appendLine("          _run $libDir/coreutils --coreutils-prog=sed -i 's|throw new Error(\"You need to install Termux[^\"]*\")|undefined|g' \"\$__f\" 2>/dev/null")
+            sb.appendLine("        fi")
+            sb.appendLine("      done")
             sb.appendLine("    fi")
             sb.appendLine("    echo \"\$__shelly_now\" > \"\$__shelly_update_marker\"")
             sb.appendLine("  ) &>/dev/null &")
