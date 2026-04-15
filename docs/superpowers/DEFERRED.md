@@ -84,7 +84,7 @@
 
 ---
 
-### bug #92 — `/sdcard` 上のシェルスクリプトが読み込み不可 (P0)
+### ✅ bug #92 — `/sdcard` 上のシェルスクリプトが読み込み不可 (修正済: d7a91a7e)
 
 **発見**: 2026-04-16 Wave L 実機検証 (手動 codex patch 作業中)
 **症状**: Shelly ターミナルから `/sdcard/Download/*.sh` を `source` / `.` / `cat` のいずれで読もうとしても `Permission denied`。
@@ -100,13 +100,12 @@ coreutils: /sdcard/Download/patch-codex.sh: Permission denied
 1. **(a) MANAGE_EXTERNAL_STORAGE 追加** — `app.config.ts` の `permissions` 配列に追加 + 初回起動で `Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` Intent を投げる Modal。Play Store 非配布 (GitHub Releases / F-Droid) なので審査制約は低い。実装 30 分。**最速。**
 2. **(b) SAF ベースの「ファイルをインポート」UI** — `Intent.ACTION_OPEN_DOCUMENT` で `~/imported/` にコピー。ユーザーが都度選択。スクリプト用途には摩擦が大きいが最も行儀が良い。
 3. **(c) `~/shared/` シンボリック or JNI bridge** — 別アプリから Shelly の private data dir に書く手段が無いため実質不可 (ADB push なら可だが `/sdcard` 経由の利便性が無くなる)。
-**修正方針**: **(a) を採用推奨**。OSS 配布アプリとしては許容範囲。
-**最小実装ポインタ**:
-- `app.config.ts` L44 `permissions:` に `"android.permission.MANAGE_EXTERNAL_STORAGE"` 追加
-- `android/app/src/main/AndroidManifest.xml` に `<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>` 追加 (prebuild で自動生成されない場合は手書き)
-- 初回起動 (SetupWizard or Home mount) で `Environment.isExternalStorageManager()` チェック → false なら Modal + `Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)`
-**優先度**: P0 (開発ワークフロー自体が詰まるため出荷前に解消)
-**担当**: Session C 調査完了、Session A 実装予定。
+**採用**: **(a) MANAGE_EXTERNAL_STORAGE 追加**。d7a91a7e で実装済み。
+**実装内容**:
+- `app.config.ts` の `permissions` 配列と `android/app/src/main/AndroidManifest.xml` の両方に `MANAGE_EXTERNAL_STORAGE` を追加
+- `TerminalEmulatorModule.kt` に `hasAllFilesAccess()` と `requestAllFilesAccess()` を expose (`Environment.isExternalStorageManager()` + `Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` Intent)
+- `lib/first-launch-setup.ts` の `runFirstLaunchSetup` で毎起動時に `ensureAllFilesAccess()` を呼び、未付与なら Settings 画面を開く
+**優先度**: 元 P0。解決済み → v0.1.0 に含まれる。
 
 ---
 
