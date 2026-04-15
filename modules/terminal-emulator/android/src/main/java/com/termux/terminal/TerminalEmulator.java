@@ -2499,12 +2499,21 @@ public final class TerminalEmulator {
         int offsetDueToCombiningChar = ((displayWidth <= 0 && mCursorCol > 0 && !mAboutToAutoWrap) ? 1 : 0);
         int column = mCursorCol - offsetDueToCombiningChar;
 
-        // Fix TerminalRow.setChar() ArrayIndexOutOfBoundsException index=-1 exception reported
-        // The offsetDueToCombiningChar would never be 1 if mCursorCol was 0 to get column/index=-1,
-        // so was mCursorCol changed after the offsetDueToCombiningChar conditional by another thread?
-        // TODO: Check if there are thread synchronization issues with mCursorCol and mCursorRow, possibly causing others bugs too.
+        // Fix TerminalRow.setChar() ArrayIndexOutOfBoundsException.
+        //
+        // bug #83: the original patch here only clamped the lower bound
+        // (column < 0 → 0). In practice we've seen crashes with column ==
+        // mColumns too, caused by the renderer thread reading mCursorCol
+        // while the input thread is mid-update on the same value. Clamp
+        // both ends so a high-column race can't escape either. Row side
+        // is also clamped because an out-of-range mCursorRow leads to
+        // the same IOOBE one frame later inside mScreen.allocateFullLine.
         if (column < 0) column = 0;
-        mScreen.setChar(column, mCursorRow, codePoint, getStyle());
+        else if (column >= mColumns) column = mColumns - 1;
+        int safeRow = mCursorRow;
+        if (safeRow < 0) safeRow = 0;
+        else if (safeRow >= mRows) safeRow = mRows - 1;
+        mScreen.setChar(column, safeRow, codePoint, getStyle());
 
         if (autoWrap && displayWidth > 0)
             mAboutToAutoWrap = (mCursorCol == mRightMargin - displayWidth);

@@ -44,8 +44,14 @@ object HomeInitializer {
      *        unexpanded $__shelly_cli_dir literals the next time the user
      *        pressed Enter. Wrapped the body in a named function and
      *        launched via `( __shelly_bg_cli_update & )` so the job is
-     *        orphaned and never enters the parent shell's job table. */
-    private const val BASHRC_VERSION = 17
+     *        orphaned and never enters the parent shell's job table.
+     *    18: bug #76 final — ship Alpine minirootfs + rewrite the codex.js
+     *        sed patch to remap the ET_EXEC binaryPath into proot's /root
+     *        view so the binary actually loads. The previous marker was
+     *        just "proot", so we switch to a "shelly-proot" tag to force
+     *        the sed to re-run on installs that already went through the
+     *        old marker. */
+    private const val BASHRC_VERSION = 18
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -56,12 +62,85 @@ object HomeInitializer {
 
         File(home, "projects").mkdirs()
 
-        // Create ~/bin/ with proot wrapper for codex.js spawn() calls
+        // bug #76 final fix: extract Alpine minirootfs so proot has a real
+        // rootfs to mount. Without one, `proot /path/to/static-binary` fails
+        // with "unexpected e_type: 2" because ET_EXEC needs a libc that
+        // proot can mmap through its own loader, and the only way to give
+        // proot a libc is to hand it a rootfs via -r. The rootfs is ~8 MiB
+        // unpacked, shipped as a 3.7 MiB .tar.gz asset.
+        val rootfsDir = File(home, ".shelly-rootfs")
+        val rootfsMarker = File(rootfsDir, "etc/alpine-release")
+        if (!rootfsMarker.exists()) {
+            try {
+                rootfsDir.mkdirs()
+                val assetName = try {
+                    context.assets.open("alpine-rootfs.tar").close(); "alpine-rootfs.tar"
+                } catch (_: Exception) {
+                    "alpine-rootfs.tar.gz"
+                }
+                val isGz = assetName.endsWith(".gz")
+                val tempTar = File(context.cacheDir, assetName)
+                context.assets.open(assetName).use { input ->
+                    tempTar.outputStream().use { output -> input.copyTo(output) }
+                }
+                val pb = ProcessBuilder(
+                    "/system/bin/tar",
+                    if (isGz) "xzf" else "xf",
+                    tempTar.absolutePath,
+                    "-C", rootfsDir.absolutePath,
+                )
+                pb.redirectErrorStream(true)
+                val proc = pb.start()
+                val out = proc.inputStream.bufferedReader().readText()
+                val code = proc.waitFor()
+                tempTar.delete()
+                if (code != 0) {
+                    android.util.Log.e("HomeInitializer", "rootfs tar failed (exit $code): $out")
+                }
+                // Make sure the proot-writable subdirs the wrapper binds into
+                // actually exist; Alpine minirootfs leaves /root and /tmp in
+                // place but we explicitly mkdir them so the bind mount can
+                // land even on stripped rootfs builds.
+                File(rootfsDir, "root").mkdirs()
+                File(rootfsDir, "tmp").mkdirs()
+                File(rootfsDir, "usr/local/bin").mkdirs()
+            } catch (e: Exception) {
+                android.util.Log.e("HomeInitializer", "rootfs extraction failed: ${e.message}")
+            }
+        }
+
+        // bug #76: proot wrapper. The earlier version passed the binary
+        // through as the only argument, which made proot try to load the
+        // ET_EXEC static binary straight into the host address space. That
+        // fails on Android because the binary's LOAD segment at 0x400000
+        // collides with mmap_min_addr, and proot reports it as
+        // "unexpected e_type: 2". The fix is to give proot a rootfs with -r
+        // plus the usual bind mounts so it re-maps the load segments
+        // through its own ptrace-based loader.
+        //
+        //   -0             fake uid 0 (required because musl's geteuid
+        //                  check refuses to run otherwise)
+        //   --kill-on-exit send SIGKILL to the tracee on proot exit
+        //   -r rootfs      use the bundled Alpine minirootfs
+        //   -b /dev        pass through real /dev
+        //   -b /proc       pass through real /proc
+        //   -b /sys        pass through real /sys
+        //   -b $HOME:/root bind Shelly HOME into /root so the user's
+        //                  files and .shelly-cli tree are visible to codex
+        //   -w /root       start in /root
         val binDir = File(home, "bin")
         binDir.mkdirs()
         val prootWrapper = File(binDir, "proot")
-        // Always regenerate to keep in sync with lib path
-        prootWrapper.writeText("#!/system/bin/sh\nexec /system/bin/linker64 $libDir/libproot.so \"\$@\"\n")
+        prootWrapper.writeText(
+            "#!/system/bin/sh\n" +
+            "exec /system/bin/linker64 $libDir/libproot.so " +
+            "-0 --kill-on-exit " +
+            "-r ${rootfsDir.absolutePath} " +
+            "-b /dev -b /proc -b /sys " +
+            "-b ${home.absolutePath}:/root " +
+            "-w /root " +
+            "\"\$@\"\n"
+        )
         prootWrapper.setExecutable(true, false)
 
         // Regenerate .bashrc if version changed
@@ -170,10 +249,14 @@ object HomeInitializer {
             // recognized as a normal Linux target, so pass --include=optional
             // and --os=linux --cpu=arm64 to pull the arm64 build down.
             sb.appendLine("  _run $libDir/node $libDir/node_modules/npm/bin/npm-cli.js install --prefix \"\$__shelly_cli_dir\" --include=optional --os=linux --cpu=arm64 @anthropic-ai/claude-code@latest @google/gemini-cli@latest @openai/codex@latest")
-            sb.appendLine("  # bug #76: patch codex.js to use proot for the ET_EXEC native binary on Android")
+            sb.appendLine("  # bug #76: patch codex.js to run the ET_EXEC native binary through")
+            sb.appendLine("  # proot+Alpine rootfs. The proot wrapper binds \$HOME to /root, so")
+            sb.appendLine("  # the binaryPath (which is always under \$HOME/.shelly-cli) has to be")
+            sb.appendLine("  # rewritten to its /root-view so proot can find it. We do the rewrite")
+            sb.appendLine("  # inline in the spawn call by replacing the \$HOME prefix with /root.")
             sb.appendLine("  __codex_js=\"\$__shelly_cli_dir/node_modules/@openai/codex/bin/codex.js\"")
-            sb.appendLine("  if [ -f \"\$__codex_js\" ] && ! grep -q proot \"\$__codex_js\"; then")
-            sb.appendLine("    _run $libDir/coreutils --coreutils-prog=sed -i 's/spawn(binaryPath, process.argv.slice(2)/spawn(\"proot\", [binaryPath, ...process.argv.slice(2)]/' \"\$__codex_js\"")
+            sb.appendLine("  if [ -f \"\$__codex_js\" ] && ! grep -q 'shelly-proot' \"\$__codex_js\"; then")
+            sb.appendLine("    _run $libDir/coreutils --coreutils-prog=sed -i 's#spawn(binaryPath, process.argv.slice(2)#spawn(\"proot\", [binaryPath.replace(process.env.HOME, \"/root\"), ...process.argv.slice(2)] /*shelly-proot*/#' \"\$__codex_js\"")
             sb.appendLine("  fi")
             // bug #77: neutralize gemini-cli's hardcoded Termux check. The
             // bundle filename includes a content hash (chunk-XXXXX.js) so we

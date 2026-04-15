@@ -98,10 +98,35 @@ Java_expo_modules_terminalemulator_ShellyJNI_createSubprocess(
     };
     ioctl(ptm, TIOCSWINSZ, &ws);
 
-    /* --- Enable UTF-8 on master ---------------------------------- */
+    /* --- Configure termios on master (bug #90) -------------------
+     *
+     * The previous version only flipped IUTF8 on and inherited the rest
+     * of the termios flags from whatever the kernel handed back. On some
+     * Android builds that default state leaves ICRNL off and OPOST off,
+     * so the very first \r written to the PTY from the input side gets
+     * eaten by the line discipline before the child shell has had a
+     * chance to call tcsetattr itself. The visible symptom is the bug
+     * #12 "first Enter does nothing" on a cold session. Explicitly bring
+     * the termios into the same state Termux uses (ICRNL, IXON, IUTF8,
+     * OPOST|ONLCR, ISIG|ICANON|IEXTEN|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE)
+     * before fork() so both master and slave start from a known-good
+     * cooked-mode baseline.
+     */
     struct termios tios;
     if (tcgetattr(ptm, &tios) == 0) {
-        tios.c_iflag |= IUTF8;
+        tios.c_iflag |= (ICRNL | IXON | IUTF8);
+        tios.c_iflag &= ~(IGNCR | INLCR);
+        tios.c_oflag |= (OPOST | ONLCR);
+        tios.c_lflag |= (ISIG | ICANON | IEXTEN | ECHO | ECHOE | ECHOK | ECHOCTL | ECHOKE);
+        tios.c_cflag |= (CREAD | CS8 | HUPCL);
+        tios.c_cc[VINTR]    = 0x03;  /* Ctrl-C */
+        tios.c_cc[VQUIT]    = 0x1c;  /* Ctrl-\ */
+        tios.c_cc[VERASE]   = 0x7f;  /* DEL    */
+        tios.c_cc[VKILL]    = 0x15;  /* Ctrl-U */
+        tios.c_cc[VEOF]     = 0x04;  /* Ctrl-D */
+        tios.c_cc[VSTART]   = 0x11;  /* Ctrl-Q */
+        tios.c_cc[VSTOP]    = 0x13;  /* Ctrl-S */
+        tios.c_cc[VSUSP]    = 0x1a;  /* Ctrl-Z */
         tcsetattr(ptm, TCSANOW, &tios);
     }
 

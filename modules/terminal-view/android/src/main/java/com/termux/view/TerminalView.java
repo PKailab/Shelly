@@ -572,24 +572,55 @@ public class TerminalView extends View {
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
 
-            // bug #37: Samsung/Gboard soft keyboards send KEYCODE_ESCAPE when
-            // the user taps the system "hide keyboard" button. The default
-            // BaseInputConnection path forwards that event through onKeyDown
-            // and into the PTY as the ^[ (ESC) control sequence, which
-            // corrupts the current shell line (and in vim pops out of insert
-            // mode unexpectedly). Shelly is a soft-keyboard-first app, so we
-            // swallow every KEYCODE_ESCAPE that arrives via the IME here.
-            // Users who need a real ESC can still use the Vim key set in
-            // CommandKeyBar (which calls writeToSession("\u001b") directly)
-            // or Ctrl+[ on a hardware keyboard (which takes the onKeyDown
-            // path, not sendKeyEvent).
+            // bug #12: cold-start Enter key double-press. Some IMEs (Gboard
+            // on stock keyboards, Samsung bookcover BT) deliver Enter via
+            // BaseInputConnection.sendKeyEvent() rather than commitText("\n"),
+            // and the default super.sendKeyEvent() path runs its own
+            // onKeyDown route which races the input thread on the very first
+            // keystroke after a session is attached. Intercept Enter here
+            // and push "\r" straight through sendTextToTerminal so the
+            // payload lands on the PTY in a single atomic write — no race,
+            // no missed keystroke. KEYCODE_NUMPAD_ENTER is covered too
+            // because some hardware keyboards report it instead of Enter.
+            //
+            // bug #37 + #84: KEYCODE_ESCAPE policy. Samsung/Gboard soft
+            // keyboards send KEYCODE_ESCAPE when the user taps the "hide
+            // keyboard" button, and letting that reach the PTY corrupts
+            // the line and pops vim out of insert mode. We used to swallow
+            // *all* sendKeyEvent KEYCODE_ESCAPEs unconditionally, but that
+            // also ate the ESC key on hardware/DeX keyboards which legit
+            // send it through this same path on Android 13+. Gate the
+            // swallow on the SOFT_KEYBOARD flag so only virtual keyboards
+            // lose the ESC — physical keyboards fall through to super and
+            // behave correctly.
             @Override
             public boolean sendKeyEvent(KeyEvent event) {
-                if (event.getKeyCode() == KeyEvent.KEYCODE_ESCAPE) {
+                int kc = event.getKeyCode();
+                int action = event.getAction();
+
+                if (action == KeyEvent.ACTION_DOWN &&
+                        (kc == KeyEvent.KEYCODE_ENTER || kc == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+                    sendTextToTerminal("\r");
                     if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
-                        mClient.logInfo(LOG_TAG, "IME: sendKeyEvent(KEYCODE_ESCAPE) swallowed (hide-keyboard button)");
+                        mClient.logInfo(LOG_TAG, "IME: sendKeyEvent(ENTER) intercepted → \\r");
                     }
                     return true;
+                }
+                if (action == KeyEvent.ACTION_UP &&
+                        (kc == KeyEvent.KEYCODE_ENTER || kc == KeyEvent.KEYCODE_NUMPAD_ENTER)) {
+                    // Swallow the UP too so super doesn't re-fire.
+                    return true;
+                }
+
+                if (kc == KeyEvent.KEYCODE_ESCAPE) {
+                    boolean isSoft = (event.getFlags() & KeyEvent.FLAG_SOFT_KEYBOARD) != 0;
+                    if (isSoft) {
+                        if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
+                            mClient.logInfo(LOG_TAG, "IME: sendKeyEvent(ESC) swallowed (soft kb hide button)");
+                        }
+                        return true;
+                    }
+                    // Hardware keyboard ESC — let the normal path run.
                 }
                 return super.sendKeyEvent(event);
             }
