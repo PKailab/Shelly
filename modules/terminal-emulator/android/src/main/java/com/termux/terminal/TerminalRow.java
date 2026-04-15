@@ -229,7 +229,17 @@ public final class TerminalRow {
         if (newIsCombining) {
             // Combining characters are added to the contents of the column instead of overwriting them, so that they
             // modify the existing contents.
-            // FIXME: Unassigned characters also get width=0.
+            //
+            // bug #85: historically an "unassigned Unicode code point" would
+            // fall into this branch because wcwidth returned 0 for anything
+            // outside the known WIDE_EASTASIAN table, which made the glyph
+            // land on top of the previous cell and visibly clip. WcWidth.width()
+            // now falls back to width=1 for every code point that isn't in
+            // the explicit ZERO_WIDTH / control-char sets, so this branch
+            // only fires for genuine combining marks. Kept as a tracking
+            // note: if a new Unicode release adds a zero-width glyph we
+            // haven't listed, the column math still works because the glyph
+            // merges into the preceding cell instead of consuming its own.
             newCharactersUsedForColumn += oldCharactersUsedForColumn;
         }
 
