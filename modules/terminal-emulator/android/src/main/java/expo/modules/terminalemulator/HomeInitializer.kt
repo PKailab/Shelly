@@ -55,8 +55,16 @@ object HomeInitializer {
      *        works (previously only libbash.so via linker64 existed). Also
      *        add install.log for the CLI post-install pipeline so sed
      *        patch failures are visible, and verify the codex.js patch
-     *        actually applied after sed runs. */
-    private const val BASHRC_VERSION = 19
+     *        actually applied after sed runs.
+     *    20: bug #91/#94 — enable readline bracketed-paste handling so
+     *        that multi-line paste blocks from TerminalEmulator.paste()
+     *        are consumed as a single input event instead of being
+     *        executed line-by-line. The emulator always emits \e[200~ ..
+     *        \e[201~ now (regardless of DECSET 2004), and readline parses
+     *        it correctly as long as `set enable-bracketed-paste on` is
+     *        bound. bash 4.4+ defaults to on but we bind explicitly so
+     *        older builds and user overrides still get the behaviour. */
+    private const val BASHRC_VERSION = 20
 
     fun getHomeDir(context: Context): File =
         File(context.filesDir, "home").also { it.mkdirs() }
@@ -191,6 +199,17 @@ object HomeInitializer {
             // with the post-install sed below so a future gemini release that
             // moves to a different gating mechanism still gets neutralised.
             sb.appendLine("export TERMUX_VERSION=shelly")
+            sb.appendLine()
+
+            // bug #91/#94: enable readline bracketed-paste handling. Shelly's
+            // TerminalEmulator.paste() always emits \e[200~ ... \e[201~ around
+            // pasted payloads regardless of DECSET 2004, so that multi-line
+            // pastes arrive as one atomic chunk. readline needs this bind to
+            // recognize the sequence as "paste, don't execute each line". bash
+            // 4.4+ defaults to on but we set it explicitly so older builds and
+            // user .inputrc overrides still get the behaviour.
+            sb.appendLine("# bug #91: ensure readline treats \\e[200~..\\e[201~ as paste")
+            sb.appendLine("bind 'set enable-bracketed-paste on' 2>/dev/null")
             sb.appendLine()
 
             // Linker64 helper function
