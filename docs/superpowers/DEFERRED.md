@@ -71,113 +71,83 @@
 
 ## P0 — 次リリース前の必須対応 (v0.1.0 ブロッカー)
 
-### bug #91 — ペースト時にコマンドが改行で分割される (P0 — 最優先)
+### ✅ bug #91 — ペースト時にコマンドが改行で分割される (修正済: 527a5d3a, 1e976712, bee63869)
 
 **発見**: 2026-04-16 Codex 手動パッチ検証中
-**症状**: 長い単一行シェルコマンドをペーストボタン / コピペで送ると、bash がコマンドの途中で Enter を押されたように受け取って中途実行する。画面上は先頭に `<` が混入し、最初の 1-2 文字が欠落しているように見える (`<cho hello` / `<wn("proot"...`)。
-```
-ユーザー意図: sed -i 's#spawn(binaryPath, process.argv.slice(2)#spawn("proot",...' "$cdj"
-実際の実行:
-  <place(process.env.HOME, "/root"), ...process.argv.slice(2)]
-  > /*shelly-proot*/#' "$cdj"; grep -c shelly-proot "$cdj"; codex --version
-  libbash.so: s#spawn(binaryPath, process.argv.slice(2)#spawn("proot", [binaryPath.replace(proc
-  ess.env.HOME, "/root"), ...process.argv.slice(2)]
-  /*shelly-proot*/#: No such file or directory
-```
-**影響**: **Shelly で Shelly を開発するワークフローが完全に成立しない。** コピペで 1 行シェルコマンドを流し込めない = tmux がない環境で長いコマンドを手打ちする羽目になる。v0.1.0 のセールスポイント「モバイルで開発」が成立しない最大のブロッカー。
-**原因候補**:
-1. クリップボード側に入った時点で既に改行混入している (AI 出力由来の wrap を clipboard manager が改行化して保存)
-2. TerminalEmulator.paste() の CR/LF 正規化が中途半端
-3. bracketed paste モード非使用時に bash が各 CR を即実行している
-4. IME paste 経路と CommandKeyBar paste 経路で処理が分岐していて片方が壊れている
-5. 先頭 `<` 欠落は `\e[200~` の先頭 ESC+`[` が消費されて `2` / `0` / `0` / `~` が欠落し残りが画面に出ている可能性 (bracketed paste シーケンスが半分だけ食われている)
-**再現手順**:
-1. 複雑な文字を含む単一行コマンド (`#`, `'`, `(`, `)` 多用) をクリップボードにコピー
-2. Shelly ターミナルで Paste ボタンまたは system paste
-3. Enter 押下前に bash が途中実行してしまう
-**修正方針**:
-1. 根本調査: `adb logcat` で ShellyTerminalSession.paste() / TerminalEmulator.paste() の入力と出力 byte stream をダンプ
-2. bracketed paste モードを常時有効化 (DECSET 2004 を Shelly 側で強制 ON、もしくは bash 起動時に `bind 'set enable-bracketed-paste on'` を .bashrc に追加)
-3. paste 内容の改行を完全に除去する (CR/LF → 空文字) オプションを追加、もしくはユーザー設定で切替
-4. IME commitText 経路と CommandKeyBar 経路の処理差分を潰す (bug #27 / #58 の時と同じように両方通らせる)
-**優先度**: P0 (v0.1.0 ブロッカー — このバグを直さない限り、Shelly を開発機として使うという当初目的が成立しない)
+**症状**: 長い単一行シェルコマンドをペースト経由で送ると、bash が途中で Enter を押されたように受け取って中途実行する。先頭に `<` 混入、先頭バイト欠落も観測。
+**根本原因**: IME の commitText が paste 由来の複数行テキストを `sendTextToTerminal` の per-char ループに流していた。ループ内で `\n → \r` 変換されて各 CR が PTY に即送信されて bash が逐次実行。CRLF 入力の場合は `\r\r` 列になっていて空コマンドと解釈される問題も。
+**修正内容**:
+- 527a5d3a: IME commitText の multi-line 分岐を追加して `mEmulator.paste()` 経由に変更。TerminalEmulator.paste() を DECSET 無視で常時 bracketed-paste wrap、CRLF → LF 正規化に変更。
+- 1e976712: Session C の audit 推奨設計 (`pasteViaEmulator` ヘルパー) を TerminalView 側に追加。middle-click paste も共通化。
+- bee63869: HomeInitializer の .bashrc 生成に `bind 'set enable-bracketed-paste on'` を追加、BASHRC_VERSION を 20 に bump。
+**優先度**: 元 P0。解決済み → v0.1.0 に含まれる。
 
 ---
 
-### bug #92 — /sdcard 上のシェルスクリプトが読み込み不可 (P0)
+### bug #92 — `/sdcard` 上のシェルスクリプトが読み込み不可 (P0)
 
-**発見**: 2026-04-16 Codex 手動パッチ検証中
-**症状**: `/sdcard/Download/*.sh` を `source`, `.`, `cat ... > ~/file && . ~/file` のいずれで読んでも `Permission denied` になる。`bash` は `command not found` (PATH 外)。
+**発見**: 2026-04-16 Wave L 実機検証 (手動 codex patch 作業中)
+**症状**: Shelly ターミナルから `/sdcard/Download/*.sh` を `source` / `.` / `cat` のいずれで読もうとしても `Permission denied`。
 ```
 ~$ source /sdcard/Download/patch-codex.sh
 libbash.so: /sdcard/Download/patch-codex.sh: Permission denied
-~$ . /sdcard/Download/patch-codex.sh
-libbash.so: /sdcard/Download/patch-codex.sh: Permission denied
-~$ cat /sdcard/Download/patch-codex.sh > ~/patch.sh && . ~/patch.sh
+~$ cat /sdcard/Download/patch-codex.sh > ~/patch.sh
 coreutils: /sdcard/Download/patch-codex.sh: Permission denied
 ```
-**原因**: Android の FUSE 経由 `/sdcard` マウントは MANAGE_EXTERNAL_STORAGE 権限を持たないプロセスから **exec/read が拒否される** (Scoped Storage)。Shelly のプロセスは本来 `MEDIA_*` 権限のみで /sdcard を直接開けない。
-**影響**: ユーザーが sdcard の Download フォルダに置いたスクリプトやファイルを Shelly から読み込めない。ワイヤレスデバッグ経由でスクリプトをデバイスに送り込む標準的なワークフローが機能しない。
-**修正方針**:
-1. Shelly アプリに `MANAGE_EXTERNAL_STORAGE` or SAF 読み書き権限を追加
-2. `/sdcard/Shelly/` のような Shelly 固有のディレクトリを MediaStore 経由で作成し、そこを読める状態にする
-3. Files タブ (Device → Download) で見えるファイルをターミナル側から `~/imported/` にコピーするブリッジを作る
-**優先度**: P0 (外部ファイル取り込み経路が無いと v0.1.1 開発の生産性に直撃)
+**原因**: Android Scoped Storage (API 30+) と FUSE マウント。通常の Android アプリは `READ_EXTERNAL_STORAGE` だけでは `/sdcard` を直接 `open(2)` 出来ない。MediaStore / SAF 経由か、`MANAGE_EXTERNAL_STORAGE` (all-files-access) が必要。現在 `AndroidManifest.xml` は `READ_EXTERNAL_STORAGE` + `WRITE_EXTERNAL_STORAGE` のみで、Expo SDK 54 の既定 targetSdk は 34 なのでレガシー権限は無効。
+**影響**: ADB 経由で `adb push <file> /sdcard/Download` → Shelly 側で source して実行、という**標準のデバッグ / patch 投入ワークフローが完全に詰まる**。本日の手動 codex patch 検証で実際に足止めされた。
+**推奨修正案** (コスト順):
+1. **(a) MANAGE_EXTERNAL_STORAGE 追加** — `app.config.ts` の `permissions` 配列に追加 + 初回起動で `Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION` Intent を投げる Modal。Play Store 非配布 (GitHub Releases / F-Droid) なので審査制約は低い。実装 30 分。**最速。**
+2. **(b) SAF ベースの「ファイルをインポート」UI** — `Intent.ACTION_OPEN_DOCUMENT` で `~/imported/` にコピー。ユーザーが都度選択。スクリプト用途には摩擦が大きいが最も行儀が良い。
+3. **(c) `~/shared/` シンボリック or JNI bridge** — 別アプリから Shelly の private data dir に書く手段が無いため実質不可 (ADB push なら可だが `/sdcard` 経由の利便性が無くなる)。
+**修正方針**: **(a) を採用推奨**。OSS 配布アプリとしては許容範囲。
+**最小実装ポインタ**:
+- `app.config.ts` L44 `permissions:` に `"android.permission.MANAGE_EXTERNAL_STORAGE"` 追加
+- `android/app/src/main/AndroidManifest.xml` に `<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>` 追加 (prebuild で自動生成されない場合は手書き)
+- 初回起動 (SetupWizard or Home mount) で `Environment.isExternalStorageManager()` チェック → false なら Modal + `Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)`
+**優先度**: P0 (開発ワークフロー自体が詰まるため出荷前に解消)
+**担当**: Session C 調査完了、Session A 実装予定。
 
 ---
 
-### bug #93 — bash という名前の実行ファイルが PATH から見えない (P1)
+### ✅ bug #93 — `bash` コマンドが PATH 外 (修正済: 8f44e01c)
 
 **発見**: 2026-04-16 Codex 手動パッチ検証中
-**症状**:
-```
-~$ bash /path/to/script.sh
-libbash.so: bash: command not found
-```
-Shelly は Plan B で bash を libbash.so として bionic ダイナミックリンカ経由で起動しているため、`bash` という名前の exec が `$PATH` 上に存在しない。`source` や `.` は builtin なので動くが、`bash <script>` の形のスクリプト実行が全滅する。
-**影響**: 世の中のスクリプトは大半が `bash foo.sh` で実行するので、npm postinstall, shell installer (oh-my-bash, n, pyenv 等), CI スクリプトが軒並み動かない。
-**修正方針**:
-1. `$HOME/bin/bash` に `exec /system/bin/linker64 $libDir/libbash.so "$@"` のラッパーを配置 (proot wrapper と同じパターン)
-2. `$HOME/bin` を PATH 先頭に追加 (既に通っていれば OK)
-3. `/bin/bash` と `/usr/bin/bash` を `$HOME/bin/bash` への symlink にできるか検討 (root 不要、普通のファイル作成)
-**優先度**: P1 (claude/gemini が動けば v0.1.0 は出せる。v0.1.1 で対応)
+**症状**: Shelly は Plan B で bash を libbash.so として linker64 経由で起動しているため、`bash` という名前の exec が PATH 上に存在しない。`bash script.sh` / `#!/usr/bin/env bash` shebang が軒並み動かない。
+**修正内容** (Session B, 8f44e01c):
+- HomeInitializer.kt に `$HOME/bin/bash` wrapper を配置 (proot wrapper と同じパターンで linker64 経由で libbash.so を起動)
+- `$HOME/bin` は既に PATH 先頭に通っている
+**優先度**: 元 P1。解決済み → v0.1.0 に含まれる。
 
 ---
 
-### bug #94 — Shelly ターミナルのペースト経路の根本設計見直し (P0 調査タスク)
+### ✅ bug #94 — ペースト経路の根本設計見直し (調査完了 + 実装済み)
 
-**発見**: 2026-04-16 セッション全体の教訓
-**症状**: bug #27 (ペースト末尾残留) / #58 (先頭 `:` 混入) / #81 (ペースト先頭バイトクリップ) / #91 (ペースト改行分割) と、**ペースト経路だけで 4 件の独立したバグ** が出ている。修正しても別の症状が別の場所で浮上する = **設計レベルで経路が複雑すぎる**。
-**現在の経路**:
-- A. システムクリップボード (Android ClipboardManager)
-- B. IME commitText (ソフトキーボード経由)
-- C. IME sendKeyEvent (ハードウェアキー)
-- D. CommandKeyBar Paste ボタン → `pasteToSession` JNI
-- E. Middle-click paste (TerminalView onTouchEvent)
-それぞれが CR/LF 正規化 / bracketed paste ラッピング / flush タイミング を **別々に扱っている** ため、1 つのバグ修正が別経路に波及する。
-**修正方針 (本格修正)**:
-1. ペースト処理を単一の `TerminalEmulator.paste(String)` に集約 — IME/CommandKeyBar/TouchEvent すべてここを通す
-2. CR/LF 正規化ロジックを 1 箇所に統一 — bracketed paste 有無で分岐
-3. 単体テストを追加 (`TerminalEmulatorPasteTest`) — 改行・CRLF・ESC シーケンス混入・日本語 IME 入力の 4 ケース
-4. logcat トレースを追加して経路ごとの入力バイトを可視化
-**優先度**: P0 調査 (bug #91 の直接原因特定後、本格修正はこの #94 の枠で対応)
+**発見**: 2026-04-16 Wave L レビュー (bug #27 / #58 / #81 / #91 が全部ペースト経路由来と判明)
+**症状**: ペーストだけで独立バグが 4 件 (先頭バイト欠け / 末尾残留 / 先頭 `:` 混入 / 改行分割)。根本原因は**ペースト経路が 5 つ並列に存在し、それぞれで CR/LF 正規化と bracketed-paste ラッピングの扱いがバラバラ**。
+**調査結果**: `docs/superpowers/specs/2026-04-16-paste-pipeline-audit.md` に 5 経路のマッピング + `TerminalEmulator.paste()` 1 点集約の推奨設計を記載 (Session C commit 9f70d3ac)。
+**要点**:
+- Funnel α (IME commitText 経由) と Funnel β (`TerminalEmulator.paste()` 経由) の 2 本が併存
+- Funnel α は `\n→\r` のみで CRLF を collapse しないため、multi-line paste が `\r\r` 列になる → bug #91 の有力仮説
+- bracketed-paste wrap は Funnel β にしか無い
+**実装結果** (Session A, 1e976712):
+- TerminalView に package-private な `pasteViaEmulator(String)` ヘルパーを追加
+- `commitText` の multi-line 分岐 + middle-click paste を全部このヘルパー経由に集約
+- emulator.paste() は bracketed-paste を DECSET 無視で常時強制 ON (527a5d3a)
+- .bashrc に readline bracketed-paste bind を追加 (bee63869)
+**優先度**: 元 P0 調査。解決済み → v0.1.0 に含まれる。
 
 ---
 
-### bug #95 — Wave L の post-install sed patch が走らない (P1)
+### ✅ bug #95 — Wave L の post-install sed patch が走らない (修正済: 8f44e01c)
 
 **発見**: 2026-04-16 Wave L 実機検証
-**症状**: HomeInitializer.kt の post-install ジョブで codex.js に sed patch を当てる処理が追加されているが、実機で `grep -c shelly-proot codex.js` が 0 を返す = patch が実行されていない。
-**原因候補**:
-1. post-install は `( __shelly_bg_cli_update & )` で背景ジョブ化されており、patch 実行タイミングが npm install 完了前に走っているか、そもそも起動していない
-2. `grep -q 'shelly-proot' codex.js` のガード条件が、マーカー文字列が file 内に無いのに true 判定してしまっている
-3. `_run $libDir/coreutils --coreutils-prog=sed` の invocation が失敗してサイレントスキップ
-**影響**: Wave L の Codex サポートが機能しない。bug #76 の解決が阻まれる。
-**修正方針**:
-1. post-install を同期実行に戻し、ログを `~/.shelly-cli/install.log` に追記してデバッグ可能に
-2. `grep -q` の出力を `|| echo "no shelly-proot marker"` でログに残す
-3. sed invocation 失敗時に exit code をチェックしてエラーログ
-**優先度**: P1 (bug #76 と連動。codex が v0.1.1 送りなら #95 も v0.1.1)
+**症状**: HomeInitializer.kt の post-install ジョブで codex.js に sed patch を当てる処理があるが、実機で `grep -c shelly-proot codex.js` が 0 を返す = patch が実行されていない。
+**修正内容** (Session B, 8f44e01c):
+- post-install 内のログを `~/.shelly-cli/install.log` に書き出し、各ステップ (npm install start/end, codex.js exists check, sed patch exit code, verify) をトレース可能に
+- sed patch 適用後に `grep -q 'shelly-proot'` で検証してログ出力
+- 背景ジョブを同期的な手順に戻し、npm install 完了を待ってから patch
+**優先度**: 元 P1。解決済み → v0.1.0 に含まれる。
 
 ---
 
