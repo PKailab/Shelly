@@ -172,6 +172,18 @@ object HomeInitializer {
         val versionFile = File(home, ".bashrc_version")
         val currentVersion = try { versionFile.readText().trim().toInt() } catch (_: Exception) { 0 }
 
+        // bug #91 follow-up: trace version bump decisions so it's obvious
+        // from logcat whether a launched session is on a stale .bashrc
+        // (e.g. the update logic ran but the file write was blocked, or
+        // BASHRC_VERSION didn't bump). Without this, diagnosing "feature
+        // X was merged but still not in the shell" requires manually
+        // cat'ing ~/.bashrc_version.
+        android.util.Log.i(
+            "HomeInitializer",
+            "bashrc version check: current=$currentVersion target=$BASHRC_VERSION " +
+                "regenerate=${!bashrc.exists() || currentVersion < BASHRC_VERSION}"
+        )
+
         if (!bashrc.exists() || currentVersion < BASHRC_VERSION) {
             // bug #76/#77: when the bashrc version bumps because the install
             // script changed, force the next bash launch to re-run the npm

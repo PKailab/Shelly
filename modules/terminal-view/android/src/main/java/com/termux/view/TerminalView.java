@@ -758,6 +758,15 @@ public class TerminalView extends View {
      */
     void pasteViaEmulator(String text) {
         if (mEmulator == null || text == null || text.isEmpty()) return;
+        // bug #91 diag: callers include IME commitText multi-line, middle-click
+        // mouse paste, CommandKeyBar Paste button. Log every hit so it is
+        // trivial to filter paste-specific issues from noisy typing traces.
+        int nl = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\n' || c == '\r') nl++;
+        }
+        Log.d("ShellyPaste", "pasteViaEmulator len=" + text.length() + " nl=" + nl);
         mEmulator.paste(text);
         mLastImeCommitAt = android.os.SystemClock.uptimeMillis();
         mImeShadow.append(text);
@@ -984,7 +993,9 @@ public class TerminalView extends View {
                             // so the shadow seeding, bracketed-paste wrapping,
                             // and CRLF normalization all happen in one place
                             // shared with the IME commitText path.
-                            pasteViaEmulator(text.toString());
+                            String pasted = text.toString();
+                            Log.d("ShellyPaste", "middle-click len=" + pasted.length());
+                            pasteViaEmulator(pasted);
                         }
                     }
                 }

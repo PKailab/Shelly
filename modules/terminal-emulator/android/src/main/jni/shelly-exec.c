@@ -202,6 +202,12 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
 
     time_t deadline = time(NULL) + timeout_sec;
     int stdout_eof = 0, stderr_eof = 0;
+    /* bug #70 regression guard: count EAGAIN spurious-wake retries so
+     * logcat can confirm the fix is live on real hardware. If we ever
+     * see a stdout buffer come back empty again, the eagain counter
+     * tells us whether the read loop was actually exercised or whether
+     * select fired zero times. */
+    int stdout_eagain = 0, stderr_eagain = 0;
 
     while (!stdout_eof || !stderr_eof) {
         fd_set rfds;
@@ -252,7 +258,11 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
                 stdout_eof = 1;
             } else if (n < 0) {
                 if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                    LOGE("execSubprocess: stdout read error errno=%d (%s)",
+                         errno, strerror(errno));
                     stdout_eof = 1;
+                } else {
+                    stdout_eagain++;
                 }
                 /* else: spurious wake, retry on next select tick */
             } else {
@@ -273,7 +283,11 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
                 stderr_eof = 1;
             } else if (n < 0) {
                 if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                    LOGE("execSubprocess: stderr read error errno=%d (%s)",
+                         errno, strerror(errno));
                     stderr_eof = 1;
+                } else {
+                    stderr_eagain++;
                 }
             } else {
                 stderr_len += n;
@@ -289,8 +303,8 @@ Java_expo_modules_terminalemulator_ShellyJNI_execSubprocess(
     waitpid(pid, &status, 0);
     int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : (WIFSIGNALED(status) ? 128 + WTERMSIG(status) : -1);
 
-    LOGI("execSubprocess: pid=%d exited with code %d, stdout=%zu bytes, stderr=%zu bytes",
-         (int)pid, exitCode, stdout_len, stderr_len);
+    LOGI("execSubprocess: pid=%d exited with code %d, stdout=%zu bytes (eagain=%d), stderr=%zu bytes (eagain=%d)",
+         (int)pid, exitCode, stdout_len, stdout_eagain, stderr_len, stderr_eagain);
 
     /* Build result array: [exitCodeStr, stdout, stderr] */
     jclass strClass = (*env)->FindClass(env, "java/lang/String");

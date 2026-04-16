@@ -2642,11 +2642,33 @@ public final class TerminalEmulator {
      * plain text + Enter" ergonomic for terminals that never opted in.
      */
     public void paste(String text) {
+        if (text == null) return;
+        final int rawLen = text.length();
+
         // First: Always remove escape key and C1 control characters [0x80,0x9F]:
         text = text.replaceAll("(\u001B|[\u0080-\u009F])", "");
 
         // Normalize CRLF → LF first so the payload is consistent.
         text = text.replaceAll("\r\n", "\n");
+
+        // bug #91: paste byte-stream trace. Logs length before/after
+        // normalization, count of newlines, and the first 32 chars so
+        // future paste regressions can be diagnosed from logcat without
+        // needing to reproduce interactively. Tag "ShellyPaste" to keep
+        // it grep-friendly.
+        try {
+            int nlCount = 0;
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (c == '\n' || c == '\r') nlCount++;
+            }
+            String preview = text.length() > 32 ? text.substring(0, 32) + "…" : text;
+            // Replace non-printable chars in preview so the log stays readable.
+            preview = preview.replace('\n', '↵').replace('\r', '⏎').replace('\t', '→');
+            android.util.Log.d("ShellyPaste",
+                "paste(raw=" + rawLen + ", sanitized=" + text.length()
+                + ", nl=" + nlCount + ", preview=\"" + preview + "\")");
+        } catch (Throwable ignore) { /* never let diagnostics break paste */ }
 
         // bug #91: always wrap in bracketed-paste markers. readline-aware
         // shells treat the whole block as one paste event (no per-line

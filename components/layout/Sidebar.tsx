@@ -20,6 +20,7 @@ import { useTheme } from '@/lib/theme-engine';
 import { useSidebarStore } from '@/store/sidebar-store';
 import { normalizePath } from '@/lib/normalize-path';
 import { readDirEntries } from '@/lib/fs-native';
+import { logInfo } from '@/lib/debug-logger';
 import { useAgentStore } from '@/store/agent-store';
 import { useTerminalStore } from '@/store/terminal-store';
 import { deleteAgent } from '@/lib/agent-manager';
@@ -79,6 +80,7 @@ export function Sidebar() {
     const path = rawPath.trim();
     if (!path) return;
     const normalized = normalizePath(path);
+    logInfo('Sidebar', `tryAddRepo raw="${path}" normalized="${normalized}"`);
     // readDirEntries returns [] on missing dir; empty repo is unlikely.
     // To distinguish "empty" from "missing", probe the parent and check
     // whether the basename is present. Still permissive: if the parent is
@@ -92,11 +94,14 @@ export function Sidebar() {
       const parentEntries = await readDirEntries(parent);
       if (parentEntries.length === 0) {
         // Parent unreadable — fall through and accept the add.
+        logInfo('Sidebar', `tryAddRepo parent="${parent}" unreadable, accepting add`);
         exists = true;
       } else {
         exists = parentEntries.some((e) => e.name === basename && (e.type === 'd' || e.type === 'l'));
+        logInfo('Sidebar', `tryAddRepo probe parent="${parent}" basename="${basename}" exists=${exists}`);
       }
-    } catch {
+    } catch (e) {
+      logInfo('Sidebar', `tryAddRepo probe threw: ${String(e)}; accepting add`);
       exists = true; // don't block on probe failure
     }
     if (!exists) {
