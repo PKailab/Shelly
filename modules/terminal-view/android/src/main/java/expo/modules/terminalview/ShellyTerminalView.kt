@@ -95,6 +95,9 @@ class ShellyTerminalView(
         // Black background like a real terminal
         setBackgroundColor(0xFF000000.toInt())
 
+        val padPx = (4 * context.resources.displayMetrics.density).toInt()
+        terminalView.setPadding(padPx, 0, padPx, 0)
+
         terminalView.setTerminalViewClient(this)
         terminalView.isFocusable = true
         terminalView.isFocusableInTouchMode = true
