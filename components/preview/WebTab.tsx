@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/hooks/use-theme';
 import { withAlpha } from '@/lib/theme-utils';
 import { getClickToEditScript, buildSetEditModeMessage, type SelectedElement } from '@/lib/click-to-edit';
-import { EditSheet } from '@/components/chat/EditSheet';
+import { EditSheet } from '@/components/preview/EditSheet';
 
 interface WebTabProps {
   url: string | null;

@@ -155,7 +155,7 @@ Shelly/
 │   ├── use-pane-voice.ts         # ペイン内音声入力
 │   ├── use-command-palette.ts    # コマンドパレット状態
 │   └── use-speech-input.ts       # 録音+文字起こし
-├── chelly/                    # Chat UI OSS切り出し（別リポ予定）
+│   # chelly/ (Chat UI) は v0.1.0 で削除、別リポ切り出し予定、git history に保存
 ├── .github/workflows/
 │   └── build-android.yml
 └── CLAUDE.md
@@ -194,7 +194,7 @@ Shelly/
 | AI PaneルーティングはGroq > Gemini > Perplexity > Local | use-ai-pane-dispatch.tsで分岐 | use-ai-pane-dispatch.ts |
 | APIキーは Settings → API Keys の inline editor | Wizard 廃止、SettingsDropdown に 1 行ずつ masked editor を展開 | components/settings/* |
 | CLI は bashrc post-install で自動 npm install | HomeInitializer.kt の __shelly_bg_cli_update が 24 時間おきに更新 | HomeInitializer.kt |
-| Chat UIをchelly/に分離 | OSS公開予定。ランタイム依存なし | chelly/ |
+| Chat UIはv0.1.0で削除 | 旧 chelly/ は git history に保存。別 repo 切り出し予定 | — |
 | デバッグログ全箇所 | `[Shelly][Module]`形式、logcat対応 | debug-logger.ts |
 | Paste は単一チョークポイント | `TerminalEmulator.paste()` に全経路を funnel。bracketed-paste は DECSET 無視で常時 wrap。readline の bracketed-paste bind を .bashrc で明示 ON | TerminalView.java, TerminalEmulator.java, HomeInitializer.kt |
 | shelly-exec は EAGAIN を retry | select + non-blocking read の spurious wake を EOF と誤認識しない。bug #70 の根治 | shelly-exec.c |
