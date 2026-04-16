@@ -6,7 +6,7 @@
 
 <h3 align="center">
   <code>Terminal + AI + Browser + Markdown + Preview</code><br>
-  <sub>One screen. Five pane types. Zero friction.</sub>
+  <sub>A mobile IDE where the AI reads your terminal. No copy-paste, no tab-switching, no desktop.</sub>
 </h3>
 
 <p align="center">
@@ -39,13 +39,13 @@
 
 ## The Copy-Paste Problem
 
-You're running Claude Code in the terminal. It throws an error. You copy it. You switch to ChatGPT. You paste. You ask "what went wrong?" You read the answer. You copy the fix. You switch back. You paste. You run it.
+You're running an AI coding tool in a terminal — Claude Code, Codex, Gemini, whatever. It throws an error. You copy it. You switch to ChatGPT. You paste. You ask "what went wrong?" You read the answer. You copy the fix. You switch back. You paste. You run it.
 
 **Seven steps. Every single time.**
 
 This is the daily workflow of every developer using CLI-based AI tools. The terminal and the AI live in different worlds, and *you* are the copy-paste bridge between them.
 
-**Shelly puts Terminal and AI panes side by side — and the AI reads your terminal output automatically.**
+**Shelly puts the terminal and the AI side by side. The AI reads your terminal output automatically.**
 
 Say **"fix the error on the right"**. Shelly reads the terminal output, explains the error, and generates an executable command. Tap **[Run]** and the fix lands directly in the Terminal pane.
 
@@ -72,25 +72,9 @@ pnpm install && pnpm android
 >
 > Termux is not required. Shelly ships with bash, Node.js, Python 3, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
 
-On first launch, Shelly asks for **All files access** (`MANAGE_EXTERNAL_STORAGE`). Android's Scoped Storage otherwise blocks the terminal from reading scripts you've adb-pushed to `/sdcard/Download` or anywhere outside the app's private data directory. Approve the permission in Settings and you can `source /sdcard/Download/foo.sh` from the shell immediately. Shelly is distributed via GitHub Releases and F-Droid, not Google Play, so the usual all-files-access audit restrictions do not apply.
+On first launch Shelly asks for **All files access** so the terminal can read scripts in `/sdcard/Download` and anywhere else on your phone. Tap **Allow** and you're done — `source /sdcard/Download/foo.sh` just works. (Shelly is distributed via GitHub Releases and F-Droid, not Google Play, so this permission is fine here.)
 
 After that, the Setup Wizard handles AI configuration. The terminal is ready in under 5 minutes.
-
----
-
-## I can't write code.
-
-I'm not an engineer. I've never written a line of TypeScript. I don't fully understand how Git works internally. I have no formal training in computer science.
-
-But I built this — a mobile terminal IDE — by talking to AI.
-
-Every architectural decision in Shelly is mine. The code is not. It was created through conversation with [Claude Code](https://claude.ai/) on a Samsung Galaxy Z Fold6. I direct. The AI builds. No desktop. No laptop. Just a foldable phone and an AI that can execute commands.
-
-The keyboard you see in the screenshots? I built that too. It's called [Nacre](https://github.com/RYOITABASHI/Nacre) — an Android IME written in Kotlin, also created entirely through AI conversation. I'm typing on it right now, inside Shelly, improving both apps simultaneously.
-
-This is not a portfolio project. This is a tool I use every day to build things. And I'm releasing it as open source — not because the code is perfect, but because I believe this represents a new way of making software.
-
-If you find rough edges in the code, that's expected. **Improvements are not just welcome — they're the reason this is open source.**
 
 ---
 
@@ -110,7 +94,8 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 |---|---|
 | **Cross-pane intelligence** | Say "fix the error." AI reads your terminal, suggests a fix, one tap to run. Zero copy-paste. |
 | **AI Edit golden path** | Tap a file in the sidebar → preview it → hit `[✨ AI]` → describe the change → accept per hunk → the file is rewritten on disk, the preview reloads automatically. |
-| **Native PTY (JNI forkpty)** | Kotlin + C, same-process, zero IPC. The only React Native app with an embedded native terminal. |
+| **Native PTY (JNI forkpty)** | Kotlin + C, same-process, zero IPC. The only React Native app we know of with an embedded native terminal. |
+| **Batteries included** | bash, Node.js, Python 3, git, curl, sqlite3, tmux, vim, ripgrep, jq ship inside the APK. Termux not required. |
 | **5 pane types** | Terminal, AI, Browser (+ background audio), Markdown, Preview. Split up to 4 live panes freely. |
 | **Multi-agent AI** | Claude Code, Gemini, Cerebras, Groq, Perplexity, Codex, Local LLM. Auto-routed or `@mention`. |
 | **Shelly theme preset** | Mock-faithful teal-on-black palette with Silkscreen pixel font. Runtime swap — your shell survives the switch. |
@@ -169,7 +154,7 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 - **Immortal sessions** — tmux keeps your shell alive when the app is backgrounded; resume any session by name
 - **Japanese input in terminal** — compose CJK characters directly in the terminal pane
 - **Silkscreen-rendered glyphs** — native Kotlin terminal view renders the PTY grid in the same Silkscreen font as the rest of the UI
-- **Atomic paste** — all paste paths (IME commitText, middle-click, keybar Paste) funnel through a single `pasteViaEmulator` helper that wraps payloads in bracketed-paste markers (`\e[200~..\e[201~`) unconditionally. Multi-line and complex one-liners arrive as one event; readline executes only the trailing newline
+- **Atomic paste** — all paste paths converge on `TerminalEmulator.paste()`, which wraps payloads in bracketed-paste markers (`\e[200~..\e[201~`) unconditionally. IME multi-line or ≥16-char commits, middle-click mouse paste, and the CommandKeyBar **Paste** key all reach the same normalizer; multi-line and complex one-liners arrive as one event so readline executes only the trailing newline
 
 </details>
 
@@ -227,7 +212,7 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 - **File Tree** — see above; embedded as a section so it flexes with the sidebar height
 - **Tasks** — recent background-agent runs with duration and status
 - **Device** — quick-access folders (`~`, `/sdcard/Download`, …) that re-bind the file tree in one tap
-- **Ports** — every 20 seconds Shelly scans `ss -tlnp` and lists each loopback / wildcard listener; tap a row to open `http://localhost:<port>` in the Browser pane. Well-known ports get friendly labels (`:3000 NEXT.JS`, `:5173 VITE`, `:8081 EXPO`, `:8888 JUPYTER`, …).
+- **Ports** — every 15 seconds Shelly reads `/proc/net/tcp` and `/proc/net/tcp6` directly in-process (JNI fopen) and lists each loopback / wildcard listener; tap a row to open `http://localhost:<port>` in the Browser pane. Well-known ports get friendly labels (`:3000 NEXT.JS`, `:5173 VITE`, `:8081 EXPO`, `:8888 JUPYTER`, …).
 - **Profiles** — saved SSH connections. Tap to insert `ssh -i KEY user@host -p PORT` into the active terminal pane; long-press to edit or delete; `Import from ~/.ssh/config` bulk-adds hosts. Key-file auth only — no passwords or passphrases are persisted.
 
 > **Cloud storage?** Shelly deliberately doesn't ship a Google Drive / Dropbox / OneDrive UI. A terminal app should lean on the tools that already solve this — install [`rclone`](https://rclone.org) from your package manager, run `rclone config` once, and mount or sync any of 40+ cloud backends from the terminal pane.
@@ -291,22 +276,13 @@ Currently registered:
 
 ---
 
-## Coming Soon
-
-Parts of the app are written but not finished. These are on the short-term roadmap, not in the current build:
-
-- **Play Store / F-Droid distribution** — the APK is published via GitHub Releases only; store submission flow not yet done
-- **End-to-end device validation** for voice dialogue, immortal sessions, and background agent AlarmManager scheduling — all wired but not yet smoke-tested on the target device
-
----
-
 ## Status
 
 | Area | State |
 |---|---|
 | Native PTY, sessions, tmux revival | ✅ shipping |
 | Multi-pane layout (5 types, splits, presets, drag resize, empty-state CTA) | ✅ shipping |
-| Atomic paste (bracketed-paste enforced, single `pasteViaEmulator` choke point) | ✅ shipping (bug #91 / #94) |
+| Atomic paste (bracketed-paste enforced, single `TerminalEmulator.paste()` choke point) | ✅ shipping (bug #91 / #94) |
 | `/sdcard` access via `MANAGE_EXTERNAL_STORAGE` (first-launch grant flow) | ✅ shipping (bug #92) |
 | `bash` wrapper at `$HOME/bin/bash` for shebangs and `bash script.sh` | ✅ shipping (bug #93) |
 | `execSubprocess` JNI read loop (EAGAIN vs EOF distinction) | ✅ shipping (bug #70) |
@@ -323,7 +299,7 @@ Parts of the app are written but not finished. These are on the short-term roadm
 | Local LLM via llama.cpp `@local` (Settings · Integrations · Local LLM: catalog, download, start/stop) | ✅ shipping |
 | MCP Servers (Settings · Integrations · MCP Servers) | ✅ shipping |
 | Claude / Gemini CLIs bundled and ready on first launch | ✅ shipping |
-| Codex CLI via Alpine rootfs + proot (ET_EXEC wrapper) | 🟡 code fix shipped, device verification pending (bug #76) |
+| Codex CLI bundled via Alpine rootfs + proot wrapper | ✅ implemented, device smoke-test pending (bug #76) |
 | Arena mode | ✅ wired, under-used — let us know how it feels |
 | Background agents — `@agent` registration, AlarmManager scheduling, Sidebar Tasks list with run-now / delete | ✅ wired, AlarmManager end-to-end smoke test pending |
 | Sidebar Ports monitor (`/proc/net/tcp` → tap to open in Browser pane) | ✅ shipping |
@@ -336,7 +312,28 @@ Full validation checklist: [`docs/superpowers/specs/2026-04-13-validation-checkl
 
 ---
 
+## Coming Soon
+
+Parts of the app are written but not yet verified. These are on the short-term roadmap, not in the current build:
+
+- **Play Store / F-Droid distribution** — the APK is published via GitHub Releases only; store submission flow not yet done
+- **End-to-end device validation** for voice dialogue, immortal sessions, Codex CLI launch via proot, and background agent AlarmManager scheduling — all wired but not yet smoke-tested on the target device
+
+---
+
 ## The Story
+
+### I don't hand-write code.
+
+I'm not an engineer by training — I'm a Creative Director. Every line in this repo was generated by AI under my direction, then reviewed, tested on-device, and shipped. What I bring is twenty years of product judgment about what belongs on a screen and what doesn't — and that turns out to be most of the job.
+
+Every architectural decision in Shelly is mine. The code is not. It was created through conversation with [Claude Code](https://claude.ai/) on a Samsung Galaxy Z Fold6. I direct. The AI builds. No desktop. No laptop. Just a foldable phone and an AI that can execute commands.
+
+The keyboard you see in the screenshots? I built that too. It's called [Nacre](https://github.com/RYOITABASHI/Nacre) — an Android IME written in Kotlin, also created entirely through AI conversation. I'm typing on it right now, inside Shelly, improving both apps simultaneously.
+
+This is not a portfolio project. This is a tool I use every day to build things. If you find something that could be better, that's what the issue tracker is for.
+
+### Why any of this exists
 
 Mobile development never took off — not because phones lack computing power, but because the **input** and **interface** weren't designed for creation.
 
@@ -344,7 +341,20 @@ Chat apps (ChatGPT, Claude, Gemini) can *talk* about code, but they can't *run* 
 
 Shelly fills the gap. You type "make me a portfolio site" in the AI pane, and a real shell runs the commands, generates files, and shows you the results — right next to the terminal that produced them.
 
-### Why Native?
+### Why every design decision is shaped like a question
+
+Every feature in Shelly started as a frustration I had with existing tools:
+
+- The cross-pane system comes from *"Why do I have to copy an error from one window and paste it into another?"*
+- The native terminal comes from *"Why does the terminal die every time I switch apps?"*
+- The approval proxy comes from *"Claude is asking me to approve something in English. I don't know what it means."*
+- The VoiceChain comes from *"I can't type on a phone keyboard fast enough to keep up with my ideas."*
+- The layout system comes from *"Why can't I have a browser, a terminal, and an AI all on the same screen at the same time?"*
+- The Shelly theme preset comes from *"Why do I have to choose between a usable UI and an aesthetically interesting one?"*
+
+Every limitation became an innovation that engineers need just as much.
+
+### Why native — the WebView pivot
 
 Early versions used ttyd and a WebView. WebSocket connections dropped. Android's Phantom Process Killer terminated background processes. Every time you switched apps, the terminal was dead.
 
@@ -424,14 +434,17 @@ Each step is a real module: `lib/open-file.ts`, `lib/ai-edit.ts`, `components/pa
 
 ```mermaid
 flowchart TB
-  JS["React Native JS"] -- "JSI bridge" --> KT["Kotlin NativeModule"]
-  KT -- "JNI call" --> C["shelly-exec.c / shelly-pty.c"]
-  C -- "forkpty()" --> SH["shell process\nbash / zsh / sh"]
-  C -- "read/write fd" --> TV["ShellyTerminalView.kt\nKotlin Canvas renderer"]
+  JS["React Native JS"] -- "Expo Module call" --> KT["Kotlin NativeModule"]
+  KT -- "JNI" --> PTY["shelly-pty.c (forkpty)"]
+  KT -- "JNI" --> EXEC["shelly-exec.c (fork+exec+pipe)"]
+  PTY -- "ptmx / setsid" --> SH["shell process\nbash / zsh / sh"]
+  PTY -- "read/write fd" --> TV["ShellyTerminalView.kt\nKotlin Canvas renderer"]
   TV --> GPU["Android SurfaceView\nGPU composited"]
 ```
 
-No TCP. No sockets. No separate process. The shell runs as a child of the app process via `forkpty`, and the PTY fd is read directly from Kotlin via JNI.
+Two JNI entry points for two different needs. **`shelly-pty.c`** owns interactive shells: it opens `/dev/ptmx`, calls `forkpty`-equivalent logic (`grantpt` + `unlockpt` + `setsid` + `execve` via `/system/bin/linker64`), and hands the master fd back to Kotlin for the terminal view to read. **`shelly-exec.c`** owns programmatic one-shots (`git status`, `ls`, file I/O, AI dispatch helpers): it does a vanilla `fork` + `exec` + `pipe` and returns `{exitCode, stdout, stderr}` synchronously, with an EAGAIN-aware read loop that distinguishes spurious select wakes from genuine EOF (bug #70 fix).
+
+No TCP. No sockets. No separate process. Shells run as children of the app process, and the PTY fd is read directly from Kotlin via JNI.
 
 ### Runtime Theme Swap
 
@@ -462,27 +475,8 @@ The `colors` object is mutable and keeps the same identity, so every `import { c
 | State | Zustand |
 | Navigation | expo-router v6 |
 | Terminal | Native emulator (Kotlin, Termux-derived) + JNI forkpty (C, same-process) |
-| Fonts | Silkscreen (400 + 700) via `@expo-google-fonts/silkscreen`, PressStart2P, system monospace |
+| Fonts | Silkscreen (single weight, via `@expo-google-fonts/silkscreen`) + PressStart2P + system monospace |
 | i18n | expo-localization + Zustand (900+ keys, EN/JA) |
-
----
-
-## Design Philosophy
-
-Shelly was designed by someone who can't use a terminal — for people who can't use a terminal.
-
-Every design decision comes from the question: *"If I don't know what this command does, how should the app protect me and teach me at the same time?"*
-
-The cross-pane system comes from: *"Why do I have to copy an error from one window and paste it into another?"*
-The native terminal comes from: *"Why does the terminal die every time I switch apps?"*
-The approval proxy comes from: *"Claude is asking me to approve something in English. I don't know what it means."*
-The VoiceChain comes from: *"I can't type on a phone keyboard fast enough to keep up with my ideas."*
-The layout system comes from: *"Why can't I have a browser, a terminal, and an AI all on the same screen at the same time?"*
-The Shelly theme preset comes from: *"Why do I have to choose between a usable UI and an aesthetically interesting one?"*
-
-Every limitation became an innovation that engineers need just as much.
-
-Read the full design philosophy: **[docs/DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md)**
 
 ---
 
@@ -518,11 +512,9 @@ Read the contributing guide: **[CONTRIBUTING.md](CONTRIBUTING.md)**
 
 ## Vision
 
-Mobile terminals are about to become standard. Most developers don't see it yet.
+In two years, mobile terminals will be standard. The hardware is already here — 40+ TOPS NPUs, 12 GB of RAM, 7B-parameter models running on-device at interactive speeds — and the only thing missing is the interface. Shelly is a bet on that timeline.
 
-Modern mobile SoCs have NPUs pushing 40+ TOPS. Local LLMs that required a desktop GPU two years ago now run on phones. Soon, 7B-13B parameter models will run natively on mobile at acceptable speeds.
-
-When that happens, you'll have zero-cost AI-assisted development, complete privacy, and development anywhere — airplanes, remote sites, commutes.
+When a full IDE runs in your pocket and the AI doesn't have to phone home, you get zero-cost assisted development, complete privacy, and the ability to ship real software from places no laptop reaches. The first person to ship a production app from a plane without wifi will be using something like this.
 
 Shelly was built for that future. Local LLM routing is already wired. The native terminal is already there. The multi-agent routing already supports local models alongside cloud APIs. The layout system already handles the screen real estate of foldables and tablets.
 
@@ -536,19 +528,21 @@ The question isn't whether mobile development will happen. It's who builds the t
 
 I built Shelly because I wanted to use Claude Code on my phone, but Termux was too intimidating. So I made a chat interface that hides the terminal complexity while keeping its full power. Then I realized the real problem wasn't the terminal itself — it was the gap between the terminal and the AI. So I connected them. Then the WebView kept dying, so I directed the AI to replace the entire rendering layer with a native terminal emulator. Then I realized I needed a browser pane, a markdown viewer, a code preview, a sidebar, and a proper layout system to make it a real IDE.
 
-100,000 lines later, I still can't write code. But I can describe what I need, and the AI builds it.
+100,000 lines later, I still don't hand-write code. I describe what I need, the AI builds it, and I decide whether it ships.
 
 The keyboard in the screenshots is **Nacre** — a split-layout Android IME I built (also through AI) to solve the input problem on mobile. Shelly handles the interface. Nacre handles the input. Together, they make phone-only development actually possible.
 
-Both were developed entirely on a Samsung Galaxy Z Fold6, without ever touching a desktop computer.
+**Both were developed entirely on a Samsung Galaxy Z Fold6, without ever touching a desktop computer.**
 
 ---
 
 ## Known Limitations
 
+Shelly is v0.1.0. Here's what we know isn't perfect yet.
+
 - **No offline mode by default** — Cloud AI features require an internet connection. Local LLM via `@local` works offline, but you must start the llama.cpp server yourself today.
-- **Additional tools beyond the bundle** — Shelly ships with bash, Node.js, Python 3, git, curl, sqlite3, tmux, vim, less, jq, make, and the GNU coreutils set. Notable tools **not** bundled include `busybox`, `watch` (procps-ng), `htop`, `ssh`, and most network daemons. If you need them, install Termux alongside Shelly or open a PR adding the binary to `modules/terminal-emulator/android/src/main/jniLibs/`.
-- **`watch` is broken in the current release** — the bundled `watch` implementation hard-codes `/bin/date` and fails with `unable to open file "/bin/date"` when invoking subcommands. The header refreshes but the command never runs. Workaround: `while true; do clear; <cmd>; sleep 1; done`. Tracked as bug #34.
+- **Additional tools beyond the bundle** — Shelly ships with bash, Node.js, Python 3, git, curl, sqlite3, tmux, vim, less, jq, make, and the GNU coreutils set. Notable tools **not** bundled include `busybox`, `watch` (procps-ng), `htop`, and most network daemons. If you need them, install Termux alongside Shelly or open a PR adding the binary to `modules/terminal-emulator/android/src/main/jniLibs/`.
+- **`watch` is broken in the current release** — the bundled `watch` binary fails to invoke subcommands under Shelly's bionic environment and the watched command never actually runs, even though the header refreshes. Workaround: `while true; do clear; <cmd>; sleep 1; done`. Tracked as bug #34.
 - **`busybox` is not bundled** — `busybox httpd`, `busybox nc`, and other applets return `command not found`. Use the standalone equivalents where available (`curl`, `nc` from the bundle, `python3 -m http.server`), or bundle `busybox-static` yourself. Tracked as bug #35.
 - **`@team` routes to multiple APIs simultaneously** — this consumes credits on every provider at once; a cost warning is shown before execution.
 - **Multi-hunk Accept against a partially-edited file** — per-hunk Accept uses fuzzy re-anchoring so successive hunks land, but if the AI's diff references context that has already been edited to something else, the hunk will be rejected with a toast asking you to regenerate.
