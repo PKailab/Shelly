@@ -98,9 +98,9 @@ Shelly/
 │   ├── CrtOverlay.tsx              # CRTエフェクト（scanlines+phosphor+flicker）
 │   ├── ContextHint.tsx             # 行動トリガーヒント
 │   ├── CommandPalette.tsx          # コマンドパレット（recent+suggested+search）
-│   ├── AuthWizard.tsx              # CLI認証（ブラウザ認証+APIキー）
-│   ├── WelcomeWizard.tsx           # セットアップウィザード（CLI自動インストール対応）
 │   └── VoiceChat.tsx               # フルスクリーン音声モード
+│   # 旧 AuthWizard / WelcomeWizard は廃止。API キーは Settings → API Keys の
+│   # inline editor、CLI 認証は bashrc の post-install pipeline が担当。
 ├── modules/
 │   ├── terminal-emulator/          # JNI forkpty ネイティブモジュール
 │   │   ├── android/src/main/java/  # Kotlin — TerminalEmulatorModule, LibExtractor, ShellyJNI
@@ -192,8 +192,8 @@ Shelly/
 | 設定タブ廃止 → ConfigTUI | 歯車ボタン or `shelly config`。全設定をボトムシートに集約 | ConfigTUI.tsx |
 | APIキーはSecureStore | settings-store.updateSettingsが自動ルーティング | secure-store.ts, settings-store.ts |
 | AI PaneルーティングはGroq > Gemini > Perplexity > Local | use-ai-pane-dispatch.tsで分岐 | use-ai-pane-dispatch.ts |
-| ウェブ認証が正規ルート | APIキーより定額プランのOAuth推奨 | AuthWizard.tsx |
-| CLI自動インストール | WelcomeWizardで`npm install -g`を自動実行 | WelcomeWizard.tsx |
+| APIキーは Settings → API Keys の inline editor | Wizard 廃止、SettingsDropdown に 1 行ずつ masked editor を展開 | components/settings/* |
+| CLI は bashrc post-install で自動 npm install | HomeInitializer.kt の __shelly_bg_cli_update が 24 時間おきに更新 | HomeInitializer.kt |
 | Chat UIをchelly/に分離 | OSS公開予定。ランタイム依存なし | chelly/ |
 | デバッグログ全箇所 | `[Shelly][Module]`形式、logcat対応 | debug-logger.ts |
 | Paste は単一チョークポイント | `TerminalEmulator.paste()` に全経路を funnel。bracketed-paste は DECSET 無視で常時 wrap。readline の bracketed-paste bind を .bashrc で明示 ON | TerminalView.java, TerminalEmulator.java, HomeInitializer.kt |

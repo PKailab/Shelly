@@ -74,7 +74,7 @@ pnpm install && pnpm android
 
 On first launch Shelly asks for **All files access** so the terminal can read scripts in `/sdcard/Download` and anywhere else on your phone. Tap **Allow** and you're done — `source /sdcard/Download/foo.sh` just works. (Shelly is distributed via GitHub Releases and F-Droid, not Google Play, so this permission is fine here.)
 
-After that, the Setup Wizard handles AI configuration. The terminal is ready in under 5 minutes.
+After that, open **Settings → API Keys** (or run `shelly config` from the terminal pane) to paste your Claude / Gemini / Cerebras / Groq / Perplexity keys. Keys are stored in `expo-secure-store` and never written to logs. The terminal is ready in under 5 minutes.
 
 ---
 
@@ -318,6 +318,7 @@ Parts of the app are written but not yet verified. These are on the short-term r
 
 - **Play Store / F-Droid distribution** — the APK is published via GitHub Releases only; store submission flow not yet done
 - **End-to-end device validation** for voice dialogue, immortal sessions, Codex CLI launch via proot, and background agent AlarmManager scheduling — all wired but not yet smoke-tested on the target device
+- **Snippet authoring UI** — the Command Palette shows the first 20 entries from your snippet store and dispatches them to the terminal, but the in-app create/import/edit flow was removed in the v0.1.0 cleanup. Snippets can still be added by editing `~/.shelly/snippets.json` directly or via `shelly config`.
 
 ---
 

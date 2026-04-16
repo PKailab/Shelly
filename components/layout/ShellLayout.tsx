@@ -14,8 +14,6 @@ import { ContextBar } from './ContextBar';
 import { MultiPaneContainer } from '@/components/multi-pane/MultiPaneContainer';
 import { applyLayoutPreset } from '@/components/multi-pane/LayoutPresetSheet';
 import { CommandPalette } from '@/components/CommandPalette';
-// WelcomeWizard kept as import for potential fallback — replaced by shelly setup
-// import { WelcomeWizard, isWizardComplete } from '@/components/WelcomeWizard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { matchKeybinding, type KeyAction } from '@/lib/keybindings';
 import { useTerminalStore } from '@/store/terminal-store';
