@@ -178,30 +178,30 @@ export interface CheckToolResult {
 export async function checkAllTools(
   runCommand: EnvCommandRunner,
 ): Promise<ToolStatus[]> {
-  const results: ToolStatus[] = [];
+  const results = await Promise.all(
+    TOOL_CATALOG.map(async (tool): Promise<ToolStatus> => {
+      try {
+        const checkResult = await runCommand(tool.checkCommand);
+        const installed = checkResult.exitCode === 0;
 
-  for (const tool of TOOL_CATALOG) {
-    try {
-      const checkResult = await runCommand(tool.checkCommand);
-      const installed = checkResult.exitCode === 0;
+        let version: string | undefined;
+        if (installed) {
+          const verResult = await runCommand(tool.versionCommand);
+          version = verResult.stdout?.trim().split('\n')[0] || undefined;
+        }
 
-      let version: string | undefined;
-      if (installed) {
-        const verResult = await runCommand(tool.versionCommand);
-        version = verResult.stdout?.trim().split('\n')[0] || undefined;
+        let running: boolean | undefined;
+        if (installed && tool.statusCommand) {
+          const statusResult = await runCommand(tool.statusCommand);
+          running = statusResult.stdout?.trim() === 'running';
+        }
+
+        return { id: tool.id, installed, version, running };
+      } catch {
+        return { id: tool.id, installed: false };
       }
-
-      let running: boolean | undefined;
-      if (installed && tool.statusCommand) {
-        const statusResult = await runCommand(tool.statusCommand);
-        running = statusResult.stdout?.trim() === 'running';
-      }
-
-      results.push({ id: tool.id, installed, version, running });
-    } catch {
-      results.push({ id: tool.id, installed: false });
-    }
-  }
+    }),
+  );
 
   return results;
 }

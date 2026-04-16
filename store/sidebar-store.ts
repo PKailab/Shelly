@@ -66,7 +66,11 @@ export const useSidebarStore = create<SidebarState>()(
   loadRepos: async () => {
     try {
       const result = await execCommand(
-        'find ~/ -maxdepth 2 -name .git -type d 2>/dev/null | head -20 | sed "s/\\.git$//"'
+        'find ~/ -maxdepth 2 -name .git -type d ' +
+        '-not -path "*/node_modules/*" -not -path "*/.npm/*" ' +
+        '-not -path "*/.cache/*" -not -path "*/.shelly-cli/*" ' +
+        '-not -path "*/.shelly-rootfs/*" ' +
+        '2>/dev/null | head -20 | sed "s/\\.git$//"'
       );
       const paths = result.stdout
         .trim()
