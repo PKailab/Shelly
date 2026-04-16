@@ -2674,9 +2674,16 @@ public final class TerminalEmulator {
         // shells treat the whole block as one paste event (no per-line
         // execution); dumb shells just see the literal markers which is a
         // tolerable cosmetic regression compared to silent data loss.
-        mSession.write("\033[200~");
-        mSession.write(text);
-        mSession.write("\033[201~");
+        //
+        // bug #91 follow-up: the three-write version (prefix / payload /
+        // suffix as separate mSession.write calls) caused a race where
+        // readline consumed the \e[200~ in one PTY read and then saw the
+        // first bytes of the payload arrive in a second read *outside*
+        // the bracketed-paste context, clipping the leading characters.
+        // Concatenating everything into a single write ensures the prefix,
+        // payload, and suffix land in one kernel pipe buffer and are read
+        // atomically by the shell.
+        mSession.write("\033[200~" + text + "\033[201~");
     }
 
     /** http://www.vt100.net/docs/vt510-rm/DECSC */
