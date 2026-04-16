@@ -72,7 +72,9 @@ pnpm install && pnpm android
 >
 > Termux is not required. Shelly ships with bash, Node.js, Python 3, git, curl, and sqlite3. For tools beyond the bundled set, Termux can be used alongside Shelly.
 
-On first launch, the Setup Wizard handles permissions and AI configuration. The terminal is ready in under 5 minutes.
+On first launch, Shelly asks for **All files access** (`MANAGE_EXTERNAL_STORAGE`). Android's Scoped Storage otherwise blocks the terminal from reading scripts you've adb-pushed to `/sdcard/Download` or anywhere outside the app's private data directory. Approve the permission in Settings and you can `source /sdcard/Download/foo.sh` from the shell immediately. Shelly is distributed via GitHub Releases and F-Droid, not Google Play, so the usual all-files-access audit restrictions do not apply.
+
+After that, the Setup Wizard handles AI configuration. The terminal is ready in under 5 minutes.
 
 ---
 
@@ -167,6 +169,7 @@ Termux gives you a terminal but no AI. ChatGPT gives you AI but no terminal. Rep
 - **Immortal sessions** — tmux keeps your shell alive when the app is backgrounded; resume any session by name
 - **Japanese input in terminal** — compose CJK characters directly in the terminal pane
 - **Silkscreen-rendered glyphs** — native Kotlin terminal view renders the PTY grid in the same Silkscreen font as the rest of the UI
+- **Atomic paste** — all paste paths (IME commitText, middle-click, keybar Paste) funnel through a single `pasteViaEmulator` helper that wraps payloads in bracketed-paste markers (`\e[200~..\e[201~`) unconditionally. Multi-line and complex one-liners arrive as one event; readline executes only the trailing newline
 
 </details>
 
@@ -303,19 +306,27 @@ Parts of the app are written but not finished. These are on the short-term roadm
 |---|---|
 | Native PTY, sessions, tmux revival | ✅ shipping |
 | Multi-pane layout (5 types, splits, presets, drag resize, empty-state CTA) | ✅ shipping |
+| Atomic paste (bracketed-paste enforced, single `pasteViaEmulator` choke point) | ✅ shipping (bug #91 / #94) |
+| `/sdcard` access via `MANAGE_EXTERNAL_STORAGE` (first-launch grant flow) | ✅ shipping (bug #92) |
+| `bash` wrapper at `$HOME/bin/bash` for shebangs and `bash script.sh` | ✅ shipping (bug #93) |
+| `execSubprocess` JNI read loop (EAGAIN vs EOF distinction) | ✅ shipping (bug #70) |
 | AI Edit golden path (stage → diff → per-hunk accept → disk writeback) | ✅ shipping, fuzzy re-anchor for successive hunks |
 | FileTree CRUD (create / rename / delete / copy path) | ✅ shipping |
 | Command Palette — tabs, terminal, git, panes, layouts, font, CRT, voice | ✅ shipping |
 | Browser fullscreen, desktop UA toggle, link capture, bookmarks | ✅ shipping |
 | Theme presets — Shelly / Silkscreen / 8-bit / Mono + Dracula / Nord / Gruvbox / Tokyo Night (runtime swap, single-weight Text monkey-patch) | ✅ shipping |
 | AgentBar + Sidebar git dirty badge (single-writer poll) | ✅ shipping |
+| Sidebar Add Repository existence check + Alert on ghost path | ✅ shipping (bug #73) |
+| AI pane Local LLM routing (URL-driven, no enable toggle) | ✅ shipping (bug #68) |
 | Voice dialogue (VoiceChat + VoiceChain + TTS) | ✅ implemented, device smoke-test pending |
 | Immortal sessions (tmux keep-alive) | ✅ implemented, device smoke-test pending |
 | Local LLM via llama.cpp `@local` (Settings · Integrations · Local LLM: catalog, download, start/stop) | ✅ shipping |
 | MCP Servers (Settings · Integrations · MCP Servers) | ✅ shipping |
+| Claude / Gemini CLIs bundled and ready on first launch | ✅ shipping |
+| Codex CLI via Alpine rootfs + proot (ET_EXEC wrapper) | 🟡 code fix shipped, device verification pending (bug #76) |
 | Arena mode | ✅ wired, under-used — let us know how it feels |
 | Background agents — `@agent` registration, AlarmManager scheduling, Sidebar Tasks list with run-now / delete | ✅ wired, AlarmManager end-to-end smoke test pending |
-| Sidebar Ports monitor (`ss -tlnp` → tap to open in Browser pane) | ✅ shipping |
+| Sidebar Ports monitor (`/proc/net/tcp` → tap to open in Browser pane) | ✅ shipping |
 | Sidebar SSH Profiles (key-file auth, ~/.ssh/config import, tap-to-connect) | ✅ shipping |
 | Cloud storage | 🚫 out of scope — use `rclone` from the terminal pane |
 | App icon | ✅ shipping |
@@ -542,6 +553,8 @@ Both were developed entirely on a Samsung Galaxy Z Fold6, without ever touching 
 - **`@team` routes to multiple APIs simultaneously** — this consumes credits on every provider at once; a cost warning is shown before execution.
 - **Multi-hunk Accept against a partially-edited file** — per-hunk Accept uses fuzzy re-anchoring so successive hunks land, but if the AI's diff references context that has already been edited to something else, the hunk will be rejected with a toast asking you to regenerate.
 - **Silkscreen is not monospaced** — `ls -la` columns may drift slightly; switch to the `Mono` font preset from the Command Palette if you need strict columns.
+- **Codex CLI launches via proot** — `@openai/codex` ships as a statically-linked ET_EXEC aarch64 binary that Android's `mmap_min_addr` refuses to load directly. Shelly ships an Alpine minirootfs and a `proot` wrapper; on first launch, the npm post-install pipeline patches `codex.js` to spawn through proot with `$HOME` bind-mounted to `/root`. If `codex --version` fails, check `~/.shelly-cli/install.log` for the `[patch] codex.js patch verified OK` line. Tracked as bug #76 until device verification confirms the fix lands on every supported device.
+- **`/sdcard` access requires MANAGE_EXTERNAL_STORAGE** — Android 11+ Scoped Storage blocks direct `open(2)` on `/sdcard` paths without this permission. Shelly asks for it on first launch; if you deny it, `source /sdcard/Download/foo.sh` will fail with `Permission denied`. Re-grant from system Settings → Apps → Shelly → Permissions → Files and media → Allow management of all files.
 
 ---
 

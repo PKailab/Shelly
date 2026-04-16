@@ -32,6 +32,10 @@
 - **コマンド実行**: `execCommand()` from `hooks/use-native-exec.ts`（JNI fork+exec+pipe）
 - **APIキー**: `lib/secure-store.ts`（expo-secure-store暗号化保存）
 - **設定**: ConfigTUI（歯車ボタン or `shelly config`）— 設定タブは廃止済み
+- **Storage**: `MANAGE_EXTERNAL_STORAGE` を取得して `/sdcard` 直接読み書き（bug #92）。初回起動時に `lib/first-launch-setup.ts` が Intent 経由で権限を要求
+- **Paste 経路**: すべてのペースト（IME commitText / middle-click / CommandKeyBar Paste）は `TerminalView.pasteViaEmulator()` に集約、最終的に `TerminalEmulator.paste()` で bracketed-paste（`\e[200~..\e[201~`）wrap（bug #91 / #94）
+- **Codex CLI**: 静的リンク ET_EXEC バイナリは Alpine minirootfs + proot wrapper 経由で起動。`codex.js` の `spawn()` は bashrc post-install の sed patch で `proot` 経由に書き換え（bug #76 / #95）
+- **bash wrapper**: `$HOME/bin/bash` に linker64 経由の shim を配置して `bash script.sh` や `#!/usr/bin/env bash` shebang を動作させる（bug #93）
 
 ---
 
@@ -192,6 +196,44 @@ Shelly/
 | CLI自動インストール | WelcomeWizardで`npm install -g`を自動実行 | WelcomeWizard.tsx |
 | Chat UIをchelly/に分離 | OSS公開予定。ランタイム依存なし | chelly/ |
 | デバッグログ全箇所 | `[Shelly][Module]`形式、logcat対応 | debug-logger.ts |
+| Paste は単一チョークポイント | `TerminalEmulator.paste()` に全経路を funnel。bracketed-paste は DECSET 無視で常時 wrap。readline の bracketed-paste bind を .bashrc で明示 ON | TerminalView.java, TerminalEmulator.java, HomeInitializer.kt |
+| shelly-exec は EAGAIN を retry | select + non-blocking read の spurious wake を EOF と誤認識しない。bug #70 の根治 | shelly-exec.c |
+| bash は linker64 経由で libbash.so を起動 | Plan B は `bash` という exec が PATH 外なので `$HOME/bin/bash` の wrapper が必要 | HomeInitializer.kt |
+| Codex CLI は Alpine rootfs + proot 経由 | 静的リンク ET_EXEC を Android の mmap_min_addr 制限下で動かすために rootfs をバンドル、proot で chroot | HomeInitializer.kt, assets/alpine-rootfs.tar.gz |
+| /sdcard は MANAGE_EXTERNAL_STORAGE | Scoped Storage 回避、初回起動で Intent 経由ユーザー許可 | app.config.ts, TerminalEmulatorModule.kt, first-launch-setup.ts |
+
+---
+
+## デバッグログタグ（logcat フィルタ用）
+
+`adb logcat -s` で使える Shelly 固有の tag 一覧。スモークテストでのトラブルシューティングに使う:
+
+| タグ | 出力元 | 内容 |
+|------|--------|------|
+| `ShellyPaste` | `TerminalEmulator.paste` / `TerminalView.pasteViaEmulator` | paste 入出力 byte 数、改行数、先頭 32 文字 preview（改行は `↵⏎` に可視化） |
+| `ShellyIME` | `TerminalView` IME 経路 | commitText / setComposingText / deleteSurroundingText / finishComposing の全ログ |
+| `ShellyExec` | `shelly-exec.c execSubprocess` | 子 PID、exit code、stdout/stderr byte 数、EAGAIN 回数 |
+| `ShellyPTY` | `shelly-pty.c createSubprocess` | fork / ptsname / termios 設定結果 |
+| `HomeInitializer` | `HomeInitializer.kt` | .bashrc バージョンチェック、rootfs 展開、proot wrapper 作成 |
+| `TerminalEmulator` | `TerminalEmulatorModule.kt` | hasAllFilesAccess / requestAllFilesAccess の権限状態遷移 |
+| `Sidebar` | `Sidebar.tsx` | tryAddRepo の probe 結果、ghost entry 診断 |
+| `Shelly` | `lib/debug-logger.ts` | `logInfo(module, ...)` 経由の汎用 JS ログ |
+
+**典型的な使い方**:
+
+```bash
+# ペースト問題を追跡
+adb logcat -s ShellyPaste:D ShellyIME:D
+
+# ターミナル起動 / CLI インストール問題
+adb logcat -s HomeInitializer:* ShellyPTY:* ShellyExec:*
+
+# /sdcard 権限問題
+adb logcat -s TerminalEmulator:* Sidebar:*
+
+# 全部
+adb logcat -s ShellyPaste:D ShellyIME:D ShellyExec:D ShellyPTY:D HomeInitializer:D TerminalEmulator:D Sidebar:D Shelly:D
+```
 
 ---
 

@@ -188,3 +188,46 @@ Then:
 - bug #27, #58, #81, #91: see `DEFERRED.md`
 - `TerminalEmulator.paste()`: `modules/terminal-emulator/.../com/termux/terminal/TerminalEmulator.java:2614-2626`
 - Shadow buffer strategy writeup: `TerminalView.java:364-422` (inline comment block)
+
+---
+
+## Implementation result — Session A (commits 527a5d3a, 1e976712, bee63869, 82420590)
+
+Session A が上記推奨設計を丸ごと採用して実装した。diff は 4 コミット:
+
+1. **`fix(terminal): route IME commitText through emulator.paste for multi-line blocks`** (527a5d3a)
+   - `TerminalEmulator.paste()` を DECSET フラグを無視して**常時** `\e[200~..\e[201~` で wrap するように変更
+   - CR normalize を `\r\n → \r` から `\r\n → \n` に変更。bracketed paste 内では readline が LF を期待するため
+   - `TerminalView.BaseInputConnection.commitText()` に paste 判定分岐を追加。`commitStr.length() > 1 && (改行含む || length >= 16)` を満たす場合は `mEmulator.paste()` 経由に回す
+
+2. **`refactor(terminal): unify paste paths through pasteViaEmulator helper`** (1e976712)
+   - `TerminalView` に package-private な `pasteViaEmulator(String)` ヘルパーを追加。本ドキュメントの「Proposed helper」セクションをそのまま実装
+   - `commitText()` と `onTouchEvent()` middle-click の両方を同ヘルパー経由に集約
+   - shadow の末尾保持ロジック（最後の改行以降を維持）を共通化
+
+3. **`fix(bashrc): enable readline bracketed-paste binding`** (bee63869)
+   - `HomeInitializer.kt` の .bashrc 生成に `bind 'set enable-bracketed-paste on' 2>/dev/null` を追加
+   - `BASHRC_VERSION` を 19 → 20 に bump
+   - これで readline が `\e[200~` を本物のペーストシーケンスと認識し、最終 `\n` でのみ execute する
+
+4. **`obs(debug): add diagnostic logs for paste / exec / permissions pipelines`** (82420590)
+   - `ShellyPaste` タグで raw/sanitized byte 数、改行カウント、先頭 32 文字 preview をログ出力
+   - pasteViaEmulator / middle-click にも各入口ログを追加。5 経路のどれを通ったかを logcat で識別可能に
+   - 将来 paste 経路で新しいバグが出ても logcat 1 発で診断できる観測性を確保
+
+### Open questions — resolution
+
+| 元の質問 | 回答 |
+|---|---|
+| Gboard の clipboard popup で短い単発 paste | 閾値 `length >= 16 || 改行含む` が kick in しない → 従来の per-char 経路に落ちる。短い paste では問題が発生しないので OK |
+| IME が paste を N 個の commitText に分割するケース | 現時点では Samsung BT keyboard / Typeless / Gboard では観測されず。分割された場合も各 chunk が 16 文字以上 or 改行含む限り paste 分岐に入る。完全分割 paste 対応は要確認 (将来 bug #96 として登録候補) |
+| CRLF 特有かどうか | `\r\n → \n` 正規化で対応。CR 単独 (旧 Mac スタイル) は そのまま bracketed paste 内で readline が処理する |
+
+### Verification path
+
+1. `ShellyPaste` タグ logcat をフィルタして `adb logcat -s ShellyPaste:D`
+2. Shelly ターミナルに複雑な sed コマンド (`sed -i 's#foo#bar#' /tmp/x` など) を貼り付け
+3. logcat で `pasteViaEmulator len=N nl=0 preview="sed -i 's#foo#bar#' /tmp/x"` のような 1 行が出れば paste 経路に正しく入っている
+4. bash プロンプトで改行なし 1 コマンドとして全文が入力された状態になり、Enter で 1 回実行されれば修正は完全に機能している
+
+paste 経路はこの設計で「単一チョークポイント」が達成された。将来 entry point を追加する時も必ず `TerminalView.pasteViaEmulator()` を通すこと。drift すると bug #94 の再発となる。
