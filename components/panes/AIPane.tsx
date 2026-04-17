@@ -35,6 +35,7 @@ import { useTheme } from '@/lib/theme-engine';
 import type { ChatMessage } from '@/store/chat-store';
 import PaneInputBar from '@/components/panes/PaneInputBar';
 import InlineDiff, { hasDiffContent } from '@/components/panes/InlineDiff';
+import { CodeBlockWithAction, splitFencedCode } from '@/components/panes/CodeBlockWithAction';
 import { useAIPaneDispatch } from '@/hooks/use-ai-pane-dispatch';
 import VoiceWaveform from '@/components/panes/VoiceWaveform';
 import { usePaneVoice } from '@/hooks/use-pane-voice';
@@ -161,7 +162,24 @@ const MessageBubble = React.memo(function MessageBubble({
         {containsDiff ? (
           <InlineDiff content={displayText} />
         ) : (
-          <Text style={bubbleStyles.assistantText} selectable>{displayText}</Text>
+          // Render fenced code blocks as CodeBlockWithAction so users get
+          // COPY + INSERT-to-terminal actions per block. Prose outside the
+          // fences renders as plain selectable text. While the response is
+          // still streaming we skip the parse and show raw text — fenced
+          // regex would fire on an unclosed ``` and hide content.
+          isLastStreaming ? (
+            <Text style={bubbleStyles.assistantText} selectable>{displayText}</Text>
+          ) : (
+            splitFencedCode(displayText).map((seg, i) =>
+              seg.kind === 'code' ? (
+                <CodeBlockWithAction key={i} lang={seg.lang} code={seg.content} />
+              ) : (
+                <Text key={i} style={bubbleStyles.assistantText} selectable>
+                  {seg.content}
+                </Text>
+              ),
+            )
+          )
         )}
         {isLastStreaming && <StreamingDots color="#6B7280" />}
       </View>
