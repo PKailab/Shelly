@@ -262,9 +262,13 @@ export function ProfilesSection() {
 }
 
 const styles = StyleSheet.create({
+  // Font sizes below use F.sidebarItem.size so Profiles visually aligns
+  // with TASKS / REPOSITORIES / FILE TREE / DEVICE / PORTS. Previously
+  // these styles hard-coded 10/9/11 which made the section read as
+  // noticeably larger than every other sidebar section.
   emptyText: {
     fontFamily: F.family,
-    fontSize: 11,
+    fontSize: F.sidebarItem.size,
     paddingHorizontal: 12,
     paddingVertical: 6,
     fontStyle: 'italic',
@@ -278,26 +282,26 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   profileSquare: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: 2,
   },
   profileIcon: {
-    width: 16,
+    width: 12,
   },
   profileText: {
     flex: 1,
   },
   profileName: {
     fontFamily: F.family,
-    fontSize: 10,
+    fontSize: F.sidebarItem.size,
     fontWeight: '700',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   profileHost: {
     fontFamily: F.family,
-    fontSize: 9,
+    fontSize: F.sidebarItem.size,
     marginTop: 1,
   },
   actionBtn: {
@@ -313,7 +317,7 @@ const styles = StyleSheet.create({
   },
   actionBtnText: {
     fontFamily: F.family,
-    fontSize: 11,
+    fontSize: F.sidebarItem.size,
   },
   // Modal
   modalOverlay: {
