@@ -426,7 +426,14 @@ export function Sidebar() {
           iconsOnly={iconsOnly}
         >
           {portEntries.length === 0 ? (
-            <Text style={styles.portEmpty}>No listeners</Text>
+            // Honest fallback: Android 10+ blocks reads of /proc/net/tcp{,6}
+            // from untrusted_app context (bug #99). Until we ship a Netlink
+            // SOCK_DIAG JNI path the list is permanently empty on modern
+            // devices — say so instead of "No listeners" which read as
+            // "everything's fine, just quiet".
+            <Text style={styles.portEmpty}>
+              Listener detection unavailable on Android 10+ (SELinux).
+            </Text>
           ) : (
             portEntries.map((entry) => {
               // Color map: Expo ports go sky, everything else green.

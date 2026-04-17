@@ -278,6 +278,31 @@ error: "/data/data/dev.shelly.terminal/files/home/.shelly-cli/node_modules/@open
 
 ---
 
+### bug #99 — PORTS が Android 10+ で listener を検知しない (SELinux 再発)
+
+**発見**: 2026-04-17 サイドバー機能検証中、ユーザー実機 (Galaxy Z Fold6 / Android 16)
+**症状**: 自前のプロセスが listen しているポート (例: `node -e ... listen(3000)`) が PORTS セクションに全く出ない。
+**原因**: Android 10+ の SELinux ポリシーが `/proc/net/tcp{,6}` と `/proc/self/net/tcp{,6}` の両方をアプリから読めないようブロックしている。bug #36 で導入した JNI 直読 (fopen in-process) も blocked:
+```
+coreutils: /proc/net/tcp6: Permission denied
+coreutils: /proc/self/net/tcp6: Permission denied
+```
+**bug #36 との関係**: #36 は「bash 経由で cat すると exit=1 になる」問題の回避策として JNI 直読に切り替えたが、どちらも SELinux の最終段階で同じ `EACCES` を返すだけで、問題の根っこは解決していなかった。Android 10+ では app_data_file コンテキストからの procfs 読みはそもそも許可されない。
+**修正方針候補**:
+1. **NETLINK_SOCK_DIAG JNI 実装** (50-100 LoC の C): `socket(AF_NETLINK, SOCK_DGRAM, NETLINK_SOCK_DIAG)` → `inet_diag_req_v2` で listen socket を query。Android の SELinux が Netlink SOCK_DIAG を許可しているか要確認 (`untrusted_app` コンテキストでは塞がれている可能性あり)。
+2. **Track own listen() calls**: アプリ自身が呼んだ `listen()` をフックして記録 (`LD_PRELOAD` 不可なので JNI ラッパー経由)。PTY 子プロセスの socket までは見えない。
+3. **`ss` バイナリをバンドル + busybox ベースで実行**: 結局 Netlink 経由になるので (1) と同じ問題。
+4. **機能廃止 → 別の "デバイスモニター" 機能に置換**: 例えば「アプリが動かしている background process 一覧」「最近 shelly が実行したコマンドの最新 exit code」等。
+**現状の影響**: PORTS セクションは常に "No listeners" 表示。サイドバーのノイズになるだけで害は無いが機能していない。
+**v0.1.0 では**: サイドバーから隠すか、"Not available on Android 10+" プレースホルダに置き換える小パッチを推奨。
+**優先度**: P1 (ユーザー可視の壊れ機能。v0.1.1 で Netlink 実装 or 機能置換を決定)
+**関連コード**:
+- `store/ports-store.ts` (パース)
+- `components/layout/Sidebar.tsx:133-151` (ポーリング)
+- `modules/terminal-emulator/android/src/main/jni/shelly-exec.c:372` (`readProcNetFile` JNI)
+
+---
+
 ## P2 — 2 リリース先 (v0.2.0 milestone)
 
 ### GitHub Issues 登録済み
