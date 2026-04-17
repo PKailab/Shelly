@@ -14,6 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import TerminalEmulator from '@/modules/terminal-emulator/src/TerminalEmulatorModule';
 import { useTerminalStore } from '@/store/terminal-store';
+import { getStagedEdit, applyStagedEdit } from '@/lib/ai-edit';
 import { colors as C, fonts as F } from '@/theme.config';
 
 type Props = {
@@ -25,6 +26,31 @@ function isShellLike(lang?: string): boolean {
   if (!lang) return false;
   const l = lang.toLowerCase();
   return l === 'bash' || l === 'sh' || l === 'zsh' || l === 'shell' || l === 'console' || l === 'terminal';
+}
+
+function langMatchesFile(lang: string | undefined, path: string): boolean {
+  if (!lang) return false;
+  const ext = path.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  if (!ext) return false;
+  const l = lang.toLowerCase();
+  // Accept the exact extension plus common aliases so ```typescript and
+  // ```ts both count as "this block is user.ts-compatible".
+  const aliases: Record<string, string[]> = {
+    ts: ['ts', 'typescript'],
+    tsx: ['tsx', 'typescriptreact'],
+    js: ['js', 'javascript'],
+    jsx: ['jsx', 'javascriptreact'],
+    py: ['py', 'python'],
+    rb: ['rb', 'ruby'],
+    go: ['go', 'golang'],
+    rs: ['rs', 'rust'],
+    md: ['md', 'markdown'],
+    yml: ['yml', 'yaml'],
+    yaml: ['yml', 'yaml'],
+    json: ['json', 'jsonc'],
+    sh: ['sh', 'bash', 'shell'],
+  };
+  return (aliases[ext] ?? [ext]).includes(l);
 }
 
 export function CodeBlockWithAction({ lang, code }: Props) {
@@ -65,11 +91,33 @@ export function CodeBlockWithAction({ lang, code }: Props) {
   }, [trimmed]);
 
   const canInsert = isShellLike(lang);
+  // If the AI pane has a staged file whose extension matches this block's
+  // language, surface an APPLY button that writes the block to that file.
+  // Primarily a fallback for when the model ignored the "respond with diff"
+  // instruction and emitted the whole file as a ```ts fence instead — still
+  // lets the user accept with one tap.
+  const staged = getStagedEdit();
+  const canApplyToFile =
+    staged != null && !canInsert && langMatchesFile(lang, staged.path);
+
+  const handleApplyToFile = useCallback(async () => {
+    if (!staged) return;
+    const err = await applyStagedEdit(trimmed);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(
+        err === null ? `Wrote ${staged.path}` : `Apply failed: ${err}`,
+        ToastAndroid.SHORT,
+      );
+    }
+  }, [staged, trimmed]);
 
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.lang}>{lang ? lang.toLowerCase() : 'code'}</Text>
+        <Text style={styles.lang}>
+          {lang ? lang.toLowerCase() : 'code'}
+          {canApplyToFile && staged ? `  ·  ${staged.path.split('/').pop()}` : ''}
+        </Text>
         <View style={styles.actions}>
           <Pressable onPress={handleCopy} style={styles.btn} hitSlop={6} accessibilityLabel="Copy code">
             <MaterialIcons name="content-copy" size={12} color={C.text2} />
@@ -79,6 +127,12 @@ export function CodeBlockWithAction({ lang, code }: Props) {
             <Pressable onPress={handleInsert} style={[styles.btn, styles.btnPrimary]} hitSlop={6} accessibilityLabel="Insert into terminal">
               <MaterialIcons name="arrow-forward" size={12} color={C.btnPrimaryText} />
               <Text style={[styles.btnLabel, styles.btnLabelPrimary]}>INSERT</Text>
+            </Pressable>
+          ) : null}
+          {canApplyToFile ? (
+            <Pressable onPress={handleApplyToFile} style={[styles.btn, styles.btnPrimary]} hitSlop={6} accessibilityLabel="Apply to staged file">
+              <MaterialIcons name="save" size={12} color={C.btnPrimaryText} />
+              <Text style={[styles.btnLabel, styles.btnLabelPrimary]}>APPLY</Text>
             </Pressable>
           ) : null}
         </View>
