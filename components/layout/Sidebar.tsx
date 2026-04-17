@@ -316,7 +316,9 @@ export function Sidebar() {
             </>
           )}
           {runningAgents.length === 0 && recentTasks.length === 0 && agents.length === 0 && (
-            <Text style={styles.tasksEmpty}>Use @agent to create background agents</Text>
+            <Text style={styles.tasksEmpty}>
+              Type `@agent status` in an AI pane to manage background agents.
+            </Text>
           )}
         </SidebarSection>
 

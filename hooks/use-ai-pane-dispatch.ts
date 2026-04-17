@@ -21,6 +21,9 @@ import { geminiChatStream, GEMINI_DEFAULT_MODEL } from '@/lib/gemini';
 import { perplexitySearchStream, PERPLEXITY_DEFAULT_MODEL } from '@/lib/perplexity';
 import { cerebrasChatStream, CEREBRAS_DEFAULT_MODEL } from '@/lib/cerebras';
 import { claudeCliStream } from '@/lib/claude-cli';
+import { parseInput } from '@/lib/input-router';
+import { parseAgentCommand, createAgent } from '@/lib/agent-manager';
+import { suggestTool } from '@/lib/agent-tool-router';
 import type { GroqMessage } from '@/lib/groq';
 import type { GeminiMessage } from '@/lib/gemini';
 import type { CerebrasMessage } from '@/lib/cerebras';
@@ -235,6 +238,47 @@ export function useAIPaneDispatch(paneId: string) {
         agent: agent as ChatMessage['agent'],
       };
       store.addMessage(paneId, userMsg);
+
+      // bug: @agent used to only be wired into TerminalPane.onBlockCompleted,
+      // so typing `@agent status` in the AI pane fell through to the LLM
+      // (which has no idea what it means). The AI pane is the natural home
+      // for @mention commands — intercept here and run the agent-manager
+      // handler inline, appending a synthetic assistant message with the
+      // result so the UX matches every other chat response.
+      const parsed = parseInput(userText);
+      if (parsed.layer === 'mention' && parsed.target === 'agent') {
+        let resultMessage: string;
+        try {
+          const agentResult = parseAgentCommand(parsed.prompt);
+          if (agentResult.type === 'create') {
+            const promptText = agentResult.message;
+            const firstWord = promptText.split(/\s+/)[0] || 'agent';
+            const name = firstWord.replace(/[^a-zA-Z0-9_-]/g, '') || `agent-${Date.now().toString(36)}`;
+            const suggestion = agentResult.data?.suggestion ?? suggestTool(promptText);
+            const created = createAgent({
+              name,
+              description: promptText.slice(0, 120),
+              prompt: promptText,
+              schedule: null,
+              tool: suggestion.tool,
+              outputPath: `$HOME/.shelly/agents/${name}/output.md`,
+            });
+            resultMessage = `✅ Agent "${created.name}" registered (${suggestion.label}).\nRun it with: @agent run ${created.name}`;
+          } else {
+            resultMessage = agentResult.message;
+          }
+        } catch (err) {
+          resultMessage = `[@agent] error: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        store.addMessage(paneId, {
+          id: generateId(),
+          role: 'assistant',
+          content: resultMessage,
+          timestamp: Date.now(),
+          agent: agent as ChatMessage['agent'],
+        });
+        return;
+      }
 
       // ── Snapshot terminal context ──
       const terminalCtx = getTerminalSnapshot();
